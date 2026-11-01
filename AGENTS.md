@@ -15,6 +15,17 @@ It enforces operational modes (`local-only`, `cloud-only`, `local-first`) so clo
 - Canonical agent definitions live as Markdown + YAML frontmatter. Mapping to provider-specific formats is name-based.
 - MVP focuses on OpenCode (local + OpenRouter via LiteLLM, plus direct OpenCode runs). Other native CLIs and Pi support come later.
 
+## Git workflow
+
+All agents must follow the multi-agent Git workflow documented in [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md):
+
+- No direct commits to `main`. Use a feature branch per task.
+- Open a PR to `main` when the task is complete (this triggers an automatic Grok review).
+- Address critical/high findings and request re-review with `/grok review` if needed.
+- Minor/nitpick findings do not require re-review.
+- Maximum 3 Grok reviews per PR; after that, hand off to a human.
+- On clean approval: merge, delete remote branch, then locally `git checkout main && git pull --prune && git branch -d <branch>`.
+
 ## Operational modes
 
 Always respect the mode passed via CLI (and, later, per-prompt front-matter):
@@ -30,6 +41,7 @@ Support primary agent, specialized agent (reviewer/debater/etc.), and fallback (
 ## File layout expectations (evolving)
 
 - Design decisions: `DECISIONS.md`
+- Git workflow: `docs/GIT_WORKFLOW.md`
 - Agent definitions (once implemented): `agents/*.md`
 - Configuration: harness config file (schema still to be finalized)
 
@@ -38,6 +50,7 @@ Support primary agent, specialized agent (reviewer/debater/etc.), and fallback (
 - Prefer the dual-path executor design already agreed (LiteLLMExecutor + NativeCLIExecutor).
 - Keep the CLI surface small for MVP: `--mode`, optional `--model`, `--agent`, `--fallback`, `--harness`, `--no-sync`.
 - Document any deviation from the decisions in `DECISIONS.md`.
+- Follow the Git workflow above for all code changes.
 
 ## Memory
 
