@@ -24,6 +24,7 @@ Complete documentation and decide on scaffolding next steps (language, config sc
 - [x] docs/ARCHITECTURE.md
 - [x] docs/IMPLEMENTATION.md
 - [x] docs/FRAMEWORKS.md
+- [x] docs/GIT_WORKFLOW.md
 - [x] PROJECT.md (this file)
 
 ### Phase 1 — Scaffolding
@@ -75,3 +76,4 @@ Complete documentation and decide on scaffolding next steps (language, config sc
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 - [docs/FRAMEWORKS.md](docs/FRAMEWORKS.md)
+- [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md)
