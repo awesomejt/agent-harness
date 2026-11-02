@@ -73,6 +73,8 @@ for line in sys.stdin:
                 break
         else:
             marker = 'AH_PROJECT_INSTRUCTIONS_OK' if scenario == 'instruction' else 'AH_ACP_LIFECYCLE_OK'
+            if failure == 'oversized-text':
+                marker = 'x' * 100_001
             send({'jsonrpc': '2.0', 'method': 'session/update', 'params': {
                 'sessionId': 'wrong' if failure == 'wrong-session' else 'fixture-session',
                 'update': {'sessionUpdate': 'agent_message_chunk', 'content': {'type': 'text', 'text': marker}}}})

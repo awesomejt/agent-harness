@@ -22,6 +22,7 @@ use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 struct BoundedRead<R> {
     inner: R,
     left: usize,
+    violation: Arc<Violation>,
 }
 impl<R: AsyncRead + Unpin> AsyncRead for BoundedRead<R> {
     fn poll_read(
@@ -30,12 +31,14 @@ impl<R: AsyncRead + Unpin> AsyncRead for BoundedRead<R> {
         buf: &mut ReadBuf<'_>,
     ) -> std::task::Poll<io::Result<()>> {
         if self.left == 0 {
+            self.violation.fail();
             return std::task::Poll::Ready(Err(io::Error::other("protocol byte limit")));
         }
         let before = buf.filled().len();
         let result = std::pin::Pin::new(&mut self.inner).poll_read(cx, buf);
         let read = buf.filled().len() - before;
         if read > self.left {
+            self.violation.fail();
             self.left = 0;
             return std::task::Poll::Ready(Err(io::Error::other("protocol byte limit")));
         }
@@ -160,16 +163,17 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut owned = OwnedChild { child, group };
     let input = owned.child.stdin.take().ok_or("no stdin")?;
     let output = owned.child.stdout.take().ok_or("no stdout")?;
+    let violation = Arc::new(Violation::default());
     let transport = ByteStreams::new(
         input.compat_write(),
         BoundedRead {
             inner: output,
             left: 2_000_000,
+            violation: violation.clone(),
         }
         .compat(),
     );
     let observed = Arc::new(Mutex::new(Observed::default()));
-    let violation = Arc::new(Violation::default());
     let notification_failure = violation.clone();
     let permission_failure = violation.clone();
     let notifications = observed.clone();

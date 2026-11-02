@@ -239,7 +239,7 @@ def fixtures():
                               ('text', 'wrong-session'), ('deny', 'duplicate-options'),
                               ('deny', 'no-denial'), ('deny', 'send-failure'), ('text', 'oversized'),
                               ('text', 'unexpected-fs'), ('text', 'deadline'), ('text', 'interrupt'),
-                              ('text', 'early-notification')]:
+                              ('text', 'early-notification'), ('text', 'oversized-text')]:
         with project('fixture', 'http://127.0.0.1:9/v1', 'sentinel', scenario) as (cwd, env, target, *_):
             (cwd / 'fixture.json').write_text(json.dumps({'scenario': scenario, 'failure': failure}))
             # Environment poisoning must not survive Rust's allowlist.
@@ -273,7 +273,7 @@ def fixtures():
             expected_success = failure in (None, 'no-denial', 'early-notification')
             if (result.returncode == 0) != expected_success:
                 raise RuntimeError('fixture outcome: ' + scenario + '/' + str(failure))
-            if failure in ('duplicate-options', 'unexpected-fs', 'wrong-session') and 'protocolViolation' not in result.stdout:
+            if failure in ('duplicate-options', 'unexpected-fs', 'wrong-session', 'oversized', 'oversized-text') and 'protocolViolation' not in result.stdout:
                 raise RuntimeError('client did not reject the protocol violation')
             pids = json.loads((cwd / 'pids.json').read_text())
             deadline = time.monotonic() + 3
