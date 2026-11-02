@@ -10,7 +10,7 @@ Rust and prebuilt binaries are accepted. A Python scaffold, embedded Python agen
 
 ## Proposed package structure
 
-Start with one Cargo package, a thin executable entry point and a library/module boundary usable by tests. Do not create a multi-crate workspace solely to mirror this table. The Cargo package name, Rust edition/MSRV and initial target are finalized in Phase 1; `ah` remains the binary command.
+Start with one Cargo package, a thin executable entry point and a library/module boundary usable by tests. Do not create a multi-crate workspace solely to mirror this table. P1.1 selects `awesomejt-agent-harness`, the `ah` binary, Rust 2024 / MSRV 1.85, and `aarch64-apple-darwin` as the initial verified development target (D019). The scaffold has `src/main.rs` over a testable `src/lib.rs` informational argument boundary, with no external dependencies. Remaining modules below are proposals, introduced only when their consuming task needs them.
 
 | Proposed module | Responsibility | Dependency direction / first phase |
 |---|---|---|

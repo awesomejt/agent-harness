@@ -4,16 +4,16 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 
 ## Current state
 
-- Active phase: 1 — integration experiment ready to start; no implementation started.
-- Active implementation task/PR: none. Default work-in-progress limit: one focused task/PR.
-- Phase 0 holistic review P0.13: pass recorded in [review report](docs/reviews/phase-00.md), effective on PR #5 merge. Next ready implementation task: P1.1, then P1.6 permission policy → P1.2 transport experiment.
+- Active phase: 1 — integration experiment started; minimal Rust scaffold implemented (P1.1 completion effective on this PR merge).
+- Active implementation task/PR: P1.1 on `feature/p1-1-rust-scaffold`; PR pending. Default work-in-progress limit: one focused task/PR.
+- Phase 0 holistic review P0.13: pass recorded in [review report](docs/reviews/phase-00.md), effective on PR #5 merge. Next after P1.1 merge: P1.6 permission policy → P1.2 transport experiment.
 - External prerequisites: CLI versions, LiteLLM/model availability and login are unverified; no external blocker has been diagnosed by this planning pass.
-- Remaining implementation/review backlog: 59 tasks across Phases 1–9; Phase 9 increments remain demand-gated.
+- Remaining implementation/review backlog after this PR merges: 58 tasks across Phases 1–9; Phase 9 increments remain demand-gated.
 - Phase 0 PR #1 review: received 0 blockers, 2 concerns, and 2 nits; all four addressed. No critical/high findings; no re-review required under docs/GIT_WORKFLOW.md.
-- Implementation: none yet.
+- Implementation: dependency-free Rust package and informational `ah` binary; coding runs are not implemented.
 - Direction: Rust CLI with prebuilt binaries; OpenCode first, LiteLLM route plus native route.
 - Execution plan: [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); per-task dependencies, boundaries and evidence: [tasks/README.md](tasks/README.md). Feature/contract review (PR #2) and Rust architecture/alignment review (PR #3) are complete; task-planning review (PR #4) is complete: 0 blockers, 1 concern and 2 nits addressed; explicit holistic phase-review gates are recorded in PR #5 (two Grok reviews; all findings resolved).
-- Feature coverage: docs/FEATURE_REVIEW.md records eight upstream projects and F01–F26 dispositions; docs/README.md indexes technical contracts. No implementation has started.
+- Feature coverage: docs/FEATURE_REVIEW.md records eight upstream projects and F01–F26 dispositions; docs/README.md indexes technical contracts. P1.1 introduces the minimal Rust scaffold.
 - First usable milestone: end of Phase 2. Core MVP: end of Phase 4.
 - Task IDs are stable references, not execution order. Every phase ends with a holistic phase-review task; evidence-preparation tasks do not close a phase. Dependent phases wait for an accepted review with no unresolved findings.
 - Phase order is dependency-based, without calendar estimates. Phases 7–8 can follow Phase 4 independently of workflow expansion.
@@ -38,7 +38,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 
 Detailed scope, dependencies and evidence: [Phase 1 cards](tasks/01-integration.md).
 
-- [ ] P1.1 Create a minimal Rust package on a feature branch; select a nonconflicting package name, Rust edition/MSRV and initial development target ([card](tasks/01-integration.md#p1-1)).
+- [x] P1.1 Create a minimal Rust package; select package name, edition/MSRV and initial target. Proposed completion on this PR merge; [evidence](docs/evidence/p1-1-rust-scaffold.md), [D019](DECISIONS.md#2026-11-01--d019-minimal-rust-scaffold-baseline).
 - [ ] P1.6 Define and test permission-request policy/noninteractive behavior before the first live integration run (decision subtask extracted from P1.3) ([card](tasks/01-integration.md#p1-6)).
 - [ ] P1.2 Exercise OpenCode ACP with a disposable project; compare native structured output if needed ([card](tasks/01-integration.md#p1-2)).
 - [ ] P1.4 Evaluate a small reusable adapter/process dependency against direct SDK/runtime use; inspect license, release/API compatibility, and platform behavior ([card](tasks/01-integration.md#p1-4)).
@@ -152,6 +152,6 @@ See the owner phase and decision triggers in [DECISIONS.md](DECISIONS.md). Open 
 
 ## Use observations and blockers
 
-No Rust implementation runs recorded yet. The earlier ai-queue review passed 59 mocked tests; that does not validate this project's live integrations or current CLI compatibility.
+2026-11-01 — P1.1: Rust 1.85.0/Cargo 1.85.0 on `aarch64-apple-darwin`; debug/release builds, formatting, Clippy and three CLI integration tests passed. Release binary reports `ah 0.1.0`. No runtime/model call; no direct-tool comparison applies to this scaffold. See [repeatable evidence](docs/evidence/p1-1-rust-scaffold.md). Rust was absent and installed with rustup without modifying shell startup files. Next: P1.6 before live execution. The earlier ai-queue review passed 59 mocked tests; that does not validate this project's live integrations or current CLI compatibility.
 
 When a milestone is used, add date, task, tested versions, route/model, outcome, manual intervention, direct-tool comparison, and resulting task/decision IDs here. Record external blockers with their next validation action.
