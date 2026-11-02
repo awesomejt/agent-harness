@@ -2,7 +2,7 @@
 
 Start with the [specification](SPECIFICATION.md), [feature review](FEATURE_REVIEW.md), and [implementation plan](IMPLEMENTATION.md). [PROJECT.md](../PROJECT.md) owns task status; [DECISIONS.md](../DECISIONS.md) owns accepted and deferred decisions.
 
-These documents are implementation contracts and planning records. The informational Rust CLI, P2.1 config/input validation and disposable integration probes are implemented; coding execution, release support and production runbooks remain phase-gated. [P2.1 evidence](evidence/p2-1-config-contract.md) records the first-slice input contract and validation. [Phase 1 acceptance preparation](evidence/p1-5-integration-acceptance.md) records selected transport/dependencies and the tested macOS boundary.
+These documents are implementation contracts and planning records. Phase 2 implements local-only OpenCode coding runs, project routing ownership, bounded supervision, preview and dirty-project reporting; the Apple Silicon pre-release is published. [First-use evidence](evidence/p2-6-first-use.md) assesses the installed release and direct OpenCode comparison. P2.9 holistic review still gates Phase 2 acceptance and Phase 3. [Phase 1 acceptance preparation](evidence/p1-5-integration-acceptance.md) records selected transport/dependencies and the tested macOS boundary.
 
 | Document | Coverage | What remains phase-gated |
 |---|---|---|

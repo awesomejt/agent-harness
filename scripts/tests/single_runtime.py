@@ -103,8 +103,12 @@ def main():
     parser.add_argument('--endpoint',default='http://litellm:4000/v1')
     parser.add_argument('--model',default='macmini-qwen3-coder-30b')
     parser.add_argument('--key-env',default='LITELLM_API_KEY')
+    parser.add_argument('--binary',type=Path,default=ROOT/'target/debug/ah',help='Path to the ah binary to test')
     parser.add_argument('--timeout-secs',type=int,default=300)
     args=parser.parse_args()
+    args.binary=args.binary.expanduser().resolve()
+    if not args.binary.is_file() or not os.access(args.binary,os.X_OK):
+        parser.error(f'not an executable ah binary: {args.binary}')
     assert not (args.live and args.cancel),"cancellation fixture uses the local deterministic model only"
     with server(args) as (s,endpoint),tempfile.TemporaryDirectory(prefix='ah-single-runtime-') as d, tempfile.TemporaryDirectory(prefix='ah-outside-') as outside:
         cwd=Path(d).resolve();s.cwd=cwd;s.outside=Path(outside).resolve()
@@ -115,7 +119,7 @@ def main():
         (cwd/'calc.py').write_text('def add(a, b):\n    return a - b\n')
         (cwd/'test_calc.py').write_text('from calc import add\nassert add(2, 3) == 5\nprint("PASS arithmetic")\n')
         prompt='Fix add in calc.py so it adds correctly. Read calc.py, edit it with the edit tool, then use bash to run python3 test_calc.py and touch verified only if it passes. Do not change test_calc.py. Do not use subagents. Reply briefly.'
-        p=subprocess.Popen([str(ROOT/'target/debug/ah'),'single',prompt,'--project',str(cwd),'--permissions','trusted','--timeout-secs',str(args.timeout_secs)],
+        p=subprocess.Popen([str(args.binary),'single',prompt,'--project',str(cwd),'--permissions','trusted','--timeout-secs',str(args.timeout_secs)],
             env={**os.environ,'TEST_KEY':s.key},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
         if args.cancel:
             assert s.waiting.wait(60),'runtime did not reach post-edit/test cancellation point'
