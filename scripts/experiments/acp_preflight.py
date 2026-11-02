@@ -24,10 +24,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--opencode', default='opencode', help='executable path')
     parser.add_argument('--live', action='store_true', help='send the fixed text-only probe prompt')
-    parser.add_argument('--endpoint', default='http://litellm:4000/v1', help='LiteLLM API base URL')
-    parser.add_argument('--model', default='macmini-qwen3-coder-30b', help='existing LiteLLM alias')
+    parser.add_argument('--endpoint', help='LiteLLM API base URL (required with --live)')
+    parser.add_argument('--model', help='existing LiteLLM alias (required with --live)')
     parser.add_argument('--key-env', default='LITELLM_API_KEY', help='API key environment variable name')
     args = parser.parse_args()
+    if args.live and (not args.endpoint or not args.model):
+        parser.error('--live requires explicit --endpoint and --model')
     alias = args.model if args.live else 'unavailable'
     target = 'harness-preflight/' + alias
     if args.live:
@@ -56,8 +58,6 @@ def main():
         base = Path(root)
         project = base / 'project'
         project.mkdir()
-        (project / 'AGENTS.md').write_text(
-            'For the transport probe, return exactly AH_ACP_P1_2_OK. Do not use tools.\n')
         # v1.18.30 appends a tool-output directory allow unless this exact glob is denied.
         permission = {'*': 'deny', 'external_directory': {
             '*': 'deny', str(base / 'data' / 'opencode' / 'tool-output' / '*'): 'deny'}}
