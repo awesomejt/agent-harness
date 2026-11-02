@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""No-prompt ACP connectivity probe; diagnostic tooling, not the Rust runtime.
+"""ACP experiment tooling, not the Rust runtime.
 
-Uses a disposable HOME/project and a deliberately unreachable synthetic provider.
-Never accepts prompts, credentials, client tool calls, or permission grants.
+Default: no-prompt connectivity probe with a synthetic unreachable provider.
+--live: one fixed text prompt via an existing LiteLLM alias, with tools disabled.
+Credentials come from the environment; no client tool calls or grants are accepted.
 """
 import argparse
 import json
@@ -15,12 +16,40 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
+from urllib.parse import urlsplit
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--opencode', default='opencode', help='executable path')
+    parser.add_argument('--live', action='store_true', help='send the fixed text-only probe prompt')
+    parser.add_argument('--endpoint', help='LiteLLM API base URL (required with --live)')
+    parser.add_argument('--model', help='existing LiteLLM alias (required with --live)')
+    parser.add_argument('--key-env', default='LITELLM_API_KEY', help='API key environment variable name')
     args = parser.parse_args()
+    if args.live and (not args.endpoint or not args.model):
+        parser.error('--live requires explicit --endpoint and --model')
+    alias = args.model if args.live else 'unavailable'
+    target = 'harness-preflight/' + alias
+    if args.live:
+        parsed = urlsplit(args.endpoint)
+        if (parsed.scheme not in ('http', 'https') or not parsed.hostname
+                or parsed.username or parsed.password or parsed.query or parsed.fragment):
+            parser.error('endpoint must be an HTTP(S) base URL without credentials/query/fragment')
+        key = os.environ.get(args.key_env)
+        if not key:
+            parser.error('API key environment variable is missing or empty')
+        try:
+            req = urllib.request.Request(args.endpoint.rstrip('/') + '/models',
+                                         headers={'Authorization': 'Bearer ' + key})
+            with urllib.request.urlopen(req, timeout=15) as response:
+                aliases = json.load(response).get('data', [])
+            if alias not in [x.get('id') for x in aliases]:
+                parser.error('selected alias is absent from authenticated discovery')
+        except Exception:
+            parser.error('authenticated model discovery failed (raw error withheld)')
+        print('Authenticated discovery: selected alias exists:', alias, flush=True)
     executable = shutil.which(args.opencode)
     if not executable:
         parser.error('OpenCode executable not found; supply --opencode /absolute/path')
@@ -29,16 +58,20 @@ def main():
         base = Path(root)
         project = base / 'project'
         project.mkdir()
+        # v1.18.30 appends a tool-output directory allow unless this exact glob is denied.
+        permission = {'*': 'deny', 'external_directory': {
+            '*': 'deny', str(base / 'data' / 'opencode' / 'tool-output' / '*'): 'deny'}}
         config = {
             'autoupdate': False, 'share': 'disabled', 'plugin': [], 'mcp': {},
-            'permission': {'*': 'deny'},
+            'permission': permission, 'tools': {'*': False},
             'enabled_providers': ['harness-preflight'],
-            'model': 'harness-preflight/unavailable',
-            'small_model': 'harness-preflight/unavailable',
+            'model': target,
+            'small_model': target,
             'provider': {'harness-preflight': {
                 'npm': '@ai-sdk/openai-compatible',
-                'options': {'baseURL': 'http://127.0.0.1:9/v1', 'apiKey': 'unused'},
-                'models': {'unavailable': {'name': 'No-prompt preflight only'}},
+                'options': {'baseURL': args.endpoint.rstrip('/') if args.live else 'http://127.0.0.1:9/v1',
+                            'apiKey': '{env:AH_PROBE_API_KEY}' if args.live else 'unused'},
+                'models': {alias: {'name': alias}},
             }},
         }
         (project / 'opencode.json').write_text(json.dumps(config))
@@ -50,20 +83,34 @@ def main():
                'OPENCODE_DISABLE_MODELS_FETCH': 'true',
                'OPENCODE_DISABLE_DEFAULT_PLUGINS': 'true',
                'OPENCODE_DISABLE_AUTOUPDATE': 'true'}
+        if args.live:
+            env['AH_PROBE_API_KEY'] = key
         version = subprocess.check_output([executable, '--version'], env=env, timeout=15).decode().strip()
         print('OpenCode:', version, flush=True)
         resolved = json.loads(subprocess.check_output(
             [executable, 'debug', 'config', '--pure'], cwd=project, env=env,
             stderr=subprocess.PIPE, timeout=30))
-        if (resolved.get('permission') != {'*': 'deny'}
+        if (resolved.get('permission') != permission
                 or resolved.get('enabled_providers') != ['harness-preflight']
-                or resolved.get('model') != 'harness-preflight/unavailable'
-                or resolved.get('small_model') != 'harness-preflight/unavailable'
+                or resolved.get('model') != target
+                or resolved.get('small_model') != target
+                or resolved.get('tools') != {'*': False}
                 or resolved.get('share') != 'disabled'
                 or resolved.get('autoupdate') is not False
                 or resolved.get('mcp') or resolved.get('plugin')):
             raise RuntimeError('Resolved configuration differs from probe restrictions')
-        print('Resolved config: deny all; synthetic provider only; no MCP/plugins.', flush=True)
+        print('Resolved config: deny all; tools disabled; sole selected provider; no MCP/plugins.', flush=True)
+        agent = json.loads(subprocess.check_output(
+            [executable, 'debug', 'agent', 'build', '--pure'], cwd=project, env=env,
+            stderr=subprocess.PIPE, timeout=30))
+        rules = agent.get('permission', [])
+        expected = [{'permission': '*', 'pattern': '*', 'action': 'deny'},
+                    {'permission': 'external_directory', 'pattern': '*', 'action': 'deny'},
+                    {'permission': 'external_directory', 'pattern':
+                     str(base / 'data' / 'opencode' / 'tool-output' / '*'), 'action': 'deny'}]
+        if rules[-3:] != expected:
+            raise RuntimeError('Build agent does not end with expected deny-all rules')
+        print('Build agent effective permission: final rules deny all, including tool-output directory.', flush=True)
         with tempfile.TemporaryFile() as errors:
             child = subprocess.Popen([executable, 'acp', '--pure', '--cwd', str(project)],
                                      cwd=project, env=env, stdin=subprocess.PIPE,
@@ -71,13 +118,15 @@ def main():
             selector = selectors.DefaultSelector()
             selector.register(child.stdout, selectors.EVENT_READ)
             pending = b''
+            text_chunks = []
+            event_counts = {'agent_message_chunk': 0, 'agent_thought_chunk': 0, 'other': 0}
 
-            def request(identifier, method, params):
+            def request(identifier, method, params, timeout=30):
                 nonlocal pending
                 child.stdin.write((json.dumps({'jsonrpc': '2.0', 'id': identifier,
                                                'method': method, 'params': params}) + '\n').encode())
                 child.stdin.flush()
-                deadline = time.monotonic() + 30
+                deadline = time.monotonic() + timeout
                 while time.monotonic() < deadline:
                     if b'\n' not in pending:
                         if not selector.select(max(0, deadline - time.monotonic())):
@@ -103,6 +152,18 @@ def main():
                             # This probe never implements client filesystem/terminal/approval operations.
                             if 'id' in message:
                                 raise RuntimeError('Unexpected ACP client request; refusing probe')
+                            if message['method'] == 'session/update':
+                                update = message.get('params', {}).get('update', {})
+                                kind = update.get('sessionUpdate')
+                                if kind in ('tool_call', 'tool_call_update'):
+                                    raise RuntimeError('Unexpected tool activity in text-only probe')
+                                event_counts[kind if kind in event_counts else 'other'] += 1
+                                if kind == 'agent_message_chunk':
+                                    content = update.get('content', {})
+                                    if content.get('type') == 'text':
+                                        text_chunks.append(content.get('text', ''))
+                                        if sum(map(len, text_chunks)) > 100_000:
+                                            raise RuntimeError('Probe text exceeded output bound')
                             continue
                         if message.get('id') == identifier:
                             if 'error' in message:
@@ -125,11 +186,27 @@ def main():
                     raise RuntimeError('Missing session identity')
                 model_options = [x for x in session.get('configOptions', []) if x.get('id') == 'model']
                 if (len(model_options) != 1
-                        or model_options[0].get('currentValue') != 'harness-preflight/unavailable'):
-                    raise RuntimeError('ACP session did not select the synthetic model')
-                print('session/new: session identity and synthetic model confirmed', flush=True)
+                        or model_options[0].get('currentValue') != target):
+                    raise RuntimeError('ACP session did not select the requested model')
+                print('session/new: session identity and selected model confirmed', flush=True)
                 print('session config:', json.dumps({k: v for k, v in session.items() if k != 'sessionId'}, sort_keys=True), flush=True)
-                print('No session/prompt sent; synthetic route only.', flush=True)
+                if args.live:
+                    print('Sending fixed text-only prompt; deadline 180 seconds.', flush=True)
+                    result = request(3, 'session/prompt', {
+                        'sessionId': session['sessionId'],
+                        'prompt': [{'type': 'text', 'text':
+                                    'Reply with exactly AH_ACP_P1_2_OK and nothing else. Do not use tools.'}],
+                    }, timeout=180)
+                    print('session/update counts:', json.dumps(event_counts, sort_keys=True), flush=True)
+                    if result.get('stopReason') != 'end_turn':
+                        raise RuntimeError('Prompt did not terminate with end_turn')
+                    if ''.join(text_chunks).strip() != 'AH_ACP_P1_2_OK':
+                        print('Marker mismatch: text characters:', sum(map(len, text_chunks)),
+                              'marker present:', 'AH_ACP_P1_2_OK' in ''.join(text_chunks), flush=True)
+                        raise RuntimeError('Assistant text did not match explicit marker (text withheld)')
+                    print('session/prompt: stopReason=end_turn; exact explicit marker received.', flush=True)
+                else:
+                    print('No session/prompt sent; synthetic route only.', flush=True)
             except Exception:
                 # Report size only: arbitrary child stderr must not leak raw secrets.
                 errors.seek(0, os.SEEK_END)

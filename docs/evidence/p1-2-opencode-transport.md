@@ -1,6 +1,6 @@
 # P1.2 — OpenCode ACP preflight and external blocker
 
-Date: 2026-11-01 (America/Denver). Task: [P1.2](../../tasks/01-integration.md#p1-2). Baseline: `1712825` (P1.6 merged via PR #7). Tested platform: Darwin arm64. **Partial evidence only; P1.2 is not complete.**
+Date: 2026-11-01 (America/Denver). Task: [P1.2](../../tasks/01-integration.md#p1-2). Baseline: `1712825` (P1.6 merged via PR #7). Tested platform: Darwin arm64. **Historical partial evidence from PR #8.** The user subsequently supplied a different LiteLLM host; [live continuation evidence](p1-2-live-acp.md) supersedes the blocker for that host and records the later P1.2 result. The observations below remain the original localhost/no-prompt record.
 
 ## Repeatable no-prompt connectivity probe
 
