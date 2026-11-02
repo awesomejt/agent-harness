@@ -1,6 +1,6 @@
 # Validation and acceptance plan
 
-Status: planned checks; the repository has no Rust implementation yet. Add runnable commands/fixtures with the consuming phase. Phase exit criteria in [IMPLEMENTATION.md](IMPLEMENTATION.md) remain authoritative; a passing mock suite does not prove live compatibility.
+Status: the informational Rust CLI, pure permission policy and isolated ACP lifecycle experiment are implemented. Production coding runs, project sync, workflows and release checks remain planned; add their runnable commands/fixtures with the consuming phase. Phase exit criteria in [IMPLEMENTATION.md](IMPLEMENTATION.md) remain authoritative; a passing mock suite does not prove live compatibility.
 
 ## Layers
 
@@ -32,7 +32,22 @@ Unit and default integration tests use fakes without provider credentials or bil
 
 ## Rust and release checks
 
-Once Cargo files exist, adopt formatting, linting and tests appropriate to supported targets (normally cargo fmt, cargo clippy and cargo test), plus dependency/license inspection when selecting reusable code. Freeze precise commands and feature combinations with the implementation; do not claim checks ran before code exists.
+The root package pins Rust 1.88.0. Current checks from the repository root (with `~/.cargo/bin` on PATH):
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
+cargo build --release --locked
+./target/release/ah --version
+cargo build --locked --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml
+cargo fmt --check --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml
+cargo clippy --locked --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml -- -D warnings
+python3 scripts/experiments/acp_lifecycle.py
+python3 scripts/experiments/acp_lifecycle.py --runtime --opencode /opt/homebrew/bin/opencode
+```
+
+The root suite covers the informational CLI and permission policy; the standalone driver covers adversarial child behavior and real OpenCode local-stub/unavailable scenarios. Exact observed counts are recorded in the dated evidence and phase review. The last command requires the tested installed OpenCode; replace its path explicitly if needed. These commands do not contact a live model provider. Explicit live commands and observed results are in [P1.3 evidence](evidence/p1-3-lifecycle.md) and [P1.5 acceptance preparation](evidence/p1-5-integration-acceptance.md). The [Phase 1 review](reviews/phase-01.md) records the integrated recheck. The scaffold has no external dependencies; the experiment graph and release attribution follow-ups are in the [dependency inventory](evidence/p1-5-dependencies.md). These checks establish the tested macOS experiment boundary, not production coding readiness.
 
 Each supported release target needs an actual build and installation smoke test; compilation alone does not establish process-tree behavior. Record platform limitations instead of implying Windows parity from Rust portability. Verify checksums and upgrade instructions, and distinguish external CLI prerequisites from harness installation.
 
