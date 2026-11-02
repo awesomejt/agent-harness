@@ -277,17 +277,19 @@ impl Plan {
                 ));
             }
         }
-        if let Some(agents) = effective.get("agent") {
-            let agents = agents
-                .as_object()
-                .ok_or(Invalid("effective agents must be an object"))?;
-            for agent in agents.values() {
-                if !agent.is_object() {
-                    return Err(Invalid("effective agent must be an object"));
-                }
-                if let Some(model) = agent.get("model") {
-                    if model != &self.desired["model"] {
-                        return Err(Invalid("effective agent overrides the selected model"));
+        for section in ["agent", "mode"] {
+            if let Some(agents) = effective.get(section) {
+                let agents = agents
+                    .as_object()
+                    .ok_or(Invalid("effective agents must be an object"))?;
+                for agent in agents.values() {
+                    if !agent.is_object() {
+                        return Err(Invalid("effective agent must be an object"));
+                    }
+                    if let Some(model) = agent.get("model") {
+                        if model != &self.desired["model"] {
+                            return Err(Invalid("effective agent overrides the selected model"));
+                        }
                     }
                 }
             }

@@ -48,7 +48,7 @@ impl Project {
 }
 impl Drop for Project {
     fn drop(&mut self) {
-        fs::remove_dir_all(&self.0).unwrap();
+        let _ = fs::remove_dir_all(&self.0);
     }
 }
 
@@ -57,8 +57,8 @@ fn preserves_unrelated_bytes_updates_owned_route_and_never_writes_key() {
     let p = Project::new();
     let unrelated = "\"theme\" : \"system\", \"formatter\": { \"x\" : false }";
     p.write("opencode.json", &format!("{{ {unrelated} }}\n"));
-    let global = Project::new();
-    global.write("opencode.json", "global sentinel");
+    let outside = Project::new();
+    outside.write("opencode.json", "global sentinel");
     let r = p.request("first", false);
     let plan = Plan::prepare(&r).unwrap();
     assert!(plan.needs_write());
@@ -86,7 +86,7 @@ fn preserves_unrelated_bytes_updates_owned_route_and_never_writes_key() {
             .unwrap()
             .needs_write()
     );
-    assert_eq!(global.read("opencode.json"), "global sentinel");
+    assert_eq!(outside.read("opencode.json"), "global sentinel");
 }
 
 #[test]
@@ -220,6 +220,27 @@ fn preserves_inactive_providers_and_refuses_malformed_effective_agents() {
         serde_json::json!({"helper":false}),
     ] {
         effective["agent"] = malformed;
+        assert!(plan.validate_effective(&effective).is_err());
+    }
+}
+
+#[test]
+fn legacy_mode_models_cannot_override_selected_route() {
+    let p = Project::new();
+    Plan::prepare(&p.request("m", false))
+        .unwrap()
+        .apply()
+        .unwrap();
+    let plan = Plan::prepare(&p.request("m", true)).unwrap();
+    let mut effective: Value = serde_json::from_str(&p.read("opencode.json")).unwrap();
+    effective["mode"] = serde_json::json!({"build":{"model":"ah-litellm/m"}});
+    plan.validate_effective(&effective).unwrap();
+    for bad in [
+        serde_json::json!({"build":{"model":"native/other"}}),
+        serde_json::json!([]),
+        serde_json::json!({"build":null}),
+    ] {
+        effective["mode"] = bad;
         assert!(plan.validate_effective(&effective).is_err());
     }
 }
