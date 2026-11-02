@@ -1,6 +1,6 @@
 # Operations and distribution contract
 
-Status: intended operator experience, not an executable runbook. Installation URLs, supported targets, exact diagnostic commands and upgrade steps are finalized with tested artifacts in Phases 2/4. See [documentation map](README.md) for decision owners.
+Status: P2.5 first binary runbook for `0.1.0-alpha.1`; later workflow/native-adapter guidance remains prospective. First-use acceptance (P2.6) and holistic phase review (P2.9) remain required. See [release evidence](evidence/p2-5-installable-binary.md).
 
 The [deployment diagram](ARCHITECTURE.md) separates the release pipeline, local executable, installed runtime and external services. Rust library dependencies are linked/packaged for the target as required; binary users do not install Cargo packages manually.
 
@@ -10,7 +10,137 @@ Distribute prebuilt harness binaries for explicitly supported OS/architecture ta
 
 Document OpenCode/other CLI installation and official login separately from harness installation. LiteLLM is an existing service with its own endpoint, model aliases and optional environment key reference. Do not imply the harness installs, upgrades or manages the proxy service. No automatic provider installation or silent self-update is planned.
 
-Initial binary support covers one tested platform; the core MVP declares its broader tested matrix. Evaluate cargo-dist in Phase 2. Package-manager distribution, signing/notarization requirements and upgrade/rollback instructions are finalized for the declared targets rather than claimed in advance.
+### Install v0.1.0-alpha.1
+
+The initial archive target is `aarch64-apple-darwin`, tested on Apple Silicon
+macOS 27.0.1. Intel macOS, earlier macOS versions, Linux and Windows are unverified.
+The executable links only macOS system libraries; no Rust, Cargo, Python, Node
+or OpenCode is required for harness version/help/preview. Coding runs require
+OpenCode separately. The artifact has an ad hoc signature, with no Developer ID
+signing or notarization. Managed macOS policies may prevent execution; use an
+approved local build or wait for signed distribution rather than disable security
+controls. Browser/quarantine/Gatekeeper approval was not verified by the terminal
+installation smoke.
+
+Download the archive and `SHA256SUMS` from the
+[versioned release](https://github.com/awesomejt/agent-harness/releases/tag/v0.1.0-alpha.1)
+into an empty directory, or use:
+
+```sh
+curl -fLO https://github.com/awesomejt/agent-harness/releases/download/v0.1.0-alpha.1/ah-v0.1.0-alpha.1-aarch64-apple-darwin.tar.gz
+curl -fLO https://github.com/awesomejt/agent-harness/releases/download/v0.1.0-alpha.1/SHA256SUMS
+shasum -a 256 -c SHA256SUMS
+tar -xzf ah-v0.1.0-alpha.1-aarch64-apple-darwin.tar.gz
+mkdir -p "$HOME/.local/bin"
+# Preserve an existing ah separately before deliberately replacing it.
+install -m 755 ah-v0.1.0-alpha.1-aarch64-apple-darwin/ah "$HOME/.local/bin/ah"
+export PATH="$HOME/.local/bin:$PATH"
+ah --version
+ah --help
+```
+
+Expect `ah 0.1.0-alpha.1`. Add that PATH entry to your shell startup file if
+needed. Keep the extracted `LICENSE`, `THIRD_PARTY_NOTICES.md`, `third-party/`
+and `BUILD-INFO.json` alongside your archived download; include them if you
+redistribute the executable. Checksums detect corruption; they are not independent
+publisher authentication. No package manager, installer script or self-update is
+provided in this slice.
+
+### Separate coding prerequisites
+
+Install **OpenCode 1.18.30**, not an automatically selected latest version.
+Its [pinned official installer](https://github.com/anomalyco/opencode/blob/v1.18.30/install)
+supports an explicit version:
+
+```sh
+curl -fLo opencode-install.sh https://raw.githubusercontent.com/anomalyco/opencode/v1.18.30/install
+# Inspect the downloaded script, then run:
+bash opencode-install.sh --version 1.18.30 --no-modify-path
+export PATH="$HOME/.opencode/bin:$PATH"
+opencode --version
+```
+
+OpenCode's installation is separate from the harness archive. A LiteLLM service
+must already expose an authenticated `/v1` endpoint and an existing model alias.
+The harness does not deploy the proxy or create aliases. Obtain the endpoint,
+alias and key from your operator; do not commit a literal key. In your project,
+create `ah.json` (substitute your endpoint/alias):
+
+```json
+{
+  "version": 1,
+  "mode": "local-only",
+  "model": "your-existing-alias",
+  "litellm": {
+    "api_base": "http://your-proxy:4000/v1",
+    "api_key_env": "LITELLM_API_KEY"
+  }
+}
+```
+
+Set `LITELLM_API_KEY` in your shell through your normal secret mechanism. No
+native cloud login is needed for this slice. Run from the project:
+
+```sh
+ah single "Review the parser" --preview
+ah single "Fix the parser and run its tests" --permissions trusted
+```
+
+Preview uses no model turn or runtime child; exit 0 validates a local plan only.
+Execution validates OpenCode version/capabilities and effective routing before a
+prompt. Default `deny` grants no tools. `trusted` explicitly authorizes host file
+and shell effects; it is not a sandbox. The harness isolates HOME/XDG and ignores
+unmanaged OpenCode customizations during execution. Git observation uses macOS
+system Git; without Command Line Tools it reports an unavailable baseline, rather
+than installing developer tools. No developer toolchain is needed by `ah` itself;
+the requested project tests may need their own tools.
+
+Exits: 0 confirmed backend success (independently verify task tests), 1 known
+failure, 2 rejected input/capability, 3 confirmed cancellation/deadline, 4 uncertain
+outcome. On 4, inspect edits and processes before a new attempt. Never assume an
+interrupted attempt made no changes. See [configuration](CONFIGURATION.md) and
+[execution](EXECUTION.md) for managed config conflicts and finite cleanup bounds.
+
+### Upgrade, rollback and removal
+
+Download and verify a specific release, retain the old executable/download and
+replace only your installed `ah`. The first release uses config schema 1 and no
+durable workflow state; older/future schemas must not be silently reinterpreted.
+Rollback restores the retained binary; it does not undo project/runtime edits.
+Remove `~/.local/bin/ah` and its PATH entry to uninstall. Inspect managed
+`opencode.json` fields and `.ah-opencode-owner.json` together before deliberately
+reconciling/removing them; uninstall performs no automatic project cleanup.
+
+### Maintainer release procedure
+
+D029 selects manual locked Cargo packaging after evaluating
+[cargo-dist](https://axodotdev.github.io/cargo-dist/book/introduction.html).
+Its generated multi-stage hosting/installer workflow is deferred until broader
+release needs justify it. Build only a clean, reviewed source commit on the
+verified native target, with pinned Rust 1.88.0 and Xcode linker tools:
+
+```sh
+python3 scripts/release/package.py --output dist/candidate
+sh scripts/release/smoke.sh dist/candidate 0.1.0-alpha.1
+```
+
+`package.py` uses a fresh temporary build directory, explicit Cargo/Rust 1.88.0,
+rejects compiler/linker/profile environment overrides, verifies Mach-O arm64/minimum
+OS metadata, fixes the target and deployment build setting, verifies registry
+archives against Cargo.lock, refreshes notices from the actual target-filtered resolve graph (including dev/build dependencies),
+records commit/toolchain/lock/binary hashes and checks system-only dylib linkage.
+It refuses a dirty checkout or an existing output directory. Python and Rust are
+maintainer tools only. The build deployment setting 14.0 is not a test claim for
+older macOS. Archives contain complete published registry archives to preserve
+embedded notices, plus extracted license files and Rust runtime attributions.
+
+Complete PR/Grok review and merge first. Package the merged commit, smoke it,
+create a GitHub **pre-release** tag `v0.1.0-alpha.1` pointing to that exact commit,
+and upload the archive and its `SHA256SUMS`. Never replace already published
+versioned assets; use a new version for corrections. Download the published
+assets into a new directory and repeat the checksum/install smoke. Package
+checksums in the release and source provenance in `BUILD-INFO.json` are
+authoritative for the final artifact. P4.5 owns broader platform/packaging polish.
 
 ## Startup and diagnosis
 
@@ -41,3 +171,9 @@ Retain enough sanitized attempt and verification information to explain routing/
 Follow the repository PR/Grok review workflow. Release documentation must list supported harness/runtime versions, platform constraints, schema/output changes and migration needs. Version machine output in Phase 4 and durable state in Phase 5, before persistence ships; do not silently reinterpret unknown future versions.
 
 Upgrades must preserve user-owned config and workflow evidence. Document recovery/downgrade limitations for incompatible state rather than imply every version is reversible. New adapters require their own tests/live evidence and capability documentation before being advertised as supported.
+
+Build-host adjustment: the initial release build hit a macOS 27 dylib loader
+failure in proc macros (`mis-aligned LINKEDIT string pool`). Packaging explicitly
+sets `CARGO_PROFILE_RELEASE_STRIP=none`, avoiding Rust's stripping path; see
+[upstream Rust issue #157750](https://github.com/rust-lang/rust/issues/157750).
+The MSRV and dependency pins remain unchanged.
