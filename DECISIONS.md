@@ -144,6 +144,13 @@ Entries record design intent, not implementation completion. Earlier entries rem
 - **Toolchain/gates**: Both pinned crates require Rust 1.88, above D019's 1.85 baseline. No toolchain change now. Before adoption, P1.3 must justify/test the MSRV and runtime/I/O fit, protocol-1 OpenCode schemas, callbacks, cancellation and cleanup; P1.5 finalizes transport/dependencies. Reject or reassess reuse if these fail, rather than weakening policy.
 - **Evidence**: [Pinned-source comparison, licenses, defaults and lifecycle gaps](docs/evidence/p1-4-dependency-evaluation.md), grounded in [P1.2 live evidence](docs/evidence/p1-2-live-acp.md). Only the existing no-prompt probe and baseline Rust checks ran; neither candidate was compiled or used for a model call. No earlier route, permission or phase-exit gate changes.
 
+## 2026-11-02 — D022: Validate SDK wire reuse in an isolated lifecycle experiment
+
+- **Decision**: P1.3 compiles/runs official ACP SDK 3.6.0 without optional features in a standalone experiment crate. Rust owns process/environment/group cleanup; `ByteStreams` and typed protocol-1 handlers supply wire dispatch over caller-owned Tokio pipes. The existing default-deny Rust permission policy receives actual ACP option kinds; no live grants are introduced.
+- **Toolchain**: The experiment alone requires and verifies Rust 1.88.0, satisfying the SDK MSRV, with its own locked dependency graph. The production scaffold stays dependency-free on 1.85.0. P1.5 selects final dependencies/transport and decides any production MSRV change using this evidence, rather than promoting experimental APIs now.
+- **Evidence**: [P1.3 lifecycle/route evidence](docs/evidence/p1-3-lifecycle.md): live LiteLLM instruction/stream/denial/cancel behavior, real runtime unavailable-service failure, observed model request payloads, fake protocol failures and descendant cleanup. Automatic project instruction loading is confirmed for OpenCode 1.18.30 on macOS. No public CLI change, other runtime, inner loop, native fallback or new permission grant.
+- **Limits**: Process-group cleanup is tested only on macOS and cannot contain deliberately detached descendants. Model-route evidence ends at the configured LiteLLM alias; proxy-internal routing remains external. Production supervision/outcome handling and platform support still require their consuming-phase work.
+
 ## Deferred decision register
 
 | Choice | Owner phase | Decide when / required evidence |

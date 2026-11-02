@@ -22,6 +22,8 @@ cargo test --locked
 
 The Cargo package is `awesomejt-agent-harness`; the binary is `ah`. The initial verified development target is Apple Silicon macOS (`aarch64-apple-darwin`). Other platforms and release installation remain unverified. See [P1.1 evidence](docs/evidence/p1-1-rust-scaffold.md) for the tested baseline. Prebuilt distribution starts in Phase 2.
 
+The separate [P1.3 ACP lifecycle experiment](docs/evidence/p1-3-lifecycle.md) uses Rust 1.88.0 via explicit `cargo +1.88.0` commands and its own manifest/lockfile under `scripts/experiments/acp_lifecycle/`. It verifies SDK wire compatibility and macOS lifecycle behavior without changing the public scaffold toolchain or adding coding-run commands.
+
 ## Delivery milestones
 
 | Milestone | Usable outcome |
