@@ -12,6 +12,8 @@ Use small feature branches/PRs following [GIT_WORKFLOW.md](GIT_WORKFLOW.md). Spl
 
 **Exit evidence:** consistent repository docs; explicit goals, non-goals, phase dependencies, acceptance criteria, and actionable next tasks. Documentation authorship does not imply implementation exists.
 
+Feature coverage is captured in [FEATURE_REVIEW.md](FEATURE_REVIEW.md). [The documentation map](README.md) identifies technical contracts and when concrete interfaces/schemas must replace deferred choices. The feature pass adds supporting tasks inside these phases without moving the first-slice or core-MVP boundaries.
+
 ## Phase 1 — OpenCode integration experiment
 
 **Depends on:** Phase 0. **Goals:** reduce uncertainty for G2/G3.
@@ -26,7 +28,7 @@ Build the smallest Rust experiment that connects to OpenCode in a disposable pro
 
 **Depends on:** Phase 1. **Goals:** G1/G2, initial G3/G4.
 
-Implement `ah single` in a project through OpenCode configured to LiteLLM. Support explicit `--mode local-only`, a model alias, minimal config, safe project-level provider sync using an environment-variable reference rather than a literal key, and `--no-sync` with route validation. Reject unimplemented modes clearly. Include streamed progress, understandable errors, cancellation, and meaningful exit codes.
+Implement `ah single` in a project through OpenCode configured to LiteLLM. Support explicit `--mode local-only`, a model alias, minimal config, safe project-level provider sync using an environment-variable reference rather than a literal key, and `--no-sync` with route validation. Reject unimplemented modes clearly. Include inline/file/stdin prompt input, basic prerequisite diagnostics and read-only plan/sync preview, streamed progress, attempt identity, understandable errors, deadlines/cancellation, and meaningful exit codes. Preserve dirty-worktree user changes. See EXECUTION.md and CONFIGURATION.md.
 
 **Exit evidence:** from a prebuilt binary on the initial supported platform, complete a real small project change and its verification; preserve project/global configuration and verify a sentinel key value never appears in generated config; demonstrate LiteLLM-unavailable and cancellation behavior; prove forbidden native fallback is not invoked. Include setup and direct-OpenCode comparison notes. A text-only completion is insufficient.
 
@@ -46,7 +48,7 @@ Add native OpenCode execution for `cloud-only`, model-group references for LiteL
 
 **Depends on:** Phase 3. **Goals:** G5; close G1–G5 MVP.
 
-Load canonical Markdown + YAML agents, map by name to OpenCode, add `--agent`, and support primary/specialized invocation with enforced supported constraints. Preserve user-owned agent files and show mapping conflicts. Complete setup diagnostics and release documentation for the declared MVP platforms.
+Load canonical Markdown + YAML agents, map by name to OpenCode, add `--agent`, and support primary/specialized invocation with enforced supported constraints. Preserve user-owned agent files and show mapping conflicts. Complete setup diagnostics and release documentation for the declared MVP platforms, versioned machine result/events and headless/CI behavior. Document inherited skills/MCP/context capabilities and supported effort mapping without taking ownership of those backend subsystems.
 
 **Exit evidence:** a primary coding task and a constrained review task use named definitions; prohibited writes/tools are denied; unsupported restrictions fail visibly. Adapter fixtures cover emitted config/definitions. Repeated real use demonstrates the dual-route workflow and identifies remaining friction. Publish installable artifacts for each declared supported target.
 
@@ -56,7 +58,7 @@ Load canonical Markdown + YAML agents, map by name to OpenCode, add `--agent`, a
 
 **Depends on:** Phase 4. **Goal:** G6.
 
-Add ordered-folder execution using existing single-run policy and agent resolution. Add minimal durable step outcomes needed for restart and inspection.
+Add ordered-folder execution using existing single-run policy and agent resolution. Add minimal durable step outcomes needed for restart and inspection, and explicit trusted verification gates with outcomes separate from agent execution. Finalize WORKFLOWS.md storage/recovery choices before implementation.
 
 **Exit evidence:** a real multi-step task executes in documented order; failed/cancelled steps stop or continue according to explicit policy; restart does not silently repeat completed or uncertain side effects. Test ordering and state recovery.
 

@@ -8,8 +8,10 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - Phase 0 review: PR #1 received 0 blockers, 2 concerns, and 2 nits; all four addressed. No critical/high findings; no re-review required under docs/GIT_WORKFLOW.md.
 - Implementation: none yet.
 - Direction: Rust CLI with prebuilt binaries; OpenCode first, LiteLLM route plus native route.
-- Next implementation task: P1.1, a narrow OpenCode integration experiment.
+- Next implementation task: P1.1, a narrow OpenCode integration experiment, with the feature/technical-contract review complete (PR #2).
+- Feature coverage: docs/FEATURE_REVIEW.md records eight upstream projects and F01–F26 dispositions; docs/README.md indexes technical contracts. No implementation has started.
 - First usable milestone: end of Phase 2. Core MVP: end of Phase 4.
+- Task IDs are stable references, not execution order; phase validation/closeout depends on every other task in that phase.
 - Phase order is dependency-based, without calendar estimates. Phases 7–8 can follow Phase 4 independently of workflow expansion.
 
 ## Phase 0 — Scope and roadmap
@@ -19,6 +21,9 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - [x] P0.3 Record Rust direction, route/transport clarification, and deferred decisions.
 - [x] P0.4 Capture reuse candidates and validation criteria without adopting them prematurely.
 - [x] P0.5 Complete documentation consistency checks and required PR review (PR #1; four minor findings addressed).
+- [x] P0.6 Compare upstream feature families and classify committed, backend-owned, candidate and excluded scope.
+- [x] P0.7 Draft execution/configuration/workflow/testing/operations contracts and documentation index with phase-owned finalization.
+- [x] P0.8 Validate feature/task/doc traceability and complete PR review for the feature/contract pass (PR #2; 0 blockers, 2 concerns and 1 nit addressed; no critical/high findings).
 
 ## Phase 1 — Integration experiment
 
@@ -31,10 +36,12 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 ## Phase 2 — First usable slice
 
 - [ ] P2.1 Define minimal config, precedence, environment key reference, and exit conventions.
-- [ ] P2.2 Implement `ah single` with `local-only`, project selection, model alias, and visible resolved route.
+- [ ] P2.2 Implement `ah single` with `local-only`, project selection, model alias, visible resolved route, and unambiguous inline/file/stdin prompt input.
 - [ ] P2.3 Implement project provider sync that preserves unrelated settings; test conflicts, interrupted writes, global-config preservation, absence of literal LiteLLM keys (use a sentinel secret), and `--no-sync` route validation.
-- [ ] P2.4 Stream progress, classify failures, handle cancellation, and verify no cloud-native fallback.
+- [ ] P2.4 Stream progress, identify attempts and reported usage, classify failures, handle deadlines/cancellation and headless permissions, and verify no cloud-native fallback.
 - [ ] P2.5 Produce an initial platform binary with installation/setup instructions.
+- [ ] P2.7 Add basic prerequisite/version diagnostics and read-only resolved-plan/sync preview without model turns or writes; fix exact syntax before release.
+- [ ] P2.8 Report dirty-worktree state and preserve pre-existing edits/untracked files; test failed/cancelled runs without automatic Git mutations.
 - [ ] P2.6 Use it for a real edit-and-test task; compare direct OpenCode and record friction before expanding.
 
 ## Phase 3 — Routing and fallback
@@ -49,9 +56,11 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 
 - [ ] P4.1 Define/validate canonical YAML schema and actual OpenCode agent destinations.
 - [ ] P4.2 Add name-based emission, collision handling, and `--agent` selection.
-- [ ] P4.3 Implement primary/specialized execution and enforce supported model/tool/permission constraints.
+- [ ] P4.3 Implement primary/specialized execution and enforce supported model/effort/tool/permission constraints, documenting unsupported effort mappings.
 - [ ] P4.4 Verify a coding agent and constrained reviewer; refuse unsupported restrictions.
 - [ ] P4.5 Declare MVP platform support; build artifacts, setup diagnostics, sample agents/config, and usage documentation.
+- [ ] P4.7 Define/version machine result/event output, preserve stdout/stderr and exit contracts, and document headless/CI use.
+- [ ] P4.8 Document/test inherited skills, MCP, instructions and context capabilities without bypassing route/agent restrictions.
 - [ ] P4.6 Record repeated real-use results and close core MVP against G1–G5.
 
 ## Phase 5 — Sequences
@@ -59,6 +68,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - [ ] P5.1 Decide ordering, context, failure policy, metadata precedence, state schema, and resume interface.
 - [ ] P5.2 Execute an ordered prompt folder through existing single-run policy.
 - [ ] P5.3 Persist step outcomes and handle cancellation/restart without silent replay.
+- [ ] P5.5 Define explicit trusted verification commands/gates and record agent success separately from verified success.
 - [ ] P5.4 Validate on a real multi-step task and test recovery cases.
 
 ## Phase 6 — Ralph
@@ -93,6 +103,10 @@ Demand-driven, independently scoped additions; not blockers for earlier mileston
 - [ ] P9.2 Decide whether optional allocation-aware selection adds value; keep it inside permitted routes.
 - [ ] P9.3 Decide scheduling/storage/recovery semantics before adding prompt delays or a durable queue.
 - [ ] P9.4 Validate unknown quota, cooldown, scheduling, and restart behavior for each increment delivered.
+
+## Feature candidates
+
+Native session continuation/fork, richer history/export, workflow recipes/templates, hooks/plugins and diff summaries are considered but not committed tasks. Their promotion rules and current exclusions are in [docs/FEATURE_REVIEW.md](docs/FEATURE_REVIEW.md). No exhaustive feature-parity promise is made.
 
 ## Deferred decisions
 

@@ -75,6 +75,19 @@ Entries record design intent, not implementation completion. New decisions ident
 - **Rationale**: Useful code exists, but framework defaults must not dictate routing, permissions, or a new inner agent loop.
 - **Validation**: Record tested releases, model/permission control, streamed events, cancellation, process cleanup, and live limitations before promoting a candidate.
 
+## 2026-11-01 — D013: Feature review dispositions and supporting scope
+
+- **Decision**: Record the upstream comparison and F01–F26 inventory in docs/FEATURE_REVIEW.md. Add input sources, basic diagnostics/preview, dirty-project preservation, attempt outcomes, machine output and explicit verification coverage within G1–G9 and existing phase boundaries.
+- **Rationale**: The prior library review did not systematically cover user-facing feature families. These additions make single/workflow operation usable and inspectable without adopting a new agent runtime.
+- **Boundary**: Backend skills/MCP/context behavior remains backend-owned and capability-checked. Session continuation/fork, richer history/export, recipes, hooks/plugins and diff summaries remain candidates. No additional runtime, parallel-team scheduler, automatic worktrees, auto-installer or marketplace is approved by this review.
+- **Evidence**: Eight upstream project documentation sets were compared on 2026-11-01; this was not a live compatibility benchmark. Revalidate integration behavior per phase.
+
+## 2026-11-01 — D014: Technical contracts before implementation, concrete schemas at consuming phase
+
+- **Decision**: Maintain docs/README.md as the documentation map, with execution, configuration/agents, workflow state, validation, and operations contracts alongside the existing architecture/specification. Finalize flags, serialized schemas, destinations, tested versions and runbook commands at their consuming phase.
+- **Rationale**: Technical coverage should be explicit now without presenting speculative interfaces or untested operational instructions as implemented behavior. This extends D011, not a requirement to freeze all later choices before first use.
+- **Validation**: Each phase updates its contract and links executable/live evidence from PROJECT.md. Documentation existence alone does not establish operational readiness.
+
 ## Deferred decision register
 
 | Choice | Owner phase | Decide when / required evidence |
@@ -82,14 +95,15 @@ Entries record design intent, not implementation completion. New decisions ident
 | Cargo package name, initial development target | 1 | Before scaffolding/publishing; verify naming and toolchain availability. |
 | OpenCode transport and adapter/process dependencies | 1 | After a narrow experiment proves model selection, project instructions, callbacks, streaming, and cancellation. |
 | ACP permission-request handling (allow/deny/prompt) | 1 | Before the first live run; document the non-interactive default and prove no implicit permission widening. |
-| Config format, filename/location, precedence, exit codes | 2 | Before first-slice configuration/CLI is implemented; use the smallest schema that supports that slice. YAML is an earlier sketch, not a locked harness-config format. |
+| Config format, filename/location, precedence, exit codes, prompt-input and preview syntax | 2 | Before first-slice configuration/CLI is implemented; use the smallest schema that supports that slice. YAML is an earlier sketch, not a locked harness-config format. |
 | Project sync ownership/conflicts and no-sync validation | 2 | Before any managed project writes; prove preservation and effective routing. |
 | Release tooling and initial binary target | 2 | Before first usable distribution; validate installation and external prerequisites. |
 | Failure eligibility, retries, uncertain tool side effects | 3 | Before automatic native fallback; define refusal/recovery behavior and test it. No blind replay of potentially applied work. |
 | Model groups and native-route config isolation | 3 | Before dual routing ships; prove cloud-only cannot inherit the managed LiteLLM route. |
 | Canonical agent schema, destination paths, constraints | 4 | Before mapping ships; verify installed backend semantics and reject unsupported restrictions. Markdown + YAML remains canonical. |
+| Versioned machine result/events, stdout/stderr and CI contract | 4 | Before automated consumers rely on output; define envelope, terminal semantics, redaction and compatibility tests. |
 | MVP platform matrix and packaging polish | 4 | After tested builds/runs; do not imply all targets from Rust portability alone. |
-| Sequence ordering/context, metadata, state and resume | 5 | Before sequence execution; define interrupted/uncertain step behavior. |
+| Sequence ordering/context, metadata, state, retention, concurrency, verification trust and resume | 5 | Before sequence execution; define interrupted/uncertain step behavior. |
 | Ralph completion, verification, limits and recovery | 6 | Before loop implementation; test false completion and bounded failure. |
 | Additional native CLI order/interface/version support | 7 | One adapter at a time, chosen from actual use; verify supported auth and provider integration. |
 | Pi transport and agent/skill mapping | 8 | Before Pi adapter; validate capability and route parity. |

@@ -1,0 +1,51 @@
+# Execution contract
+
+Status: design contract, not a published Rust API or wire schema. See [architecture](ARCHITECTURE.md), [configuration](CONFIGURATION.md), and [workflow state](WORKFLOWS.md). Phase 1 chooses transport/permission handling, Phase 2 fixes initial request/exit behavior, and Phase 4 versions machine-readable output.
+
+## Request resolution
+
+Resolve one project path, prompt source, operational mode, runtime, and model alias, plus an optional canonical agent once supported. Record whether each effective choice came from the invocation or configuration. Accept inline text, a file, or stdin; reject conflicting sources and empty content before launching work. Exact flag names and byte limits are a Phase 2 choice. A missing input must not unexpectedly launch an interactive coding session in CI.
+
+Keep primary versus specialized role separate from route and runtime. A request to review without writes must become enforceable runtime restrictions; advisory system text is insufficient.
+
+## Lifecycle
+
+Conceptual lifecycle (names are not serialized enums): resolve -> validate -> preview or prepare managed configuration -> launch -> active -> terminating if cancelled -> terminal outcome. Validation rejection and spawn failure can terminate before active work. Preview ends without executing or modifying configuration. Retrying creates a new attempt linked to the original run rather than rewriting history.
+
+A prompt acknowledgement, text chunk, clean stdout EOF, model completion, child exit, and verified task completion are different events. The adapter must identify the backend's actual terminal condition and await cleanup. Workflow verification is a separate result from successful agent execution.
+
+## Progress and outcome
+
+Every invocation has a run identity; every launched attempt has its own identity and selected route/runtime/model. Show elapsed time, useful activity, permission requests when applicable, and a final outcome. Preserve backend session identity when reported without assuming cross-runtime continuity. Report token/cost usage only with provenance and units; unavailable metrics remain unknown, not zero.
+
+Outcomes distinguish validation rejection, launch failure, runtime/provider failure, success, cancellation/deadline, and uncertain completion after an interrupted attempt. Include retry eligibility and possible side effects where known. Do not infer that absent tool events prove no tool executed after a transport failure.
+
+Human diagnostics go to stderr when stdout carries a final response or structured records. The Phase 4 machine contract must specify envelope version, IDs, timestamps/order, event types, optional provider fields, redaction, and a terminal record. Do not expose chain-of-thought as a required normalized field. Bound output buffering and document truncation rather than silently dropping completion or permission events.
+
+Numeric exit codes are fixed in Phase 2; success, failed/rejected execution, cancellation with known outcome, and uncertain completion have distinct exit statuses. Uncertainty takes precedence when cancellation or timeout may have left side effects; report that uncertainty explicitly on stderr in Phase 2 rather than waiting for Phase 4 machine records. Later structured-output additions must preserve documented shell behavior.
+
+## Adapter capability contract
+
+Record tested runtime version, launch interface, model/effort mapping, project/rule loading, progress/terminal semantics, tool and permission restrictions, headless behavior, session behavior, usage reporting, and cancellation/descendant cleanup. Mark capabilities as tested, unsupported, or unverified; a capability declaration alone is not evidence.
+
+Resolve restrictions before model work. If a runtime cannot enforce the requested constraint or route, refuse execution. In particular, inherited models, helper/subagent models, skills, MCP tools, and runtime fallback must not bypass routing/permissions. This is configuration and integration policy, not a claim of OS/network sandboxing for arbitrary commands.
+
+Runtime-managed skills, MCP, context selection, compaction and caching remain runtime responsibilities. The harness reports relevant limitations and preserves restrictions; it does not implement those subsystems for MVP.
+
+## Permissions and headless operation
+
+Phase 1 must choose and document how permission requests are allowed, denied or prompted before the first live run. A noninteractive request cannot hang waiting for a TUI; an unanswered request must follow the documented deny/refuse/timeout behavior, never implicit approval. Explicit user policy may grant tools; startup must show the effective policy and never substitute an unrelated adapter's permissive defaults.
+
+Treat project instructions, prompt files and backend output as data/instructions within the selected trust scope, not authorization to change mode or credentials. The harness is not a security sandbox around a coding runtime and cannot promise containment of arbitrary shell tools merely from a project path.
+
+## Failure and fallback
+
+Phase 3 defines classification and bounded retries. Distinguish configuration/authentication errors, unavailable endpoint/model, rate limits, transient transport errors, runtime failures, and ambiguous completion. Invalid input or unsupported restrictions are not reasons to send the prompt to a less constrained route.
+
+Fallback is only permitted in local-first and only to the configured native target. Validate the same project/agent restrictions on the new target. A deterministic pre-execution failure can be eligible. An active-attempt timeout or broken connection may leave changes; stop with uncertainty unless an explicit recovery policy authorizes continuation. Never silently send the full backend transcript to another provider.
+
+## Process and project integrity
+
+Drain stdout/stderr concurrently; test backpressure, oversized records, partial UTF-8/JSON, unexpected exits, ignored termination, and descendants holding pipes. Cancellation/deadlines apply to the process tree and cleanup as supported by the platform, with documented limitations.
+
+Detect and report an existing dirty worktree without rejecting normal developer work. Preserve pre-existing edits and untracked files. The harness must not stash, reset, clean, commit, roll back, or create worktrees automatically. Runtime tool actions remain subject to its explicit permissions; document that distinction. A later diff summary must distinguish baseline user changes from attributed run changes or state that attribution is unknown.
