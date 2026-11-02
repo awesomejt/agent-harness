@@ -125,7 +125,7 @@ sh scripts/release/smoke.sh dist/candidate 0.1.0-alpha.1
 ```
 
 `package.py` uses a fresh temporary build directory, explicit Cargo/Rust 1.88.0,
-rejects ambient compiler/linker/profile overrides, verifies Mach-O arm64/minimum
+rejects compiler/linker/profile environment overrides, verifies Mach-O arm64/minimum
 OS metadata, fixes the target and deployment build setting, verifies registry
 archives against Cargo.lock, refreshes notices from the actual target-filtered resolve graph (including dev/build dependencies),
 records commit/toolchain/lock/binary hashes and checks system-only dylib linkage.

@@ -58,12 +58,6 @@ def main():
     package = tomllib.loads((ROOT / 'Cargo.toml').read_text())['package']
     version = package['version']
     commit = run('git', 'rev-parse', 'HEAD')
-    args.output.mkdir(parents=True, exist_ok=False)
-    with tempfile.TemporaryDirectory(prefix='ah-release-build-') as build_directory:
-        build_package(args.output, version, commit, Path(build_directory))
-
-
-def build_package(output_directory, version, commit, build_directory):
     # Keep registry caches, but refuse ambient compiler/linker/profile overrides.
     overrides = [name for name in os.environ if name.startswith(
         ('CARGO_TARGET_', 'CARGO_PROFILE_', 'CARGO_BUILD_', 'RUSTC_', 'RUSTDOC'))
@@ -71,6 +65,17 @@ def build_package(output_directory, version, commit, build_directory):
                     'MACOSX_DEPLOYMENT_TARGET', 'SDKROOT')]
     if overrides:
         raise RuntimeError('unset build override variable names: ' + ', '.join(sorted(overrides)))
+    args.output.mkdir(parents=True, exist_ok=False)
+    try:
+        with tempfile.TemporaryDirectory(prefix='ah-release-build-') as build_directory:
+            build_package(args.output, version, commit, Path(build_directory))
+    except BaseException:
+        # This invocation exclusively created the output directory above.
+        shutil.rmtree(args.output)
+        raise
+
+
+def build_package(output_directory, version, commit, build_directory):
     env = dict(os.environ, MACOSX_DEPLOYMENT_TARGET='14.0', RUSTFLAGS='',
                CARGO_ENCODED_RUSTFLAGS='', CARGO_PROFILE_RELEASE_STRIP='none',
                CARGO_TARGET_DIR=str(build_directory))

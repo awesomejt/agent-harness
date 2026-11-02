@@ -49,7 +49,7 @@ will differ because source/build provenance and archive metadata are refreshed.
 
 The independent packaging review's two build-provenance concerns are resolved:
 use a fresh temporary Cargo target directory, explicit Cargo/Rust 1.88.0, reject
-ambient compiler/linker/profile overrides, and verify/record actual Mach-O arm64
+compiler/linker/profile environment overrides, and verify/record actual Mach-O arm64
 architecture and `minos 14.0`. The updated package from `860c41f` passed the same
 archive smoke with these guards. Cargo user/project configuration remains part
 of the maintainer's trusted build environment; this is not a hermetic build.
@@ -64,3 +64,11 @@ commit, normalizing tar ownership/timestamps (and gzip timestamp), checking both
 preview output streams for redaction, and making pre-publication wording
 conditional. The guarded build/provenance improvements from the independent
 review are included. Fresh packaging/install verification follows these fixes.
+
+The refreshed archive/install smoke from `ecffd01` passed, as did exact license
+refusal, archive ownership/timestamp, pinned-link, source/notice count and
+provenance checks. Grok follow-up: 0 blockers, 0 concerns, 2 nits; both addressed.
+Build environment checks now precede output creation, and failed builds remove
+only the output directory exclusively created by that invocation. The runbook
+precisely says environment overrides; Cargo configuration remains trusted as
+already noted above. Two reviews total; nit fixes require no further re-review.
