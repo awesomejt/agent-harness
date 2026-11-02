@@ -6,7 +6,7 @@ The goal is to run real project work with explicit routing, portable agent defin
 
 ## Status
 
-Phase 1 integration experiment: a minimal Rust scaffold provides `ah --help` and `ah --version`. Coding runs are not implemented yet. Rust is the accepted implementation language, with prebuilt platform binaries as the intended installation path. ACP protocol 1 and the minimal Rust stack are selected in [P1.5](docs/evidence/p1-5-integration-acceptance.md); the [holistic Phase 1 review](docs/reviews/phase-01.md) proposes a verified pass effective on [PR #13](https://github.com/awesomejt/agent-harness/pull/13) merge, after which P2.1 is next.
+Phase 2 has started after the accepted [Phase 1 review](docs/reviews/phase-01.md) merged in [PR #13](https://github.com/awesomejt/agent-harness/pull/13). P2.1 defines and validates [first-slice configuration and inputs](docs/CONFIGURATION.md); the public `ah` binary still provides help/version only. Coding runs, managed configuration and preview are not implemented yet. Rust is the accepted implementation language, with prebuilt platform binaries as the intended installation path.
 
 ## Development scaffold
 
@@ -52,9 +52,9 @@ The harness owns its LiteLLM routing configuration and managed project-level Ope
 ## Planned first-slice experience
 
 ```bash
-# Proposed interface; not implemented yet. Run from the target project.
+# Selected contract; not implemented yet. Run from the target project.
 # Replace <configured-alias> with an alias already configured in LiteLLM.
-ah single "Fix the parser and run its tests" --mode local-only --model "<configured-alias>"
+ah single "Fix the parser and run its tests" --mode local-only --model "<configured-alias>" --permissions trusted
 ```
 
 The run should show the selected route/model, stream agent activity, preserve project changes, and provide a meaningful exit status. Cancellation and missing/unreachable dependencies must be understandable. Setup instructions must distinguish installing `ah` from installing OpenCode and configuring LiteLLM.
