@@ -16,6 +16,7 @@ These documents are implementation contracts and planning records. No CLI, seria
 | [Workflow state](WORKFLOWS.md) | Sequence/Ralph recovery, context and verification contracts | Durable schema/resume 5; completion/limits 6 |
 | [Validation plan](TESTING.md) | Policy, adapter, lifecycle, sync, release and live acceptance evidence | Executable tests and commands as implementation appears |
 | [Operations](OPERATIONS.md) | Installation, diagnostics, data handling, troubleshooting and release expectations | Concrete install/upgrade/runbook commands and supported targets 2/4 |
+| [Phase reviews](PHASE_REVIEW.md) / [report template](../tasks/PHASE_REVIEW_TEMPLATE.md) | Whole-phase findings, remediation, verification and progression gates | Every phase must pass; reports live in docs/reviews/ |
 | [Project execution plan](PROJECT_PLAN.md) / [task cards](../tasks/README.md) | Recommended work/PR order, dependencies, readiness gates and evidence | Status stays only in PROJECT.md; task cards refine before execution |
 | [Implementation plan](IMPLEMENTATION.md) | Dependencies, phase exit evidence and decision timing | Tasks complete only with evidence |
 | [Git workflow](GIT_WORKFLOW.md) | Branch/PR/review/merge rules | Existing mandatory repository workflow |

@@ -5,7 +5,7 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 <a id="p2-1"></a>
 ## P2.1 — First-slice configuration and CLI contract
 
-- **Depends on:** [P1.5](01-integration.md#p1-5)
+- **Depends on:** [P1.7](01-integration.md#p1-7)
 - **Deliverable and boundary:** Fix minimal config format/location/precedence, environment key reference, prompt-input syntax, explicit mode/model selection, exits, deadlines and preview semantics. Add validation without generalizing later schemas.
 - **Acceptance evidence:** Config/input validation fixtures and a decision entry specify success/failure/known-cancelled/uncertain exits. Empty/conflicting inputs reject before launch; literal keys are excluded from serializable config.
 - **Decision/readiness gate:** AC04–AC07; no unsupported mode or optional metadata can silently widen policy.
@@ -70,7 +70,15 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 
 - **Depends on:** [P2.5](02-first-slice.md#p2-5)
 - **Deliverable and boundary:** Use the installed binary for a small real edit-and-test task. Compare direct OpenCode, exercise unavailable LiteLLM and cancellation, then record friction and immediate corrective tasks.
-- **Acceptance evidence:** All Phase 2 tasks and first-slice columns AC01–AC11 are assessed, with later-only items explicitly N/A. Link tested versions, verification, interventions and outcome; required review is complete.
+- **Acceptance evidence:** All preceding Phase 2 implementation/evidence tasks and first-slice columns AC01–AC11 are assessed, with later-only items explicitly N/A. Link tested versions, verification, interventions and outcome; required review is complete.
 - **Decision/readiness gate:** All Phase 2 dependencies are gates; no Phase 3 expansion until first-use evidence is recorded.
 - **Contract:** [docs/SPECIFICATION.md](../docs/SPECIFICATION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
+<a id="p2-9"></a>
+## P2.9 — Phase review: holistic findings and remediation
+
+- **Depends on:** [P2.6](02-first-slice.md#p2-6)
+- **Deliverable and boundary:** Review all Phase 2 deliverables together, accumulated changes since its accepted entry baseline, acceptance/live evidence, Rust architecture/contracts, tests, regressions and operational limits. The preceding task prepares evidence; it does not close the phase.
+- **Acceptance evidence:** A phase-numbered report under docs/reviews/ records the reviewed commit/PR scope, goal/feature/acceptance coverage, test/live evidence, findings, remediation and verification. A pass requires no unresolved finding; review/fix PRs follow the Git workflow.
+- **Decision/readiness gate:** Dependent phase work remains gated until the whole-phase review passes, all findings are resolved/verified, and required review/fix PRs merge. Do not substitute a set of individual PR approvals.
+- **Contract:** [Phase review procedure](../docs/PHASE_REVIEW.md) and [report template](PHASE_REVIEW_TEMPLATE.md); canonical status/evidence in [PROJECT.md](../PROJECT.md).

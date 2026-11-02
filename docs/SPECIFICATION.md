@@ -84,7 +84,7 @@ The core MVP adds all routing modes and named OpenCode agents (G1–G5). Sequenc
 
 ## Milestone acceptance matrix
 
-Every row is required for core MVP; the first-slice column shows what must already work at Phase 2. These are acceptance checks for G1–G5 and supporting features, not additional product phases. The core MVP closes only after all rows and all Phase 2–4 tasks have evidence in PROJECT.md.
+Every row is required for core MVP; the first-slice column shows what must already work at Phase 2. These are acceptance checks for G1–G5 and supporting features, not additional product phases. The core MVP closes only after all rows and all Phase 2–4 tasks have evidence in PROJECT.md and holistic Phase 4 review P4.9 passes with no unresolved findings. Every phase similarly requires its explicit review before dependent work, as defined in PHASE_REVIEW.md.
 
 | ID | Requirement | First usable slice (Phase 2) | Core MVP (Phase 4) / acceptance evidence | Tasks |
 |---|---|---|---|---|

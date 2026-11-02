@@ -6,16 +6,16 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 
 - Active phase: 1 — integration experiment ready to start; no implementation started.
 - Active implementation task/PR: none. Default work-in-progress limit: one focused task/PR.
-- Next ready task: P1.1. Next dependency chain: P1.6 permission policy → P1.2 transport experiment.
+- Current prerequisite: P0.13 holistic planning review. After its accepted pass, next ready implementation task is P1.1, then P1.6 permission policy → P1.2 transport experiment.
 - External prerequisites: CLI versions, LiteLLM/model availability and login are unverified; no external blocker has been diagnosed by this planning pass.
-- Remaining implementation backlog: 50 tasks across Phases 1–9; Phase 9 increments remain demand-gated.
+- Remaining implementation/review backlog: 59 tasks across Phases 1–9; Phase 9 increments remain demand-gated.
 - Phase 0 review: PR #1 received 0 blockers, 2 concerns, and 2 nits; all four addressed. No critical/high findings; no re-review required under docs/GIT_WORKFLOW.md.
 - Implementation: none yet.
 - Direction: Rust CLI with prebuilt binaries; OpenCode first, LiteLLM route plus native route.
-- Execution plan: [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); per-task dependencies, boundaries and evidence: [tasks/README.md](tasks/README.md). Feature/contract review (PR #2) and Rust architecture/alignment review (PR #3) are complete; task-planning review (PR #4) is complete: 0 blockers, 1 concern and 2 nits addressed; no critical/high findings.
+- Execution plan: [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); per-task dependencies, boundaries and evidence: [tasks/README.md](tasks/README.md). Feature/contract review (PR #2) and Rust architecture/alignment review (PR #3) are complete; task-planning review (PR #4) is complete: 0 blockers, 1 concern and 2 nits addressed; explicit holistic phase-review gates are being added before implementation.
 - Feature coverage: docs/FEATURE_REVIEW.md records eight upstream projects and F01–F26 dispositions; docs/README.md indexes technical contracts. No implementation has started.
 - First usable milestone: end of Phase 2. Core MVP: end of Phase 4.
-- Task IDs are stable references, not execution order; phase validation/closeout depends on every other task in that phase.
+- Task IDs are stable references, not execution order. Every phase ends with a holistic phase-review task; evidence-preparation tasks do not close a phase. Dependent phases wait for an accepted review with no unresolved findings.
 - Phase order is dependency-based, without calendar estimates. Phases 7–8 can follow Phase 4 independently of workflow expansion.
 
 ## Phase 0 — Scope and roadmap
@@ -32,6 +32,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - [x] P0.10 Validate diagrams/document consistency and complete PR review of the Rust architecture pass (PR #3; 0 blockers, 2 concerns and 3 nits addressed; no critical/high findings).
 - [x] P0.11 Draft the remaining-phase execution plan, dependency gates, detailed task cards and immediate ready queue.
 - [x] P0.12 Validate task/dependency/contract consistency and complete required PR review of the planning structure (PR #4; all three minor findings addressed; completion effective on merge).
+- [ ] P0.13 Phase review: assess the entire scope/design/plan baseline, resolve and verify all findings, and accept the report before P1.1 starts ([card](tasks/00-scope.md#p0-13)).
 
 ## Phase 1 — Integration experiment
 
@@ -43,6 +44,7 @@ Detailed scope, dependencies and evidence: [Phase 1 cards](tasks/01-integration.
 - [ ] P1.4 Evaluate a small reusable adapter/process dependency against direct SDK/runtime use; inspect license, release/API compatibility, and platform behavior ([card](tasks/01-integration.md#p1-4)).
 - [ ] P1.3 After the P1.6 permission decision, verify no implicit widening, LiteLLM model selection, project instructions, progress, cancellation, and child cleanup ([card](tasks/01-integration.md#p1-3)).
 - [ ] P1.5 Record tested versions, live evidence, selected transport/dependencies, validated Rust module/type boundaries, and unresolved limitations ([card](tasks/01-integration.md#p1-5)).
+- [ ] P1.7 Phase review: holistically assess all Phase 1 deliverables, resolve/verify findings, and accept the review before phase exit or dependent work ([card](tasks/01-integration.md#p1-7)).
 
 ## Phase 2 — First usable slice
 
@@ -56,6 +58,7 @@ Detailed scope, dependencies and evidence: [Phase 2 cards](tasks/02-first-slice.
 - [ ] P2.8 Report dirty-worktree state and preserve pre-existing edits/untracked files; test failed/cancelled runs without automatic Git mutations ([card](tasks/02-first-slice.md#p2-8)).
 - [ ] P2.5 Produce an initial platform binary with installation/setup instructions ([card](tasks/02-first-slice.md#p2-5)).
 - [ ] P2.6 Use it for a real edit-and-test task; compare direct OpenCode and record friction before expanding ([card](tasks/02-first-slice.md#p2-6)).
+- [ ] P2.9 Phase review: holistically assess all Phase 2 deliverables, resolve/verify findings, and accept the review before phase exit or dependent work ([card](tasks/02-first-slice.md#p2-9)).
 
 ## Phase 3 — Routing and fallback
 
@@ -66,6 +69,7 @@ Detailed scope, dependencies and evidence: [Phase 3 cards](tasks/03-routing.md).
 - [ ] P3.3 Add model-group references with explicit proxy-configuration handoff/validation and configured local-first fallback ([card](tasks/03-routing.md#p3-3)).
 - [ ] P3.4 Test all mode boundaries, discovery requests, inherited runtime settings, and uncertain outcomes ([card](tasks/03-routing.md#p3-4)).
 - [ ] P3.5 Demonstrate each route and eligible fallback in use; record findings ([card](tasks/03-routing.md#p3-5)).
+- [ ] P3.6 Phase review: holistically assess all Phase 3 deliverables, resolve/verify findings, and accept the review before phase exit or dependent work ([card](tasks/03-routing.md#p3-6)).
 
 ## Phase 4 — Agents and core MVP
 
@@ -78,7 +82,8 @@ Detailed scope, dependencies and evidence: [Phase 4 cards](tasks/04-core-mvp.md)
 - [ ] P4.8 Document/test inherited skills, MCP, instructions and context capabilities without bypassing route/agent restrictions ([card](tasks/04-core-mvp.md#p4-8)).
 - [ ] P4.4 Verify a coding agent and constrained reviewer; refuse unsupported restrictions ([card](tasks/04-core-mvp.md#p4-4)).
 - [ ] P4.5 Declare MVP platform support; build artifacts, setup diagnostics, sample agents/config, and usage documentation ([card](tasks/04-core-mvp.md#p4-5)).
-- [ ] P4.6 Record repeated real-use results and close core MVP against G1–G5 and AC01–AC11, including all supporting Phase 2–4 tasks ([card](tasks/04-core-mvp.md#p4-6)).
+- [ ] P4.6 Record repeated real-use results and prepare core MVP acceptance against G1–G5 and AC01–AC11, including all supporting Phase 2–4 tasks ([card](tasks/04-core-mvp.md#p4-6)).
+- [ ] P4.9 Phase review: holistically assess all Phase 4 deliverables, resolve/verify findings, and accept the review before phase exit or dependent work ([card](tasks/04-core-mvp.md#p4-9)).
 
 ## Phase 5 — Sequences
 
@@ -89,6 +94,7 @@ Detailed scope, dependencies and evidence: [Phase 5 cards](tasks/05-sequences.md
 - [ ] P5.2 Execute an ordered prompt folder through existing single-run policy ([card](tasks/05-sequences.md#p5-2)).
 - [ ] P5.3 Persist step outcomes and handle cancellation/restart without silent replay ([card](tasks/05-sequences.md#p5-3)).
 - [ ] P5.4 Validate on a real multi-step task and test recovery cases ([card](tasks/05-sequences.md#p5-4)).
+- [ ] P5.6 Phase review: holistically assess all Phase 5 deliverables, resolve/verify findings, and accept the review before phase exit or dependent work ([card](tasks/05-sequences.md#p5-6)).
 
 ## Phase 6 — Ralph
 
@@ -98,6 +104,7 @@ Detailed scope, dependencies and evidence: [Phase 6 cards](tasks/06-ralph.md).
 - [ ] P6.2 Implement fresh-context iterations and durable filesystem progress ([card](tasks/06-ralph.md#p6-2)).
 - [ ] P6.3 Enforce completion verification, iteration/time bounds, and cancellation ([card](tasks/06-ralph.md#p6-3)).
 - [ ] P6.4 Demonstrate completion, bounded non-completion, and interrupted-run recovery ([card](tasks/06-ralph.md#p6-4)).
+- [ ] P6.5 Phase review: holistically assess all Phase 6 deliverables, resolve/verify findings, and accept the review before phase exit or dependent work ([card](tasks/06-ralph.md#p6-5)).
 
 ## Phase 7 — Native adapter increments
 
@@ -111,6 +118,7 @@ Choose order from use; finish one adapter's contract before starting the next.
 - [ ] P7.4 Grok adapter: execution, events, constraints, named mapping, tests, and live example ([card](tasks/07-native-adapters.md#p7-4)).
 - [ ] P7.5 Gemini adapter: execution, events, constraints, named mapping, tests, and live example ([card](tasks/07-native-adapters.md#p7-5)).
 - [ ] P7.6 Audit final capability/version/install coverage after all four committed adapters pass; incremental docs belong to each adapter task ([card](tasks/07-native-adapters.md#p7-6)).
+- [ ] P7.7 Phase review: holistically assess all Phase 7 deliverables, resolve/verify findings, and accept the review before phase exit or dependent work ([card](tasks/07-native-adapters.md#p7-7)).
 
 ## Phase 8 — Pi
 
@@ -119,7 +127,8 @@ Detailed scope, dependencies and evidence: [Phase 8 cards](tasks/08-pi.md).
 - [ ] P8.1 Decide supported transport, agent/skill mapping, and permission handling ([card](tasks/08-pi.md#p8-1)).
 - [ ] P8.2 Implement Pi behind the same route policy and capability checks ([card](tasks/08-pi.md#p8-2)).
 - [ ] P8.3 Demonstrate Pi primary/specialized single-run parity and document capability limits; initial Pi milestone may precede sequences/Ralph ([card](tasks/08-pi.md#p8-3)).
-- [ ] P8.4 Validate Pi sequence/Ralph parity and recovery after both P8.3 and P6.4; close full Phase 8 only after this follow-up ([card](tasks/08-pi.md#p8-4)).
+- [ ] P8.4 Validate Pi sequence/Ralph parity and recovery after both P8.3 and P6.5; prepare full Phase 8 evidence after this follow-up; P8.5 closes the phase ([card](tasks/08-pi.md#p8-4)).
+- [ ] P8.5 Phase review: holistically assess all Phase 8 deliverables, resolve/verify findings, and accept the review before phase exit or dependent work ([card](tasks/08-pi.md#p8-5)).
 
 ## Phase 9 — Optional resource-aware features
 
@@ -131,6 +140,7 @@ Demand-driven, independently scoped additions; not blockers for earlier mileston
 - [ ] P9.2 Decide whether optional allocation-aware selection adds value; keep it inside permitted routes ([card](tasks/09-resource-awareness.md#p9-2)).
 - [ ] P9.3 Decide scheduling/storage/recovery semantics before adding prompt delays or a durable queue ([card](tasks/09-resource-awareness.md#p9-3)).
 - [ ] P9.4 Validate unknown quota, cooldown, scheduling, and restart behavior per selected increment; quota/ranking and scheduling have conditional independent prerequisites, not a requirement to implement all optional scope ([card](tasks/09-resource-awareness.md#p9-4)).
+- [ ] P9.5 Phase review: holistically assess all Phase 9 deliverables, resolve/verify findings, and accept the review before phase exit or dependent work ([card](tasks/09-resource-awareness.md#p9-5)).
 
 ## Feature candidates
 

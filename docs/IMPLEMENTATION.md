@@ -92,13 +92,13 @@ Choose the first target from observed needs, then deliver Claude, Codex, Grok, a
 
 Add Pi as an alternative runtime using the same policy boundary. Evaluate its supported integration and agent/skill mapping at that time.
 
-**Exit evidence:** P8.3 delivers primary/specialized single-run tasks, permitted route enforcement and documented capability limits. P8.4 verifies sequence/Ralph parity after P6.4; initial Pi use does not wait for those workflows, but full Phase 8 closeout includes this follow-up.
+**Exit evidence:** P8.3 delivers primary/specialized single-run tasks, permitted route enforcement and documented capability limits. P8.4 verifies sequence/Ralph parity after accepted review P6.5; initial Pi use does not wait for those workflows, but full Phase 8 closeout includes this follow-up and holistic review P8.5.
 
 **Decide here:** Pi transport, definition mapping, context and permission differences. Do not silently convert restrictions into advisory prompt text.
 
 ## Phase 9 — Optional quota and scheduling increments
 
-**Depends on:** a relevant completed native adapter from Phase 7 for native quota work; Phase 5 for queued execution state. Quota/ranking and scheduling are independent demand-gated increments; full Phase 7 completion is not required. **Goal:** G9.
+**Depends on:** accepted Phase 7 holistic review P7.7 for native quota work; accepted Phase 5 review P5.6 for queued execution state. Quota/ranking and scheduling remain independent demand-gated increments; D018 supersedes the earlier first-adapter shortcut. **Goal:** G9.
 
 Revisit ai-queue's usage readers, cooldown logic, prompt delays, and queue behavior as demand appears. Deliver read-only usage visibility before allocation-aware selection; deliver scheduling separately. These are not MVP or full workflow blockers.
 
@@ -106,6 +106,11 @@ Revisit ai-queue's usage readers, cooldown logic, prompt delays, and queue behav
 
 **Decide here:** provider support, freshness policy, optional ranking, storage, scheduling syntax, and recovery guarantees. A daemon is not assumed.
 
-## Phase closeout
+## Phase review and closeout
+
+Each phase has a separate holistic review task: P0.13, P1.7, P2.9, P3.6, P4.9, P5.6, P6.5, P7.7, P8.5 and P9.5. Evidence-preparation/use tasks are prerequisites, not phase exit approval. Follow [PHASE_REVIEW.md](PHASE_REVIEW.md); review the integrated phase against all applicable contracts, record findings, fix them and verify corrections before an accepted pass. Successor tasks depend on the review gate.
+
+The existing branch structure remains after accepted prerequisite reviews. Quota work now waits for P7.7 (full portfolio review); scheduling waits for P5.6; Pi workflow parity waits for P6.5. This supersedes earlier narrower readiness shortcuts. Phase 9's review repeats for newly selected increment scope without requiring unselected features.
+
 
 For each phase: run appropriate checks, record the usable example and limitations, complete PR review, update PROJECT.md, and append decisions with evidence. An unchecked task or unavailable external dependency remains visible; do not mark a milestone complete from mocked tests alone when live evidence is required.
