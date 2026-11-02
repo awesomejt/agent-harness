@@ -71,7 +71,7 @@ Locked Cargo metadata (full graph and `--filter-platform aarch64-apple-darwin`) 
 
 ## PR review and final closeout
 
-All five real OpenCode local-stub/unavailable scenarios pass. Pending final documentation checks and Grok review. This section is updated with observed results before merge; no pending check is counted as passing.
+All five real OpenCode local-stub/unavailable scenarios pass. Local Markdown file-target checks pass (506 targets); tracker inventory has 52 remaining tasks after proposed acceptance; `git diff --check` passes. [PR #13](https://github.com/awesomejt/agent-harness/pull/13) is open and Grok review is pending. This section is updated with observed results before merge; no pending check is counted as passing.
 
 ## Gate outcome
 
