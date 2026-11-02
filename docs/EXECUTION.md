@@ -36,7 +36,20 @@ Runtime-managed skills, MCP, context selection, compaction and caching remain ru
 
 ## Permissions and headless operation
 
-Phase 1 must choose and document how permission requests are allowed, denied or prompted before the first live run. A noninteractive request cannot hang waiting for a TUI; an unanswered request must follow the documented deny/refuse/timeout behavior, never implicit approval. Explicit user policy may grant tools; startup must show the effective policy and never substitute an unrelated adapter's permissive defaults.
+P1.6 fixes the experiment policy in [D020](../DECISIONS.md#2026-11-01--d020-fail-closed-experiment-permissions). The dependency-free `permission` module and synthetic request fixtures exercise this policy; they are not an ACP implementation or proof of live runtime enforcement.
+
+| Action / policy | Experiment behavior |
+|---|---|
+| File reads, edits, shell commands (including tests), network, external/MCP tools, unknown actions | Deny by default, including inside the disposable project. Project location alone grants nothing. |
+| Explicit trusted grant for one fully described request | Select only an advertised, adapter-verified allow-once option for that exact request. |
+| Allow-always, category/wildcard grants, inherited permissive defaults | Unsupported; never substitute these for allow-once. |
+| Prompt / interactive approval | Unsupported for this experiment, even with a TTY. Refuse a policy requiring prompting before launching model work. |
+
+Each attempt starts with a fresh default-deny policy. A trusted experiment driver may supply a grant after checking session authorization, requested tool arguments and scope; backend text and project instructions cannot supply grants. Bind the grant to the attempt-unique request ID, complete action descriptor (including arguments/scope) and advertised options. Consume it on the next request, including mismatch or malformed input. Changed/repeated requests need new authorization; no grants carry into retries or fallback. The Rust fixture accepts an already reviewed normalized request, not arbitrary backend labels as trusted semantics.
+
+For a valid ungranted request, select an advertised, adapter-verified denial option immediately. If none exists, respond with protocol cancellation; if cancellation is unsupported, stop the attempt. Empty request/action/option identities or duplicate option IDs are malformed: refuse and fail the attempt. Never invent option IDs or infer semantics from display labels. There is no stdin read, TUI, approval wait or implicit timeout approval in the policy function.
+
+Before a live P1.2 prompt, the adapter must show effective policy/grants, map actual transport option kinds, and verify that runtime auto-allowed tools, inherited settings, filesystem/terminal callbacks and external tools cannot bypass the selected restrictions. Configure deny/ask behavior as needed so granted operations pass through enforcement. A runtime that cannot enforce the policy is refused before model work. Permission-response send failures stop work and enter cleanup; do not retry with broader permissions. Lost transport or uncertain tool activity produces an uncertain outcome under the lifecycle contract. P1.2 establishes transport feasibility; P1.3 still owes live denial, cancellation and cleanup evidence. The experiment policy does not add CLI/config syntax or claim an OS sandbox.
 
 Treat project instructions, prompt files and backend output as data/instructions within the selected trust scope, not authorization to change mode or credentials. The harness is not a security sandbox around a coding runtime and cannot promise containment of arbitrary shell tools merely from a project path.
 
