@@ -6,13 +6,13 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 
 - Active phase: 1 — integration experiment ready to start; no implementation started.
 - Active implementation task/PR: none. Default work-in-progress limit: one focused task/PR.
-- Current prerequisite: P0.13 holistic planning review. After its accepted pass, next ready implementation task is P1.1, then P1.6 permission policy → P1.2 transport experiment.
+- Phase 0 holistic review P0.13: pass recorded in [review report](docs/reviews/phase-00.md), effective on PR #5 merge. Next ready implementation task: P1.1, then P1.6 permission policy → P1.2 transport experiment.
 - External prerequisites: CLI versions, LiteLLM/model availability and login are unverified; no external blocker has been diagnosed by this planning pass.
 - Remaining implementation/review backlog: 59 tasks across Phases 1–9; Phase 9 increments remain demand-gated.
 - Phase 0 PR #1 review: received 0 blockers, 2 concerns, and 2 nits; all four addressed. No critical/high findings; no re-review required under docs/GIT_WORKFLOW.md.
 - Implementation: none yet.
 - Direction: Rust CLI with prebuilt binaries; OpenCode first, LiteLLM route plus native route.
-- Execution plan: [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); per-task dependencies, boundaries and evidence: [tasks/README.md](tasks/README.md). Feature/contract review (PR #2) and Rust architecture/alignment review (PR #3) are complete; task-planning review (PR #4) is complete: 0 blockers, 1 concern and 2 nits addressed; explicit holistic phase-review gates are being added before implementation.
+- Execution plan: [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); per-task dependencies, boundaries and evidence: [tasks/README.md](tasks/README.md). Feature/contract review (PR #2) and Rust architecture/alignment review (PR #3) are complete; task-planning review (PR #4) is complete: 0 blockers, 1 concern and 2 nits addressed; explicit holistic phase-review gates are recorded in PR #5 (two Grok reviews; all findings resolved).
 - Feature coverage: docs/FEATURE_REVIEW.md records eight upstream projects and F01–F26 dispositions; docs/README.md indexes technical contracts. No implementation has started.
 - First usable milestone: end of Phase 2. Core MVP: end of Phase 4.
 - Task IDs are stable references, not execution order. Every phase ends with a holistic phase-review task; evidence-preparation tasks do not close a phase. Dependent phases wait for an accepted review with no unresolved findings.
@@ -32,7 +32,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - [x] P0.10 Validate diagrams/document consistency and complete PR review of the Rust architecture pass (PR #3; 0 blockers, 2 concerns and 3 nits addressed; no critical/high findings).
 - [x] P0.11 Draft the remaining-phase execution plan, dependency gates, detailed task cards and immediate ready queue.
 - [x] P0.12 Validate task/dependency/contract consistency and complete required PR review of the planning structure (PR #4; all three minor findings addressed; completion effective on merge).
-- [ ] P0.13 Phase review: assess the entire scope/design/plan baseline, resolve and verify all findings, and accept the report before P1.1 starts ([card](tasks/00-scope.md#p0-13)).
+- [x] P0.13 Phase review: scope/design/plan baseline assessed; ten findings resolved/verified, [report accepted on PR #5 merge](docs/reviews/phase-00.md), before P1.1 starts ([card](tasks/00-scope.md#p0-13)).
 
 ## Phase 1 — Integration experiment
 
