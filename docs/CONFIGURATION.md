@@ -2,6 +2,12 @@
 
 Status: format-neutral requirements. No example in this document establishes a real configuration filename, precedence table, or provider destination. Phase 2 selects these for the first slice; Phase 3 adds route/model-group details; Phase 4 fixes the canonical-agent schema and backend mapping.
 
+## Rust representation and LiteLLM boundary
+
+Deserialize into input structures, then validate into route-specific domain values as outlined in [DESIGN.md](DESIGN.md). Canonical YAML frontmatter does not require choosing YAML for the harness config file; that format remains a Phase 2 decision. Runtime state is not inherited from ai-queue's SQLite schema.
+
+The first slice references an existing LiteLLM alias. The harness owns desired endpoint/group selection and policy; the proxy executes internal routing. Phase 3 defines group representation, validation and any configuration handoff. This does not imply automatic proxy-service installation/restart/reconfiguration privileges.
+
 ## Resolution and validation
 
 Define the complete precedence among explicit invocation values, any supported environment settings, project config, optional user defaults, and built-ins before the first CLI ships. Do not add implicit parent-directory discovery without specifying its trust and conflict rules. An explicit invocation-level mode restriction stays authoritative over later prompt metadata.

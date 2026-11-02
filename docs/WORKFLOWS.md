@@ -2,6 +2,8 @@
 
 Status: behavioral requirements for Phases 5–6; storage format, command names, ordering rules, and completion protocol are intentionally not frozen. Single-run semantics live in [EXECUTION.md](EXECUTION.md).
 
+Workflow coordinators call the same Rust application execution service described in [DESIGN.md](DESIGN.md); they cannot call providers directly or bypass capability/policy validation. They enter after core MVP; durable workflow state is not needed for the first usable single run.
+
 ## Sequence inputs and context
 
 Choose deterministic filename ordering, supported file types, hidden-file behavior, empty-folder behavior, and prompt metadata precedence in Phase 5. Resolve the ordered input list before launching; retain content hashes or equivalent identities so changed prompts cannot silently resume as the same step.

@@ -2,7 +2,7 @@
 
 Living record of important design decisions for agent-harness.
 
-Entries record design intent, not implementation completion. New decisions identify superseded scope and the phase that must supply validation.
+Entries record design intent, not implementation completion. Earlier entries remain historical; D009 revises D007 scope, D010 clarifies D004 execution paths, and D015–D016 align the implementation blueprint and ownership boundaries with Rust. New decisions identify superseded scope and the phase that must supply validation.
 
 ## 2026-11-01 — D001: Name
 
@@ -88,18 +88,34 @@ Entries record design intent, not implementation completion. New decisions ident
 - **Rationale**: Technical coverage should be explicit now without presenting speculative interfaces or untested operational instructions as implemented behavior. This extends D011, not a requirement to freeze all later choices before first use.
 - **Validation**: Each phase updates its contract and links executable/live evidence from PROJECT.md. Documentation existence alone does not establish operational readiness.
 
+## 2026-11-01 — D015: Rust modular CLI and explicit MVP acceptance
+
+- **Decision**: Rust is the accepted implementation language. Start with a single Cargo package and a thin CLI over domain, policy, application, project/config and runtime-adapter boundaries. No Python scaffold, embedded Python bridge, ai-queue runtime dependency, mandatory daemon or speculative plugin workspace is required.
+- **Design status**: docs/DESIGN.md proposes internal modules/types; docs/ARCHITECTURE.md owns system/component, execution, fallback, lifecycle and deployment diagrams. Concrete Rust APIs, dependency versions, edition/MSRV and transport are validated in Phase 1 rather than frozen by diagram labels.
+- **Scope**: AC01–AC11 in docs/SPECIFICATION.md make the existing first-slice/core-MVP acceptance explicit. Core MVP remains single runs through OpenCode with all modes, configured fallback and constrained named agents plus supporting installation/diagnostic/automation behavior. Sequences/Ralph and broader runtimes remain later phases.
+- **Rationale**: The feature contract was clear but the software design lacked a Rust blueprint and diagrams. Explicit acceptance prevents supporting features being omitted or later workflows delaying first use.
+- **Validation**: Check diagram syntax and documentation/task references now; confirm architecture through Phase 1 experiment and phase-owned implementation evidence. No implementation exists yet.
+
+## 2026-11-01 — D016: Clarify LiteLLM configuration and service ownership
+
+- **Clarifies**: D005 and D010; no change to the permitted model routes or the harness-owned source of desired routing policy.
+- **Decision**: The harness owns desired endpoint/group selection, route policy and managed project runtime settings; the existing LiteLLM proxy executes internal routing. Phase 2 uses an existing alias. Phase 3 defines group representation, validation and any configuration handoff before claiming proxy configuration synchronization.
+- **Boundary**: Ownership of desired routing is not automatic privilege to install, restart or live-reconfigure the proxy service. Project-only OpenCode writes, environment key references and native-route isolation remain mandatory.
+- **Rationale**: Earlier shorthand could imply service management or a raw-completion coding runtime. The diagrams distinguish control configuration, runtime model traffic and external service operation.
+- **Validation**: P2.3 covers effective project routing; P3.3 records how group configuration is represented and matched to the proxy. Unsupported/unverified effective routing is refused rather than assumed.
+
 ## Deferred decision register
 
 | Choice | Owner phase | Decide when / required evidence |
 |---|---|---|
-| Cargo package name, initial development target | 1 | Before scaffolding/publishing; verify naming and toolchain availability. |
-| OpenCode transport and adapter/process dependencies | 1 | After a narrow experiment proves model selection, project instructions, callbacks, streaming, and cancellation. |
+| Cargo package name, Rust edition/MSRV, initial development target | 1 | Before scaffolding/publishing; verify naming and toolchain availability. |
+| OpenCode transport, adapter/process dependencies and concrete Rust interfaces | 1 | After a narrow experiment proves model selection, project instructions, callbacks, streaming, and cancellation. |
 | ACP permission-request handling (allow/deny/prompt) | 1 | Before the first live run; document the non-interactive default and prove no implicit permission widening. |
 | Config format, filename/location, precedence, exit codes, prompt-input and preview syntax | 2 | Before first-slice configuration/CLI is implemented; use the smallest schema that supports that slice. YAML is an earlier sketch, not a locked harness-config format. |
 | Project sync ownership/conflicts and no-sync validation | 2 | Before any managed project writes; prove preservation and effective routing. |
 | Release tooling and initial binary target | 2 | Before first usable distribution; validate installation and external prerequisites. |
 | Failure eligibility, retries, uncertain tool side effects | 3 | Before automatic native fallback; define refusal/recovery behavior and test it. No blind replay of potentially applied work. |
-| Model groups and native-route config isolation | 3 | Before dual routing ships; prove cloud-only cannot inherit the managed LiteLLM route. |
+| Model groups, proxy-config handoff/validation and native-route config isolation | 3 | Before dual routing ships; prove cloud-only cannot inherit the managed LiteLLM route. |
 | Canonical agent schema, destination paths, constraints | 4 | Before mapping ships; verify installed backend semantics and reject unsupported restrictions. Markdown + YAML remains canonical. |
 | Versioned machine result/events, stdout/stderr and CI contract | 4 | Before automated consumers rely on output; define envelope, terminal semantics, redaction and compatibility tests. |
 | MVP platform matrix and packaging polish | 4 | After tested builds/runs; do not imply all targets from Rust portability alone. |

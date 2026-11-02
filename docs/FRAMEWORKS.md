@@ -22,6 +22,8 @@ Research snapshot: 2026-11-01. These are evaluation candidates, not installed de
 
 [OpenCode's ACP documentation](https://opencode.ai/docs/acp/) describes `opencode acp` over stdio. Phase 1 verifies it in our actual project/model/permission setup. ACP support does not itself prove provider authentication terms or constraint compatibility.
 
+The Rust/module direction is accepted in [DESIGN.md](DESIGN.md); the candidates below are not yet locked dependencies. No Python scaffold or embedded ai-queue runtime is planned.
+
 ## Supporting stack candidates
 
 | Concern | Candidate |

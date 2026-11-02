@@ -12,7 +12,7 @@ Use small feature branches/PRs following [GIT_WORKFLOW.md](GIT_WORKFLOW.md). Spl
 
 **Exit evidence:** consistent repository docs; explicit goals, non-goals, phase dependencies, acceptance criteria, and actionable next tasks. Documentation authorship does not imply implementation exists.
 
-Feature coverage is captured in [FEATURE_REVIEW.md](FEATURE_REVIEW.md). [The documentation map](README.md) identifies technical contracts and when concrete interfaces/schemas must replace deferred choices. The feature pass adds supporting tasks inside these phases without moving the first-slice or core-MVP boundaries.
+Feature coverage is captured in [FEATURE_REVIEW.md](FEATURE_REVIEW.md). [The documentation map](README.md) identifies technical contracts and when concrete interfaces/schemas must replace deferred choices. The feature pass adds supporting tasks inside these phases without moving the first-slice or core-MVP boundaries. AC01–AC11 in SPECIFICATION.md are the core-MVP acceptance checklist; DESIGN.md and ARCHITECTURE.md provide the Rust blueprint and diagrams.
 
 ## Phase 1 — OpenCode integration experiment
 
@@ -22,7 +22,7 @@ Build the smallest Rust experiment that connects to OpenCode in a disposable pro
 
 **Exit evidence:** repeatable experiment/test output, exact tested versions, and a decision selecting the transport and minimum dependencies. If the configured LiteLLM endpoint is unavailable, report that limitation and resolve live validation before declaring the local integration proven. Do not build a general framework or a library benchmark suite.
 
-**Decide here:** Cargo package name, initial development target, OpenCode transport, minimum config needs, permission handling (including the non-interactive default before the first live run; no implicit widening). Stable ACP versus native output is an experiment, not a preselected dependency.
+**Decide here:** Cargo package name, initial development target, OpenCode transport, minimum config needs, Rust edition/MSRV, proposed module/type boundaries, permission handling (including the non-interactive default before the first live run; no implicit widening). Stable ACP versus native output is an experiment, not a preselected dependency.
 
 ## Phase 2 — First usable local coding slice
 
@@ -46,7 +46,7 @@ Add native OpenCode execution for `cloud-only`, model-group references for LiteL
 
 ## Phase 4 — Named agents; core MVP
 
-**Depends on:** Phase 3. **Goals:** G5; close G1–G5 MVP.
+**Depends on:** Phase 3. **Goals:** G5; close G1–G5 MVP against AC01–AC11, including all supporting tasks in Phases 2–4.
 
 Load canonical Markdown + YAML agents, map by name to OpenCode, add `--agent`, and support primary/specialized invocation with enforced supported constraints. Preserve user-owned agent files and show mapping conflicts. Complete setup diagnostics and release documentation for the declared MVP platforms, versioned machine result/events and headless/CI behavior. Document inherited skills/MCP/context capabilities and supported effort mapping without taking ownership of those backend subsystems.
 
