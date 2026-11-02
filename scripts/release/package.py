@@ -32,17 +32,30 @@ def main():
         parser.error('build and test on native Apple Silicon macOS only')
     if run('git', 'status', '--porcelain'):
         parser.error('commit all source changes before packaging')
-    if run('rustc', '--version').split()[1] != '1.88.0':
+    if run('rustc', '+1.88.0', '--version').split()[1] != '1.88.0':
         parser.error('Rust 1.88.0 is required')
     package = tomllib.loads((ROOT / 'Cargo.toml').read_text())['package']
     version = package['version']
     commit = run('git', 'rev-parse', 'HEAD')
     args.output.mkdir(parents=True, exist_ok=False)
+    with tempfile.TemporaryDirectory(prefix='ah-release-build-') as build_directory:
+        build_package(args.output, version, commit, Path(build_directory))
+
+
+def build_package(output_directory, version, commit, build_directory):
+    # Keep registry caches, but refuse ambient compiler/linker/profile overrides.
+    overrides = [name for name in os.environ if name.startswith(
+        ('CARGO_TARGET_', 'CARGO_PROFILE_', 'CARGO_BUILD_', 'RUSTC_', 'RUSTDOC'))
+        or name in ('RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS', 'RUSTC',
+                    'MACOSX_DEPLOYMENT_TARGET', 'SDKROOT')]
+    if overrides:
+        raise RuntimeError('unset build override variable names: ' + ', '.join(sorted(overrides)))
     env = dict(os.environ, MACOSX_DEPLOYMENT_TARGET='14.0', RUSTFLAGS='',
-               CARGO_ENCODED_RUSTFLAGS='', CARGO_PROFILE_RELEASE_STRIP='none', CARGO_TARGET_DIR=str(ROOT / 'target/release-build'))
-    subprocess.run(['cargo', 'build', '--release', '--locked', '--target', TARGET],
+               CARGO_ENCODED_RUSTFLAGS='', CARGO_PROFILE_RELEASE_STRIP='none',
+               CARGO_TARGET_DIR=str(build_directory))
+    subprocess.run(['cargo', '+1.88.0', 'build', '--release', '--locked', '--target', TARGET],
                    cwd=ROOT, env=env, check=True)
-    metadata = json.loads(run('cargo', 'metadata', '--locked', '--format-version', '1',
+    metadata = json.loads(run('cargo', '+1.88.0', 'metadata', '--locked', '--format-version', '1',
                               '--filter-platform', TARGET, env=env))
     ids = {node['id'] for node in metadata['resolve']['nodes']}
     dependencies = sorted((p for p in metadata['packages'] if p['id'] in ids and p['source']),
@@ -53,9 +66,14 @@ def main():
     with tempfile.TemporaryDirectory(prefix='ah-package-') as temporary:
         bundle = Path(temporary) / name
         bundle.mkdir()
-        binary = ROOT / 'target/release-build' / TARGET / 'release/ah'
+        binary = build_directory / TARGET / 'release/ah'
         shutil.copy2(binary, bundle / 'ah')
-        dylibs = run('otool', '-L', str(binary))
+        architecture = run('/usr/bin/lipo', '-archs', str(binary))
+        build_version = run('/usr/bin/xcrun', 'vtool', '-show-build', str(binary))
+        if architecture != 'arm64' or not any(
+                line.split() == ['minos', '14.0'] for line in build_version.splitlines()):
+            raise RuntimeError('unexpected Mach-O architecture or deployment target')
+        dylibs = run('/usr/bin/otool', '-L', str(binary))
         for line in dylibs.splitlines()[1:]:
             if not line.strip().startswith(('/usr/lib/', '/System/Library/')):
                 raise RuntimeError(f'unbundled non-system library: {line}')
@@ -109,7 +127,7 @@ def main():
             inventory.append(dict(name=dep['name'], version=dep['version'], selected_license=selected,
                                   license=dep['license'], source=dep['source'], sha256=checksum))
         shutil.copytree(ROOT / 'scripts/release/licenses', notices / 'supplemental')
-        rust_docs = Path(run('rustc', '--print', 'sysroot')) / 'share/doc/rust'
+        rust_docs = Path(run('rustc', '+1.88.0', '--print', 'sysroot')) / 'share/doc/rust'
         rust_notices = notices / 'rust-1.88.0'
         rust_notices.mkdir()
         for path in rust_docs.iterdir():
@@ -122,15 +140,17 @@ def main():
             raise RuntimeError('missing Rust standard-library notices')
         (notices / 'inventory.json').write_text(json.dumps(inventory, indent=2) + '\n')
         info = dict(version=version, source_commit=commit, target=TARGET,
-                    cargo_lock_sha256=sha(ROOT / 'Cargo.lock'), rustc=run('rustc', '-Vv'),
+                    cargo_lock_sha256=sha(ROOT / 'Cargo.lock'), rustc=run('rustc', '+1.88.0', '-Vv'),
+                    cargo=run('cargo', '+1.88.0', '-V'), architecture=architecture,
+                    macho_build_version=build_version,
                     macos=platform.mac_ver()[0], deployment_target='14.0', strip='none',
                     linker=run('xcodebuild', '-version'), dylibs=dylibs,
                     binary_sha256=sha(bundle / 'ah'), registry_packages=len(inventory))
         (bundle / 'BUILD-INFO.json').write_text(json.dumps(info, indent=2) + '\n')
-        output = args.output / f'{name}.tar.gz'
+        output = output_directory / f'{name}.tar.gz'
         with tarfile.open(output, 'w:gz') as archive:
             archive.add(bundle, arcname=name)
-        (args.output / 'SHA256SUMS').write_text(f'{sha(output)}  {output.name}\n')
+        (output_directory / 'SHA256SUMS').write_text(f'{sha(output)}  {output.name}\n')
     print(output.resolve())
 
 

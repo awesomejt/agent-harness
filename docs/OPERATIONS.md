@@ -124,12 +124,14 @@ python3 scripts/release/package.py --output dist/candidate
 sh scripts/release/smoke.sh dist/candidate 0.1.0-alpha.1
 ```
 
-`package.py` fixes the target and deployment build setting, verifies registry
+`package.py` uses a fresh temporary build directory, explicit Cargo/Rust 1.88.0,
+rejects ambient compiler/linker/profile overrides, verifies Mach-O arm64/minimum
+OS metadata, fixes the target and deployment build setting, verifies registry
 archives against Cargo.lock, refreshes notices from the actual production graph,
 records commit/toolchain/lock/binary hashes and checks system-only dylib linkage.
 It refuses a dirty checkout or an existing output directory. Python and Rust are
 maintainer tools only. The build deployment setting 14.0 is not a test claim for
-older macOS. Archives contain conservative full upstream sources to preserve
+older macOS. Archives contain complete published registry archives to preserve
 embedded notices, plus extracted license files and Rust runtime attributions.
 
 Complete PR/Grok review and merge first. Package the merged commit, smoke it,
