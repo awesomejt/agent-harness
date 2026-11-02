@@ -44,3 +44,9 @@ Port relevant behavior/test cases to Rust as needed. Its scheduling store, alloc
 ## Adoption evidence
 
 Before selecting a dependency, record the smallest needed feature, tested release/version, license and attribution, supported platforms, live integration evidence, and known limitations. Prefer a small adapter/leaf library when it avoids taking ownership of a new agent runtime. Do not let dependency defaults select routes, broaden permissions, or modify global configuration.
+
+## P1.4 evaluation outcome
+
+[D021](../DECISIONS.md#2026-11-01--d021-keep-process-policy-owned-evaluate-sdk-wire-reuse) retains direct Rust subprocess ownership. The pinned comparison rejects `cli-stream` 0.5.0 and ACP SDK 3.6.0's convenience launcher because their inherited-environment APIs cannot express the experiment's cleared/allowlisted environment. The official SDK's protocol engine over caller-owned I/O is the preferred P1.3 candidate; compatibility, runtime fit and its Rust 1.88 requirement must be validated before adoption. No Rust dependency or toolchain change has been made. P1.5 still owns final transport/dependency selection.
+
+See [P1.4 evidence](evidence/p1-4-dependency-evaluation.md) for release hashes, license/attribution inspection, exact defaults, platform limits, alternatives and outstanding lifecycle checks. The shortlist above remains research context, not an instruction to evaluate more frameworks.

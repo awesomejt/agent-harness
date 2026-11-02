@@ -137,6 +137,13 @@ Entries record design intent, not implementation completion. Earlier entries rem
 - **Boundary**: [Execution contract](docs/EXECUTION.md#permissions-and-headless-operation) specifies the adapter preflight gate. `src/permission.rs` is a transport-independent experiment with synthetic normalized request tests, not an ACP wire schema or live security claim. No new dependencies, commands, model calls or backend launches. P1.2 must verify actual transport mapping and enforcement before live work; P1.3 proves denied-action and lifecycle behavior. Earlier routing/transport decisions remain unchanged.
 - **Evidence**: [P1.6 policy fixtures](docs/evidence/p1-6-permission-policy.md). This resolves the pre-live permission decision only; Phase 1 remains open.
 
+## 2026-11-01 — D021: Keep process policy owned; evaluate SDK wire reuse
+
+- **Decision**: P1.4 retains harness-owned subprocess supervision using direct Rust process APIs. Reject `cli-stream` 0.5.0 and ACP SDK 3.6.0's `AcpAgent` launcher for the current integration: both inherit the parent environment without an environment-clear control; the SDK launcher also lacks project cwd configuration. The leaf wrapper leaves protocol dispatch and an ownership guard to us.
+- **Protocol reuse**: Prefer the official ACP SDK 3.6.0 protocol engine over caller-owned I/O as the bounded P1.3 experiment, with no process/stdio/unstable features. This is a conditional candidate, not an adopted dependency or a claim of compatibility. It avoids committing to a custom dispatcher while preserving route/permission control.
+- **Toolchain/gates**: Both pinned crates require Rust 1.88, above D019's 1.85 baseline. No toolchain change now. Before adoption, P1.3 must justify/test the MSRV and runtime/I/O fit, protocol-1 OpenCode schemas, callbacks, cancellation and cleanup; P1.5 finalizes transport/dependencies. Reject or reassess reuse if these fail, rather than weakening policy.
+- **Evidence**: [Pinned-source comparison, licenses, defaults and lifecycle gaps](docs/evidence/p1-4-dependency-evaluation.md), grounded in [P1.2 live evidence](docs/evidence/p1-2-live-acp.md). Only the existing no-prompt probe and baseline Rust checks ran; neither candidate was compiled or used for a model call. No earlier route, permission or phase-exit gate changes.
+
 ## Deferred decision register
 
 | Choice | Owner phase | Decide when / required evidence |
