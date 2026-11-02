@@ -522,6 +522,9 @@ fn verified_external(permission: &Value, descriptor: Option<&Value>) -> bool {
 /// Pinned callbacks can add generated metadata (e.g. an edit diff), while read
 /// metadata is empty. Shared arguments and normalized path aliases must agree.
 fn consistent_metadata(metadata: &Value, arguments: &Value) -> bool {
+    if metadata.is_null() {
+        return arguments.is_object();
+    }
     let (Some(metadata), Some(arguments)) = (metadata.as_object(), arguments.as_object()) else {
         return false;
     };
@@ -545,6 +548,8 @@ mod tests {
     fn permission_metadata_rejects_changed_arguments_and_path_aliases() {
         let args = json!({"filePath":"/tmp/file","command":"true"});
         assert!(consistent_metadata(&json!({}), &args));
+        assert!(consistent_metadata(&json!(null), &args));
+        assert!(!consistent_metadata(&json!([]), &args));
         assert!(consistent_metadata(
             &json!({"filepath":"/tmp/file","diff":"generated"}),
             &args

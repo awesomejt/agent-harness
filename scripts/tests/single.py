@@ -62,7 +62,7 @@ def check(case, expected, trusted=False, source='inline'):
             result=json.loads((base/'permission-result.json').read_text())
             if case not in ['duplicate','empty-id']:
                 option = result['result']['outcome'].get('optionId')
-                assert option == ('once' if trusted and case in ['read','edit','execute','search','external','unexpected-write'] else 'reject'), (case,result)
+                assert option == ('once' if trusted and case in ['read','edit','execute','search','external','unexpected-write','empty-metadata','omitted-metadata'] else 'reject'), (case,result)
         assert not (base/'rogue').exists()
         if expected == 2:
             assert not (base/'launched').exists()
@@ -84,7 +84,7 @@ for case in ['version','route','widened','agent-widened','agent-reversed','empty
 check('text',2,source='missing')
 for source in ['inline','file','stdin']:
     check('text',0,source=source)
-for case in ['read','edit','execute','search','external','other','no-once','kind-mismatch','unbound','argument-mismatch']:
+for case in ['read','edit','execute','search','external','other','no-once','kind-mismatch','unbound','argument-mismatch','empty-metadata','omitted-metadata']:
     check(case,0,trusted=True)
 check('deny',0)
 check('deny-progress',4)

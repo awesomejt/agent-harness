@@ -83,7 +83,7 @@ for line in sys.stdin:
         if case == 'oversized':
             print('x' * 8_000_001, flush=True)
             continue
-        if case in ['read','edit','execute','search','other','external','duplicate','deny','no-once','empty-id','kind-mismatch','unbound','unexpected-write','argument-mismatch']:
+        if case in ['read','edit','execute','search','other','external','duplicate','deny','no-once','empty-id','kind-mismatch','unbound','unexpected-write','argument-mismatch','empty-metadata','omitted-metadata']:
             kind = case if case in ['read','edit','execute','search','other'] else ('other' if case == 'external' else 'read')
             if case == 'kind-mismatch': kind='execute'
             raw = dict(filepath='/tmp/outside', parentDir='/tmp') if case == 'external' else dict(filePath='/tmp/example', command='true')
@@ -98,8 +98,10 @@ for line in sys.stdin:
                 send(dict(jsonrpc='2.0', method='session/update', params=dict(sessionId='test', update=dict(
                     sessionUpdate='tool_call',toolCallId='tool-1',title='Tool',kind='read' if kind=='other' or case=='kind-mismatch' else kind,rawInput=dict(filePath='/tmp/outside') if case=='external' else raw,status='pending'))))
             if case=='argument-mismatch': raw={**raw,'filePath':'/tmp/different'}
-            send(dict(jsonrpc='2.0', id=100, method='session/request_permission', params=dict(
-                sessionId='test', toolCall=dict(toolCallId='' if case == 'empty-id' else 'tool-1', title='Arbitrary', kind=kind, rawInput=raw), options=options)))
+            params=dict(sessionId='test',toolCall=dict(toolCallId='' if case=='empty-id' else 'tool-1',title='Arbitrary',kind=kind,rawInput=raw),options=options)
+            if case=='empty-metadata': params['toolCall']['rawInput']={}
+            if case=='omitted-metadata': params['toolCall'].pop('rawInput')
+            send(dict(jsonrpc='2.0',id=100,method='session/request_permission',params=params))
         else:
             send(dict(jsonrpc='2.0', method='session/update', params=dict(
                 sessionId='wrong' if case == 'wrong-session' else 'test', update=dict(sessionUpdate='agent_message_chunk',content=dict(type='text',text='OK')))))
