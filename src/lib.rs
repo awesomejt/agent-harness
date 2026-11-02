@@ -12,10 +12,24 @@ pub fn response(args: impl IntoIterator<Item = OsString>) -> Result<String, &'st
         return Err("expected at most one option; use --help");
     }
 
-    match first.as_deref().and_then(|arg| arg.to_str()) {
-        None if first.is_none() => Ok(HELP.to_owned()),
+    let Some(first) = first else {
+        return Ok(HELP.to_owned());
+    };
+    match first.to_str() {
         Some("--help" | "-h") => Ok(HELP.to_owned()),
         Some("--version" | "-V") => Ok(format!("ah {}\n", env!("CARGO_PKG_VERSION"))),
         _ => Err("unsupported argument; use --help"),
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::response;
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+
+    #[test]
+    fn non_utf8_argument_is_rejected() {
+        assert!(response([OsString::from_vec(vec![0xff])]).is_err());
     }
 }

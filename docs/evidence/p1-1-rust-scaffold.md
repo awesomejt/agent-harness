@@ -1,6 +1,6 @@
 # P1.1 — Rust scaffold evidence
 
-Date: 2026-11-01 (America/Denver). Task: [P1.1](../../tasks/01-integration.md#p1-1). Decision: [D019](../../DECISIONS.md#2026-11-01--d019-minimal-rust-scaffold-baseline). Branch: `feature/p1-1-rust-scaffold`; PR linked from PROJECT.md. Prerequisite P0.13 was accepted by merged PR #5 (baseline `e1061bb`).
+Date: 2026-11-01 (America/Denver). Task: [P1.1](../../tasks/01-integration.md#p1-1). Decision: [D019](../../DECISIONS.md#2026-11-01--d019-minimal-rust-scaffold-baseline). Branch: `feature/p1-1-rust-scaffold`; [PR #6](https://github.com/awesomejt/agent-harness/pull/6). Prerequisite P0.13 was accepted by merged PR #5 (baseline `e1061bb`).
 
 ## Scope and environment
 
@@ -23,7 +23,11 @@ cargo build --release --locked
 ./target/release/ah --version
 ```
 
-All final commands passed. Formatting and Clippy had no findings; three subprocess integration tests passed. The release binary printed `ah 0.1.0` with success. Tests verify package-version output and both version flags, help/no-argument behavior, empty success stderr, and failure with empty stdout for unsupported commands/options and extra arguments. An initial `--locked` build correctly refused the absent lockfile; generating the dependency-free lockfile resolved it before the full successful check sequence.
+All final commands passed. Formatting and Clippy had no findings; four subprocess integration tests and one Unix unit test passed. The release binary printed `ah 0.1.0` with success. Tests verify package-version output and both version flags, help/no-argument behavior, empty success stderr, and failure with empty stdout for unsupported commands/options and extra arguments. An initial `--locked` build correctly refused the absent lockfile; generating the dependency-free lockfile resolved it before the full successful check sequence.
+
+## PR review
+
+Grok completed one review on PR #6: 0 blockers, 0 concerns, 3 nits. Simplified the distinction between absent and non-UTF-8 arguments and added a Unix unit test for invalid UTF-8. Replaced panicking output macros with fallible writes and added a Unix closed-output subprocess test; output failure exits 1 without a panic. Updated PROJECT.md with the PR link and proposed post-merge state. The full check sequence passed again after these changes. Nit fixes do not require re-review under the Git workflow.
 
 ## Limits and follow-up
 

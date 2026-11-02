@@ -47,3 +47,21 @@ fn unsupported_commands_and_extra_arguments_fail() {
         assert!(String::from_utf8(output.stderr).unwrap().contains("--help"));
     }
 }
+
+#[cfg(unix)]
+#[test]
+fn closed_stdout_fails_without_panicking() {
+    use std::os::fd::OwnedFd;
+    use std::os::unix::net::UnixStream;
+    use std::process::Stdio;
+
+    let (writer, reader) = UnixStream::pair().unwrap();
+    drop(reader);
+    let output = Command::new(env!("CARGO_BIN_EXE_ah"))
+        .arg("--help")
+        .stdout(Stdio::from(OwnedFd::from(writer)))
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stderr.is_empty());
+}
