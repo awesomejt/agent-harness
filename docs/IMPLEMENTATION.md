@@ -20,15 +20,15 @@ Build the smallest Rust experiment that connects to OpenCode in a disposable pro
 
 **Exit evidence:** repeatable experiment/test output, exact tested versions, and a decision selecting the transport and minimum dependencies. If the configured LiteLLM endpoint is unavailable, report that limitation and resolve live validation before declaring the local integration proven. Do not build a general framework or a library benchmark suite.
 
-**Decide here:** Cargo package name, initial development target, OpenCode transport, minimum config needs, permission handling. Stable ACP versus native output is an experiment, not a preselected dependency.
+**Decide here:** Cargo package name, initial development target, OpenCode transport, minimum config needs, permission handling (including the non-interactive default before the first live run; no implicit widening). Stable ACP versus native output is an experiment, not a preselected dependency.
 
 ## Phase 2 — First usable local coding slice
 
 **Depends on:** Phase 1. **Goals:** G1/G2, initial G3/G4.
 
-Implement `ah single` in a project through OpenCode configured to LiteLLM. Support explicit `--mode local-only`, a model alias, minimal config, safe project-level provider sync, and `--no-sync` with route validation. Reject unimplemented modes clearly. Include streamed progress, understandable errors, cancellation, and meaningful exit codes.
+Implement `ah single` in a project through OpenCode configured to LiteLLM. Support explicit `--mode local-only`, a model alias, minimal config, safe project-level provider sync using an environment-variable reference rather than a literal key, and `--no-sync` with route validation. Reject unimplemented modes clearly. Include streamed progress, understandable errors, cancellation, and meaningful exit codes.
 
-**Exit evidence:** from a prebuilt binary on the initial supported platform, complete a real small project change and its verification; preserve project/global configuration; demonstrate LiteLLM-unavailable and cancellation behavior; prove forbidden native fallback is not invoked. Include setup and direct-OpenCode comparison notes. A text-only completion is insufficient.
+**Exit evidence:** from a prebuilt binary on the initial supported platform, complete a real small project change and its verification; preserve project/global configuration and verify a sentinel key value never appears in generated config; demonstrate LiteLLM-unavailable and cancellation behavior; prove forbidden native fallback is not invoked. Include setup and direct-OpenCode comparison notes. A text-only completion is insufficient.
 
 **Decide here:** config format/location/precedence, exit conventions, managed-config ownership and conflict behavior, initial binary release mechanism. Ship a binary and instructions; expand the platform matrix later.
 

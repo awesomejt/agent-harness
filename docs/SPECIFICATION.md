@@ -48,6 +48,8 @@ Fallback is a new execution attempt, not an assumption of resumable shared sessi
 
 Configuration must grow to cover default mode, LiteLLM URL and environment-based key reference, model groups, runtime paths, native target/model, fallback target, and project sync. File format, location, and precedence are decided incrementally before their consumers ship.
 
+Synced project configuration must never contain a literal LiteLLM key: retain an environment-variable reference supported by the backend, without resolving it into the generated file.
+
 Project OpenCode sync must preserve unrelated settings, leave global config untouched, avoid partial writes, and detect conflicting generated output. `--no-sync` skips writes; it does not waive routing validation. Native cloud routes must neither write the OpenCode provider block nor accidentally inherit the managed LiteLLM route.
 
 Canonical agents have a name, description, role (`primary`, `subagent`, or `all`), optional model alias, tool/permission constraints, and a Markdown system-prompt body. Validate the exact schema and backend destinations in Phase 4. Provider-specific filenames and permissions are verified when each adapter is implemented.

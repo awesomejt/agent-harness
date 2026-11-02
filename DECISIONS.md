@@ -4,17 +4,17 @@ Living record of important design decisions for agent-harness.
 
 Entries record design intent, not implementation completion. New decisions identify superseded scope and the phase that must supply validation.
 
-## 2026-11-01 — Name
+## 2026-11-01 — D001: Name
 
 - **Decision**: Repository and project name is `agent-harness`. CLI command is `ah` (or `agent-harness`).
 - **Rationale**: Explicit about the role; easy to search; leaves room for modes, agent sync, fallback, and Ralph loops.
 
-## 2026-11-01 — LiteLLM scope
+## 2026-11-01 — D002: LiteLLM scope
 
 - **Decision**: LiteLLM is used only for local models, open-weight subscriptions, and OpenRouter. It is **not** used as a proxy for cloud subscription traffic that would violate provider ToS.
 - **Rationale**: Avoid account suspension or request refusal. Native CLIs are driven directly for those providers.
 
-## 2026-11-01 — Operational modes
+## 2026-11-01 — D003: Operational modes
 
 - **Decision**: Support three modes via CLI flag (MVP) and later via per-prompt front-matter:
   - `local-only` — LiteLLM only.
@@ -22,22 +22,22 @@ Entries record design intent, not implementation completion. New decisions ident
   - `local-first` — LiteLLM first, native CLI fallback on failure.
 - **Rationale**: Explicit control at the entry point; matches user preference for CLI first, front-matter later.
 
-## 2026-11-01 — Dual-path executor and three capacities
+## 2026-11-01 — D004: Dual-path executor and three capacities
 
 - **Decision**: Two backends — `LiteLLMExecutor` and `NativeCLIExecutor`. Support primary agent, specialized agent, and fallback (fallback only in local-first).
 - **Rationale**: Clean separation of ToS-safe routing from direct CLI use; covers the three requested capacities.
 
-## 2026-11-01 — LiteLLM ownership and OpenCode sync
+## 2026-11-01 — D005: LiteLLM ownership and OpenCode sync
 
 - **Decision**: Harness owns LiteLLM endpoint, model groups, and routing policy. When driving OpenCode in a local-capable mode, sync the provider block into the **project-level** OpenCode config (overrides global OpenCode settings for that project only). Global OpenCode config is left alone. `--no-sync` available.
 - **Rationale**: Single source of truth; avoids maintaining two routing configs; keeps other tools/manual sessions unaffected.
 
-## 2026-11-01 — Canonical agent format
+## 2026-11-01 — D006: Canonical agent format
 
 - **Decision**: Markdown + YAML frontmatter is the canonical format. Sync maps by name into each provider’s expected location (OpenCode, Claude, Gemini, Grok, Codex TOML, Pi Skills, etc.).
 - **Rationale**: Matches the de facto standard already used by OpenCode, Claude Code, Gemini CLI, and Grok Build.
 
-## 2026-11-01 — Original MVP scope (superseded below)
+## 2026-11-01 — D007: Original MVP scope (superseded below)
 
 - **Decision**: Start with OpenCode for local models + OpenRouter (via LiteLLM) and direct OpenCode runs. CLI `--mode` flag first. Agent sync for OpenCode. Single / sequence / Ralph modes. Pi and other native CLIs later. Other open-source subscription fallbacks stay inside LiteLLM.
 - **Rationale**: Smallest useful surface that exercises the dual-path design and the user’s existing LiteLLM instance.
@@ -52,7 +52,7 @@ Entries record design intent, not implementation completion. New decisions ident
 ## 2026-11-01 — D009: First slice before core MVP
 
 - **Decision**: Phase 2 delivers one real project coding run through OpenCode + LiteLLM in local-only mode. Phase 4 closes the core MVP with all operational modes, configured fallback, and named OpenCode agents. Sequences and Ralph are separate later milestones, followed by additional runtimes and optional resource awareness.
-- **Supersedes**: The original requirement to include single/sequence/Ralph in the first MVP; no full-product workflow goal is dropped.
+- **Supersedes**: D007, the original requirement to include single/sequence/Ralph in the first MVP; no full-product workflow goal is dropped.
 - **Rationale**: Start learning through useful execution quickly. Do not wait for every workflow or provider.
 - **Validation**: Each usable phase records representative tasks and direct-tool comparisons in PROJECT.md. Goals and exit evidence are in docs/SPECIFICATION.md and docs/IMPLEMENTATION.md.
 
@@ -81,6 +81,7 @@ Entries record design intent, not implementation completion. New decisions ident
 |---|---|---|
 | Cargo package name, initial development target | 1 | Before scaffolding/publishing; verify naming and toolchain availability. |
 | OpenCode transport and adapter/process dependencies | 1 | After a narrow experiment proves model selection, project instructions, callbacks, streaming, and cancellation. |
+| ACP permission-request handling (allow/deny/prompt) | 1 | Before the first live run; document the non-interactive default and prove no implicit permission widening. |
 | Config format, filename/location, precedence, exit codes | 2 | Before first-slice configuration/CLI is implemented; use the smallest schema that supports that slice. YAML is an earlier sketch, not a locked harness-config format. |
 | Project sync ownership/conflicts and no-sync validation | 2 | Before any managed project writes; prove preservation and effective routing. |
 | Release tooling and initial binary target | 2 | Before first usable distribution; validate installation and external prerequisites. |

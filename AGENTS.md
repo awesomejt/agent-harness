@@ -57,7 +57,7 @@ Support primary agent, specialized agent (reviewer/debater/etc.), and fallback (
 ## When implementing
 
 - Preserve the dual-path routing policy (LiteLLMExecutor + NativeCLIExecutor conceptually). Separate model route from runtime/transport: an OpenCode subprocess can serve either route. OpenCode owns the inner coding-agent loop; raw HTTP completion is not a coding run.
-- Keep the CLI surface small and add flags only with their phase: `--mode`, optional `--model`, `--agent`, `--fallback`, `--harness`, `--no-sync`. Reject unsupported modes explicitly; no speculative command skeletons are needed for later workflows.
+- Keep the CLI surface small: Phase 2 introduces `--mode`, optional `--model`, and `--no-sync`; Phase 4 introduces `--agent`. Decide fallback overrides in Phase 3 and runtime-selection syntax in Phases 7–8 before adding corresponding flags. Reject unsupported modes explicitly; no speculative command skeletons are needed for later workflows.
 - Document any deviation from the decisions in `DECISIONS.md`.
 - Follow the Git workflow above for all code changes.
 

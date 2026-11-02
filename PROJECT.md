@@ -4,7 +4,8 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 
 ## Current state
 
-- Active phase: 0 — scope and roadmap documentation, pending PR review.
+- Active phase: 1 — integration experiment ready to start; no implementation started.
+- Phase 0 review: PR #1 received 0 blockers, 2 concerns, and 2 nits; all four addressed. No critical/high findings; no re-review required under docs/GIT_WORKFLOW.md.
 - Implementation: none yet.
 - Direction: Rust CLI with prebuilt binaries; OpenCode first, LiteLLM route plus native route.
 - Next implementation task: P1.1, a narrow OpenCode integration experiment.
@@ -17,13 +18,13 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - [x] P0.2 Separate first slice, core MVP, sequences, Ralph, and broader integrations.
 - [x] P0.3 Record Rust direction, route/transport clarification, and deferred decisions.
 - [x] P0.4 Capture reuse candidates and validation criteria without adopting them prematurely.
-- [ ] P0.5 Complete documentation consistency checks and required PR review.
+- [x] P0.5 Complete documentation consistency checks and required PR review (PR #1; four minor findings addressed).
 
 ## Phase 1 — Integration experiment
 
 - [ ] P1.1 Create a minimal Rust package on a feature branch; select a nonconflicting package name and initial development target.
 - [ ] P1.2 Exercise OpenCode ACP with a disposable project; compare native structured output if needed.
-- [ ] P1.3 Verify LiteLLM model selection, project instructions, permissions, progress, cancellation, and child cleanup.
+- [ ] P1.3 Define permission-request handling and its non-interactive default before the first live run; verify no implicit widening, LiteLLM model selection, project instructions, progress, cancellation, and child cleanup.
 - [ ] P1.4 Evaluate a small reusable adapter/process dependency against direct SDK/runtime use; inspect license, release/API compatibility, and platform behavior.
 - [ ] P1.5 Record tested versions, live evidence, selected transport/dependencies, and unresolved limitations.
 
@@ -31,7 +32,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 
 - [ ] P2.1 Define minimal config, precedence, environment key reference, and exit conventions.
 - [ ] P2.2 Implement `ah single` with `local-only`, project selection, model alias, and visible resolved route.
-- [ ] P2.3 Implement project provider sync that preserves unrelated settings; test conflicts, interrupted writes, global-config preservation, and `--no-sync` route validation.
+- [ ] P2.3 Implement project provider sync that preserves unrelated settings; test conflicts, interrupted writes, global-config preservation, absence of literal LiteLLM keys (use a sentinel secret), and `--no-sync` route validation.
 - [ ] P2.4 Stream progress, classify failures, handle cancellation, and verify no cloud-native fallback.
 - [ ] P2.5 Produce an initial platform binary with installation/setup instructions.
 - [ ] P2.6 Use it for a real edit-and-test task; compare direct OpenCode and record friction before expanding.
