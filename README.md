@@ -6,7 +6,7 @@ The goal is to run real project work with explicit routing, portable agent defin
 
 ## Status
 
-Phase 2 is in progress after the accepted [Phase 1 review](docs/reviews/phase-01.md). `ah single` now runs OpenCode **1.18.30** over ACP against the configured LiteLLM alias on macOS. Managed project routing and explicit inline/file/stdin inputs are implemented. Progress hardening, preview, dirty-project reporting and distribution remain later Phase 2 tasks; this is a development binary, not a first-slice release.
+Phase 2 is in progress after the accepted [Phase 1 review](docs/reviews/phase-01.md). `ah single` now runs OpenCode **1.18.30** over ACP against the configured LiteLLM alias on macOS. Managed project routing and explicit inline/file/stdin inputs are implemented. Bounded progress/cancellation and read-only preview are implemented; dirty-project reporting and distribution remain later Phase 2 tasks; this is a development binary, not a first-slice release.
 
 ## Development scaffold
 
@@ -81,3 +81,11 @@ The first adapter isolates HOME/XDG and ignores unmanaged OpenCode settings duri
 ## License
 
 See [LICENSE](LICENSE).
+
+Inspect a resolved plan without starting OpenCode, contacting LiteLLM or writing configuration:
+
+```bash
+ah single "Review this project" --preview
+```
+
+Preview validates the same inputs and managed routing as execution. It reports required changes, choice sources and local OpenCode discovery, with secrets and prompt contents omitted. Version/capability, service and alias availability remain unverified; exit 0 confirms only a valid local plan. Use `--no-sync` to require an already matching project route.

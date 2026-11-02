@@ -16,25 +16,49 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
         Ok(cwd) => cwd,
         Err(_) => return Exit::Invalid,
     };
-    let resolved = (|| {
+    let resolved: Result<_, crate::config::Invalid> = (|| {
         let invocation = Invocation::parse(args, &cwd)?;
-        let config = Config::open(&invocation.config_path())?;
-        invocation.resolve(
+        let config_path = invocation.config_path();
+        let config = Config::open(&config_path)?;
+        let request = invocation.resolve(
             config,
             |name| std::env::var_os(name),
             std::io::stdin().lock(),
-        )
+        )?;
+        Ok((request, config_path))
     })();
-    let request = match resolved {
+    let (request, config_path) = match resolved {
         Ok(request) => request,
         Err(error) => {
             progress.event(format!("{}; use --help", error.0));
+            if error.0 == crate::config::MISSING_KEY {
+                progress.event(
+                    "set the environment variable named by litellm.api_key_env before retrying",
+                );
+            }
             return Exit::Invalid;
         }
     };
     if request.preview {
-        progress.event("preview is not yet supported");
-        return Exit::Invalid;
+        return match Plan::prepare(&request) {
+            Ok(plan) => {
+                use std::io::Write;
+                let report = crate::preview::render(&request, &plan, &config_path);
+                if std::io::stdout()
+                    .lock()
+                    .write_all(report.as_bytes())
+                    .is_ok()
+                {
+                    Exit::Success
+                } else {
+                    Exit::Failed
+                }
+            }
+            Err(error) => {
+                progress.event(error.0);
+                Exit::Invalid
+            }
+        };
     }
     #[cfg(not(target_os = "macos"))]
     {

@@ -4,6 +4,8 @@ use std::ffi::OsString;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+pub(crate) const MISSING_KEY: &str = "API key environment reference is missing or empty";
+
 pub const CONFIG_NAME: &str = "ah.json";
 pub const MAX_INPUT_BYTES: u64 = 1_048_576;
 pub const DEFAULT_TIMEOUT_SECS: u64 = 1800;
@@ -351,7 +353,7 @@ impl Invocation {
             return Err(Invalid("project must be a directory"));
         }
         if key_lookup(&config.litellm.api_key_env).is_none_or(|key| key.is_empty()) {
-            return Err(Invalid("API key environment reference is missing or empty"));
+            return Err(Invalid(MISSING_KEY));
         }
         let prompt = match self.prompt {
             PromptSource::Inline(text) => bounded(text.as_bytes())?,

@@ -51,18 +51,10 @@ impl Runtime {
         deadline: tokio::time::Instant,
         progress: crate::progress::Progress,
     ) -> Result<Self, Exit> {
-        let executable = std::env::var_os("PATH")
-            .into_iter()
-            .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
-            .filter(|p| p.is_absolute())
-            .map(|p| p.join("opencode"))
-            .find(|p| {
-                use std::os::unix::fs::PermissionsExt;
-                p.metadata()
-                    .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-            })
-            .and_then(|p| p.canonicalize().ok())
-            .ok_or(Exit::Invalid)?;
+        let executable = crate::preview::discover_runtime().ok_or_else(|| {
+            progress.event("OpenCode missing: install 1.18.30 on an absolute PATH entry");
+            Exit::Invalid
+        })?;
         let home = PrivateHome::new().map_err(|_| Exit::Failed)?;
         let mut config = plan.runtime_routing();
         config["provider"]["ah-litellm"]["options"]["apiKey"] = json!("{env:AH_RUNTIME_API_KEY}");
