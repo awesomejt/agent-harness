@@ -1,76 +1,73 @@
 # Architecture
 
-High-level architecture of **agent-harness**.
+The harness separates model-route policy from agent runtimes and their transports. This clarifies the earlier dual-executor sketch; see [DECISIONS.md](../DECISIONS.md).
 
-## Components
-
-```
-+-------------------------------------------------------------+
-|                        agent-harness CLI                     |
-|  (single | sequence | ralph)  +  --mode / --agent / …       |
-+----------------------------+--------------------------------+
-                             |
-                             v
-+----------------------------+--------------------------------+
-|                     Mode & Policy Layer                      |
-|  Resolves operational mode, selects backend(s), applies     |
-|  fallback rules, loads agent definition                     |
-+-------------+------------------------------+---------------+
-              |                              |
-              v                              v
-+-------------+--------------+   +-----------+----------------+
-|     LiteLLMExecutor        |   |    NativeCLIExecutor       |
-|  - HTTP to LiteLLM proxy   |   |  - Spawn official CLI      |
-|  - Model groups            |   |  - OpenCode (MVP)          |
-|  - Budgets / fallbacks     |   |  - Claude, Codex, Grok,    |
-|    already in LiteLLM      |   |    Gemini (later)          |
-+----------------------------+   +----------------------------+
-              |                              |
-              v                              v
-+----------------------------+   +----------------------------+
-|   OpenCode config sync     |   |   Agent definition mapper  |
-|  (project-level only)      |   |  (canonical → backend)      |
-+----------------------------+   +----------------------------+
+```text
+CLI: single / sequence / ralph
+              |
+              v
+Resolve configuration + canonical agent + capabilities
+              |
+              v
+Mode policy: select permitted route and eligible fallback
+              |
+       +------+-------+
+       |              |
+       v              v
+LiteLLM route      Native subscription route
+       |              |
+Project provider   Official CLI authentication
+sync/validation    and explicit native target
+       |              |
+       +------+-------+
+              v
+Runtime adapter: OpenCode first; other CLIs and Pi later
+              |
+Transport: ACP / structured CLI output (selected by experiment)
+              |
+Progress events + result + cancellation + attempt record
 ```
 
-## Data flow (local-first example)
+## Route and runtime are separate
 
-1. CLI parses mode, agent name, prompt (or sequence / Ralph task).
-2. Policy layer loads canonical agent definition (if any).
-3. If mode allows LiteLLM:
-   - Optionally sync OpenCode provider config (when driving OpenCode).
-   - Call LiteLLMExecutor.
-4. If LiteLLM fails (or mode is cloud-only):
-   - Map agent definition to the target native CLI format if needed.
-   - Call NativeCLIExecutor with the appropriate binary and args.
-5. Return result (or continue Ralph / sequence loop).
+`LiteLLMExecutor` and `NativeCLIExecutor` remain conceptual execution paths, not a requirement for exactly two concrete Rust types. The policy layer chooses the allowed model route. The runtime adapter executes the coding task. The transport communicates with that runtime.
 
-## Configuration ownership
+OpenCode can run as a subprocess over ACP or another supported interface while its model calls go through LiteLLM. A subprocess therefore does not imply cloud-only. A native OpenCode run must select its native target without inheriting a LiteLLM model from harness-managed settings.
 
-| Concern | Owner | Notes |
-|---------|-------|-------|
-| LiteLLM URL, model groups, fallback policy | Harness | Source of truth |
-| Project OpenCode provider block | Harness (sync) | Written only for local-capable OpenCode runs |
-| Global OpenCode config | User / OpenCode | Left untouched |
-| Native CLI credentials | Native CLI | Never handled by harness or LiteLLM |
-| Canonical agent definitions | Harness directory | Synced outward by name |
+Direct HTTP to LiteLLM is suitable for discovery/diagnostics and optional text-only work. It supplies no coding tools by itself. The MVP does not add a custom tool loop to make raw completions act as coding runs.
 
-## Agent definition mapping
+## Single-run flow
 
-Canonical Markdown + frontmatter is loaded once. A mapper emits the backend-specific representation:
+1. Resolve project, explicit mode, model alias, and optional agent definition.
+2. Validate configuration, capabilities, and route restrictions before launching work.
+3. For a LiteLLM route, merge/validate only project-managed provider settings. `--no-sync` skips mutation, not validation.
+4. Drive OpenCode in the project, enforcing supported agent constraints and collecting progress/outcome.
+5. For local-first eligible failure, record the failed attempt and apply the Phase 3 recovery policy before launching the configured native target. Unknown tool side effects are not automatically replayed.
+6. Return an outcome or pass it to the sequence/Ralph outer loop.
 
-- OpenCode / Claude / Gemini / Grok: nearly identical Markdown files into the expected directory.
-- Codex: TOML conversion.
-- Pi: SKILL.md (Agent Skills standard) or prompt injection for MVP.
+## Ownership
 
-## Extensibility
+| Concern | Owner |
+|---|---|
+| Mode, allowed routes, model groups, native fallback selection | Harness |
+| Model routing within the configured LiteLLM route | Harness-owned LiteLLM configuration / proxy |
+| Project OpenCode managed provider settings | Harness sync, preserving unrelated content |
+| Global OpenCode config | User; never modified |
+| Native credentials and authentication | Official native CLI |
+| Tool execution and inner agent loop | Existing runtime |
+| Canonical definitions and name-based mapping | Harness |
+| Sequence/Ralph orchestration and durable progress | Harness, added in Phases 5–6 |
 
-- New native CLIs are additional NativeCLIExecutor targets.
-- New harnesses (Pi) are additional sync targets and invocation backends.
-- Model groups and fallback order live in config, not code.
+## Internal boundaries
 
-## Boundaries
+Use a small set of modules for CLI/configuration, policy, runtime adapters, project sync, agent loading, and outcomes. Add workflow state only when implementing sequences. Concrete traits and crate layout are selected from the integration experiment; do not build a plugin framework before a second adapter needs it.
 
-- The harness does not implement its own agent loop for the MVP; it drives existing tools (OpenCode, later others).
-- State for Ralph loops is filesystem-based (files, git) so it survives process restarts.
-- No long-running daemon is required for MVP; each CLI invocation is self-contained.
+A common event/outcome vocabulary should preserve meaningful backend details and distinguish configuration/authentication, availability, rate limits, runtime failure, cancellation, and uncertain completion. Normalize only what the harness needs to make correct decisions.
+
+Each adapter reports supported features. Missing permission or tool restrictions cause refusal rather than implicit widening. Fresh sessions, resumed sessions, specialized roles, and streamed events must be validated per backend rather than assumed portable.
+
+## Persistence and process lifetime
+
+Early single runs need observable attempts and final outcomes, not a mandatory database. Sequence and Ralph durable state is filesystem-based; schema and interrupted-run semantics are decided before those phases ship. Child processes and descendants must terminate correctly on cancellation/deadline. Pipe draining, event backpressure, and partial output are part of the adapter acceptance criteria.
+
+No long-running daemon is required. Prebuilt binaries remove the harness language runtime requirement, but selected agent CLIs and the LiteLLM service remain external prerequisites.

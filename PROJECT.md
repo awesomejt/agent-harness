@@ -1,79 +1,104 @@
-# PROJECT.md
+# Project tracker
 
-Living status and task list for **agent-harness**.
+Last updated: 2026-11-01. Status is maintained here; phase contracts are in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
 
-Last updated: 2026-11-01
+## Current state
 
-## Status
+- Active phase: 0 — scope and roadmap documentation, pending PR review.
+- Implementation: none yet.
+- Direction: Rust CLI with prebuilt binaries; OpenCode first, LiteLLM route plus native route.
+- Next implementation task: P1.1, a narrow OpenCode integration experiment.
+- First usable milestone: end of Phase 2. Core MVP: end of Phase 4.
+- Phase order is dependency-based, without calendar estimates. Phases 7–8 can follow Phase 4 independently of workflow expansion.
 
-**Phase**: 0 — Documentation  
-**State**: Design captured; ready for scaffolding  
-**MVP target**: OpenCode + LiteLLM dual path with operational modes
+## Phase 0 — Scope and roadmap
 
-## Current focus
+- [x] P0.1 Draft complete goals, boundaries, and milestone success criteria.
+- [x] P0.2 Separate first slice, core MVP, sequences, Ralph, and broader integrations.
+- [x] P0.3 Record Rust direction, route/transport clarification, and deferred decisions.
+- [x] P0.4 Capture reuse candidates and validation criteria without adopting them prematurely.
+- [ ] P0.5 Complete documentation consistency checks and required PR review.
 
-Complete documentation and decide on scaffolding next steps (language, config schema, Ralph signal).
+## Phase 1 — Integration experiment
 
-## Task list
+- [ ] P1.1 Create a minimal Rust package on a feature branch; select a nonconflicting package name and initial development target.
+- [ ] P1.2 Exercise OpenCode ACP with a disposable project; compare native structured output if needed.
+- [ ] P1.3 Verify LiteLLM model selection, project instructions, permissions, progress, cancellation, and child cleanup.
+- [ ] P1.4 Evaluate a small reusable adapter/process dependency against direct SDK/runtime use; inspect license, release/API compatibility, and platform behavior.
+- [ ] P1.5 Record tested versions, live evidence, selected transport/dependencies, and unresolved limitations.
 
-### Phase 0 — Documentation
-- [x] DECISIONS.md
-- [x] README.md + AGENTS.md
-- [x] docs/SPECIFICATION.md
-- [x] docs/DESIGN.md
-- [x] docs/ARCHITECTURE.md
-- [x] docs/IMPLEMENTATION.md
-- [x] docs/FRAMEWORKS.md
-- [x] docs/GIT_WORKFLOW.md
-- [x] PROJECT.md (this file)
+## Phase 2 — First usable slice
 
-### Phase 1 — Scaffolding
-- [ ] Choose implementation language
-- [ ] CLI skeleton with `--mode`
-- [ ] Config file loader
-- [ ] Basic error handling
+- [ ] P2.1 Define minimal config, precedence, environment key reference, and exit conventions.
+- [ ] P2.2 Implement `ah single` with `local-only`, project selection, model alias, and visible resolved route.
+- [ ] P2.3 Implement project provider sync that preserves unrelated settings; test conflicts, interrupted writes, global-config preservation, and `--no-sync` route validation.
+- [ ] P2.4 Stream progress, classify failures, handle cancellation, and verify no cloud-native fallback.
+- [ ] P2.5 Produce an initial platform binary with installation/setup instructions.
+- [ ] P2.6 Use it for a real edit-and-test task; compare direct OpenCode and record friction before expanding.
 
-### Phase 2 — LiteLLM path
-- [ ] LiteLLMExecutor
-- [ ] Model group resolution
-- [ ] Single-shot via LiteLLM
-- [ ] Error classification for fallback
+## Phase 3 — Routing and fallback
 
-### Phase 3 — OpenCode native path
-- [ ] NativeCLIExecutor (OpenCode)
-- [ ] Per-project OpenCode config sync
-- [ ] `--no-sync`
-- [ ] Single-shot via OpenCode
+- [ ] P3.1 Define eligible failures, retry limits, and partial-work recovery policy.
+- [ ] P3.2 Add explicit native OpenCode target/model and cloud-only execution isolated from managed LiteLLM routing.
+- [ ] P3.3 Add model-group references and configured local-first fallback.
+- [ ] P3.4 Test all mode boundaries, discovery requests, inherited runtime settings, and uncertain outcomes.
+- [ ] P3.5 Demonstrate each route and eligible fallback in use; record findings.
 
-### Phase 4 — Agent definitions
-- [ ] Canonical agent loader
-- [ ] OpenCode emitter
-- [ ] `--agent` flag
-- [ ] Specialized-agent constraints
+## Phase 4 — Agents and core MVP
 
-### Phase 5 — Execution modes
-- [ ] Sequence mode
-- [ ] Ralph loop + completion signal
-- [ ] local-first fallback path
+- [ ] P4.1 Define/validate canonical YAML schema and actual OpenCode agent destinations.
+- [ ] P4.2 Add name-based emission, collision handling, and `--agent` selection.
+- [ ] P4.3 Implement primary/specialized execution and enforce supported model/tool/permission constraints.
+- [ ] P4.4 Verify a coding agent and constrained reviewer; refuse unsupported restrictions.
+- [ ] P4.5 Declare MVP platform support; build artifacts, setup diagnostics, sample agents/config, and usage documentation.
+- [ ] P4.6 Record repeated real-use results and close core MVP against G1–G5.
 
-### Phase 6 — Polish
-- [ ] Example config + sample agents
-- [ ] Usage examples in README
-- [ ] Basic tests
+## Phase 5 — Sequences
 
-## Open questions
+- [ ] P5.1 Decide ordering, context, failure policy, metadata precedence, state schema, and resume interface.
+- [ ] P5.2 Execute an ordered prompt folder through existing single-run policy.
+- [ ] P5.3 Persist step outcomes and handle cancellation/restart without silent replay.
+- [ ] P5.4 Validate on a real multi-step task and test recovery cases.
 
-- Ralph completion signal (DONE file, promise tag, exit code, external test)?
-- Final config schema and file location?
-- Language lock (Python vs other)?
-- Exact OpenCode non-interactive flags?
+## Phase 6 — Ralph
 
-## References
+- [ ] P6.1 Evaluate Rust Ralph examples; decide completion verification, limits, and recovery.
+- [ ] P6.2 Implement fresh-context iterations and durable filesystem progress.
+- [ ] P6.3 Enforce completion verification, iteration/time bounds, and cancellation.
+- [ ] P6.4 Demonstrate completion, bounded non-completion, and interrupted-run recovery.
 
-- [DECISIONS.md](DECISIONS.md)
-- [docs/SPECIFICATION.md](docs/SPECIFICATION.md)
-- [docs/DESIGN.md](docs/DESIGN.md)
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
-- [docs/FRAMEWORKS.md](docs/FRAMEWORKS.md)
-- [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md)
+## Phase 7 — Native adapter increments
+
+Choose order from use; finish one adapter's contract before starting the next.
+
+- [ ] P7.1 Choose first additional native CLI and record its supported integration/authentication.
+- [ ] P7.2 Claude adapter: execution, events, constraints, named mapping, tests, and live example.
+- [ ] P7.3 Codex adapter: execution, events, constraints, named mapping, tests, and live example.
+- [ ] P7.4 Grok adapter: execution, events, constraints, named mapping, tests, and live example.
+- [ ] P7.5 Gemini adapter: execution, events, constraints, named mapping, tests, and live example.
+- [ ] P7.6 Maintain adapter capability/version matrix and installation instructions as each ships.
+
+## Phase 8 — Pi
+
+- [ ] P8.1 Decide supported transport, agent/skill mapping, and permission handling.
+- [ ] P8.2 Implement Pi behind the same route policy and capability checks.
+- [ ] P8.3 Demonstrate primary/specialized runs and supported sequence/Ralph parity when available.
+
+## Phase 9 — Optional resource-aware features
+
+Demand-driven, independently scoped additions; not blockers for earlier milestones.
+
+- [ ] P9.1 Reassess ai-queue usage readers and introduce non-spending quota visibility where supported.
+- [ ] P9.2 Decide whether optional allocation-aware selection adds value; keep it inside permitted routes.
+- [ ] P9.3 Decide scheduling/storage/recovery semantics before adding prompt delays or a durable queue.
+- [ ] P9.4 Validate unknown quota, cooldown, scheduling, and restart behavior for each increment delivered.
+
+## Deferred decisions
+
+See the owner phase and decision triggers in [DECISIONS.md](DECISIONS.md). Open choices do not block unrelated earlier work.
+
+## Use observations and blockers
+
+No Rust implementation runs recorded yet. The earlier ai-queue review passed 59 mocked tests; that does not validate this project's live integrations or current CLI compatibility.
+
+When a milestone is used, add date, task, tested versions, route/model, outcome, manual intervention, direct-tool comparison, and resulting task/decision IDs here. Record external blockers with their next validation action.
