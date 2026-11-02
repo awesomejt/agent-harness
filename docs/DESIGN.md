@@ -1,77 +1,37 @@
-# Design
+# Design rationale
 
-Design decisions and rationale for **agent-harness**.
+[Specification](SPECIFICATION.md) defines goals; [DECISIONS.md](../DECISIONS.md) records decisions and [ARCHITECTURE.md](ARCHITECTURE.md) defines boundaries.
 
-See [DECISIONS.md](../DECISIONS.md) for the living record and [SPECIFICATION.md](SPECIFICATION.md) for requirements.
+## Learn through use
 
-## Core problem
+The first milestone must perform a real coding task. A single local-only OpenCode run through LiteLLM exercises the most important integration without waiting for multi-provider mapping or autonomous workflows. Usable phases provide evidence about setup friction, routing clarity, permissions, output, and recovery.
 
-Many AI coding agent tools cannot safely share a single routing layer when cloud subscriptions are involved. Proxying Anthropic, OpenAI, or similar subscription traffic through a third-party harness risks ToS violations, account suspension, or refused requests. At the same time, users want:
+The core MVP then adds the complete mode policy and named agents. Sequences and Ralph remain product goals but do not delay first use or core MVP. Later choices receive an owner phase and a decision trigger so planning stays complete without guessing every implementation detail now.
 
-- A single entry point.
-- Local models and OpenRouter via an existing LiteLLM instance.
-- Explicit control over local vs cloud.
-- Agent/subagent definitions that work across tools.
-- Single-shot, sequenced, and Ralph-loop execution.
+## Rust and distribution
 
-## Dual-path design
+Rust is the planned implementation language, reflecting the user's preference for binary installation and willingness to learn it. Select a nonconflicting Cargo package name separately from repository/CLI naming. Prebuilt binaries are the primary user installation experience; Cargo installation can remain an optional developer path.
 
-Two independent backends:
+The integration experiment determines libraries and transport. AI assistance does not remove the need to understand ownership, cancellation, process lifetime, or platform differences. Test those boundaries directly.
 
-```
-                    +------------------+
-                    |   agent-harness  |
-                    |   (CLI / modes)  |
-                    +--------+---------+
-                             |
-              +--------------+--------------+
-              |                             |
-     +--------v--------+           +--------v--------+
-     | LiteLLMExecutor |           | NativeCLIExecutor|
-     | (local, OR,     |           | (Claude, Codex,  |
-     |  open-weight)   |           |  Grok, Gemini,   |
-     +-----------------+           |  OpenCode, …)    |
-                                   +-----------------+
-```
+## Existing runtimes supply coding behavior
 
-- **LiteLLM path**: Safe for local models, open-weight subscriptions, and OpenRouter. The harness talks HTTP to the user’s existing LiteLLM proxy.
-- **Native CLI path**: Official binaries only. No proxying of cloud subscription credentials or traffic.
+The product orchestrates installed tools. OpenCode owns its inner model/tool loop; the harness owns route selection, configuration, definition mapping, and outer workflows. Raw LiteLLM completions do not replace a coding runtime. This avoids taking on an agent framework solely to issue HTTP calls.
 
-The operational mode selects which path(s) are allowed and in what order.
+Model route and runtime transport are orthogonal. Both LiteLLM-backed and native-model OpenCode runs may use the same executable and transport. Enforce policy on the effective route, including inherited configuration and tool/subagent model choices.
 
-## Operational modes as first-class policy
+## Explicit policy and recoverable work
 
-Modes are not an afterthought; they are the policy that selects backends:
+Mode restrictions are stronger than availability, quota ranking, or fallback convenience. Provider credentials stay in native tools; no subscription-token extraction or prohibited proxying.
 
-- `local-only` — LiteLLMExecutor only.
-- `cloud-only` — NativeCLIExecutor only.
-- `local-first` — LiteLLMExecutor, then NativeCLIExecutor on failure.
+Coding attempts have side effects. Timeouts and interrupted streams may leave applied changes; a naive retry can duplicate work. Classify failure and expose uncertainty before adding automatic fallback or resume. Durable workflows must record enough evidence to distinguish completed, failed, and uncertain work without promising exactly-once execution.
 
-CLI flag is the MVP control surface. Per-prompt front-matter overrides come later so the entry point stays simple and explicit.
+## Configuration and portable definitions
 
-## Ownership of routing
+Project-level sync provides one source of truth while preserving user/global settings. Validate effective routing even when writes are skipped. Canonical Markdown + YAML agents map by name, but actual destinations and enforceable permissions are verified per backend. Portability includes an honest capability report and refusal of unsupported restrictions.
 
-The harness is the source of truth for LiteLLM endpoint, model groups, and fallback policy. When it drives OpenCode in a local-capable mode it syncs the relevant provider block into the project-level OpenCode config. This:
+## Selective reuse
 
-- Avoids two divergent routing configs.
-- Leaves global OpenCode settings alone.
-- Keeps native cloud CLI sessions unaffected.
+Use ai-queue's HTTP/error handling, test patterns, and later usage readers as behavioral references. Do not import its allocation-first routing, tools-disabled temporary execution, TOML agent schema, or SQLite queue as the default architecture.
 
-## Canonical agents
-
-Markdown + YAML frontmatter was chosen because it is already the de facto format across OpenCode, Claude Code, Gemini CLI, and Grok Build. Codex (TOML) and Pi (Skills) are mapped rather than forced into a different primary format. Name-based mapping keeps definitions portable.
-
-## Three capacities
-
-Primary, specialized, and fallback are orthogonal to the mode:
-
-- Primary and specialized differ mainly in constraints (tools, model, permissions, or subagent invocation).
-- Fallback is only meaningful in `local-first` and reuses the same prompt against a native CLI.
-
-## Ralph loop
-
-The Ralph pattern (filesystem-persisted iterative loop, fresh context per iteration, completion signal) is implemented as an outer loop around an existing harness (OpenCode for MVP) rather than a new agent runtime. Existing OpenCode Ralph plugins or a thin wrapper around `opencode run` are acceptable.
-
-## Frameworks considered
-
-See [FRAMEWORKS.md](FRAMEWORKS.md) for the list of tools and libraries under consideration and the current recommendation.
+Evaluate Rust ACP/adapter/process libraries behind our boundaries. Borrow Ralph and configuration-sync patterns where useful. Avoid adopting a whole framework when a leaf component satisfies the requirement. Preserve required attribution when code is reused.

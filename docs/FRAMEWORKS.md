@@ -1,36 +1,44 @@
-# Frameworks and Tools
+# Tools and reuse candidates
 
-Tools and frameworks under consideration or already in use for **agent-harness**.
+Research snapshot: 2026-11-01. These are evaluation candidates, not installed dependencies or compatibility guarantees. Recheck the selected release's API, license, platform behavior, and provider integration at adoption. Do not mix repository-head examples with an older published crate without checking differences.
 
-## In use / planned for MVP
+## Product dependencies
 
-| Tool | Role | Notes |
-|------|------|-------|
-| **LiteLLM** | Model gateway for local models, open-weight subscriptions, OpenRouter | Already running on user’s Docker/Proxmox. Harness owns config and syncs to OpenCode. Not used for cloud subscription proxying. |
-| **OpenCode** | Primary agent harness for MVP | Local models + OpenRouter via LiteLLM; also direct native runs. Agent definitions as Markdown + frontmatter in `.opencode/agents/`. |
+- Existing LiteLLM proxy: model gateway for allowed local/open-weight/OpenRouter routes; not replaced by a Rust gateway.
+- OpenCode: initial coding runtime for LiteLLM-backed and native routes.
+- Additional native CLIs and Pi: incrementally evaluated in Phases 7–8.
 
-## Planned post-MVP
+## Rust integration candidates
 
-| Tool | Role | Notes |
-|------|------|-------|
-| **Pi** | Alternative minimal harness | Skills (SKILL.md / Agent Skills standard), TypeScript extensions. Multiple Ralph loop packages exist. Good candidate for wider interest. |
-| **Claude Code** | Native cloud CLI | Subagents as Markdown + frontmatter in `.claude/agents/`. Direct invocation only. |
-| **OpenAI Codex** | Native cloud CLI | Custom agents as TOML in `.codex/agents/`. Direct invocation only. |
-| **Grok Build** | Native cloud CLI | Agents as Markdown in `.grok/agents/`. Direct invocation only. |
-| **Gemini CLI** | Native cloud CLI | Subagents as Markdown + frontmatter in `.gemini/agents/`. Direct invocation only. |
+| Candidate | Relevant reuse | Evaluation boundary |
+|---|---|---|
+| [Official ACP Rust SDK](https://github.com/agentclientprotocol/rust-sdk) | Structured client/agent communication, examples, test utilities | First transport candidate; verify installed OpenCode compatibility and required client callbacks. |
+| [getlatentic/agent-harness](https://github.com/getlatentic/agent-harness) | Harness trait, normalized events, CLI/ACP adapters | MIT/Apache-2.0; API is evolving. Evaluate a pinned release behind our policy layer; optional in-process tool loop is outside MVP. |
+| [cli-stream](https://github.com/getlatentic/agent-harness/tree/main/crates/cli-stream) | Leaf subprocess streaming/cancellation component | Independently evaluate tree cleanup, pipe draining, backpressure, runtime fit, and supported platforms. |
+| [harness-cli](https://github.com/ayshptk/harness-cli) | CLI adapters and event normalization | Manifest declares MIT; inspect invocation defaults, cancellation, noisy output, version compatibility, and license artifacts before reuse. |
+| [Ralph Orchestrator](https://github.com/mikeyobrien/ralph-orchestrator) | Loop, roles, verification, persisted task examples | MIT; reference for Phase 6. Its current Unix-oriented release configuration is not evidence of Windows parity. |
+| [agents-cli](https://github.com/agentsfolder/agents-cli) | Canonical config projection, preview, drift, fixtures | Its schema/settings projection differs from our named-agent format. Inspect relevant implementation/license before adoption. |
+| [Goose](https://github.com/aaif-goose/goose) / [Rig](https://github.com/0xPlaygrounds/rig) | Broader agent application/framework examples | Reference material; importing a new inner agent loop would require a separate scope decision. |
 
-## Patterns and standards
+[OpenCode's ACP documentation](https://opencode.ai/docs/acp/) describes `opencode acp` over stdio. Phase 1 verifies it in our actual project/model/permission setup. ACP support does not itself prove provider authentication terms or constraint compatibility.
 
-| Item | Role | Notes |
-|------|------|-------|
-| **Agent Skills standard** | Portable skill format | Used by Pi and increasingly by other tools. SKILL.md with name + description frontmatter. |
-| **Ralph loop** | Iterative agent pattern | Filesystem-persisted state, fresh context per iteration, completion signal. Outer loop around existing harness for MVP. |
-| **Markdown + YAML frontmatter** | Canonical agent definition | De facto standard across OpenCode, Claude Code, Gemini CLI, Grok Build. |
+## Supporting stack candidates
 
-## Explicitly out of scope for routing
+| Concern | Candidate |
+|---|---|
+| CLI | [clap](https://docs.rs/clap/latest/clap/) |
+| Async process and I/O | [Tokio](https://docs.rs/tokio/latest/tokio/process/index.html), optional evaluated wrapper |
+| HTTP to LiteLLM | [reqwest](https://docs.rs/reqwest/latest/reqwest/); typed serialization with Serde |
+| Config/agent parsing | Serde plus an evaluated maintained parser; decide config format in Phase 2 and full agent schema in Phase 4 |
+| Diagnostics/errors | tracing and typed errors; concrete selection in Phase 1–2 |
+| Release binaries/installers | [cargo-dist](https://axodotdev.github.io/cargo-dist/), evaluated in Phase 2 |
 
-Cloud subscription traffic for Anthropic, OpenAI, xAI, Google, etc. is **not** routed through LiteLLM. The harness invokes the official CLIs directly so Terms of Service are respected.
+## ai-queue reuse
 
-## Language / implementation (open)
+The sibling ai-queue project supplies HTTP transport/error-classification patterns, injectable fake runners/clocks/transports, CLI response parsers, and later non-spending usage-reader examples. Its 59 tests passed during the initial review; current live integrations were not validated by that test run.
 
-Python is acceptable for initial scaffolding. A stronger evidence-based language decision can still be made before locking the implementation. The architecture (dual-path executor, config ownership, agent mapping) is language-agnostic.
+Port relevant behavior/test cases to Rust as needed. Its scheduling store, allocation-ranked routing, isolated tools-disabled sends, and simplified frontmatter parser are not drop-in implementations of our requirements.
+
+## Adoption evidence
+
+Before selecting a dependency, record the smallest needed feature, tested release/version, license and attribution, supported platforms, live integration evidence, and known limitations. Prefer a small adapter/leaf library when it avoids taking ownership of a new agent runtime. Do not let dependency defaults select routes, broaden permissions, or modify global configuration.
