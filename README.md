@@ -6,7 +6,11 @@ The goal is to run real project work with explicit routing, portable agent defin
 
 ## Status
 
-Phase 2 is in progress after the accepted [Phase 1 review](docs/reviews/phase-01.md). `ah single` now runs OpenCode **1.18.30** over ACP against the configured LiteLLM alias on macOS. Managed project routing and explicit inline/file/stdin inputs are implemented. Bounded progress/cancellation and read-only preview are implemented; dirty-project reporting and distribution remain later Phase 2 tasks; this is a development binary, not a first-slice release.
+Phase 2 is in progress after the accepted [Phase 1 review](docs/reviews/phase-01.md). `ah single` now runs OpenCode **1.18.30** over ACP against the configured LiteLLM alias on macOS. Managed project routing and explicit inline/file/stdin inputs are implemented. Bounded progress/cancellation, read-only preview and dirty-project reporting are implemented. The first Apple Silicon macOS pre-release is available via the [installation runbook](docs/OPERATIONS.md); real-use acceptance and holistic Phase 2 review remain open.
+
+## Install
+
+Download the Apple Silicon macOS prebuilt binary from [v0.1.0-alpha.1](https://github.com/awesomejt/agent-harness/releases/tag/v0.1.0-alpha.1). Follow the [checksum, installation and prerequisite instructions](docs/OPERATIONS.md). Binary users need no Rust or Python; coding runs separately require OpenCode 1.18.30 and an existing LiteLLM service. Only macOS 27.0.1 on Apple Silicon has been release-tested.
 
 ## Development scaffold
 
@@ -20,7 +24,7 @@ cargo clippy --all-targets --locked -- -D warnings
 cargo test --locked
 ```
 
-The Cargo package is `awesomejt-agent-harness`; the binary is `ah`. The initial verified development target is Apple Silicon macOS (`aarch64-apple-darwin`). Other platforms and release installation remain unverified. See [P1.1 evidence](docs/evidence/p1-1-rust-scaffold.md) for the tested baseline. Prebuilt distribution starts in Phase 2.
+The Cargo package is `awesomejt-agent-harness`; the binary is `ah`. The initial verified development target is Apple Silicon macOS (`aarch64-apple-darwin`). Other platforms remain unverified. See [P1.1 evidence](docs/evidence/p1-1-rust-scaffold.md) for the tested baseline. P2.5 supplies the initial prebuilt distribution.
 
 The separate [P1.3 ACP lifecycle experiment](docs/evidence/p1-3-lifecycle.md) uses Rust 1.88.0 via explicit `cargo +1.88.0` commands and its own manifest/lockfile under `scripts/experiments/acp_lifecycle/`. It verifies SDK wire compatibility and macOS lifecycle behavior with the same toolchain now selected for the public scaffold. The production adapter now consumes the same pinned SDK 3.6.0/Tokio 1.48.0 transport stack; the standalone experiment remains separate regression tooling.
 
@@ -60,7 +64,7 @@ ah single "Fix the parser and run its tests" --mode local-only --model "<configu
 
 The command requires an existing LiteLLM alias and nonempty environment key reference. It reports the selected route/model, buffers bounded assistant text until successful completion, and writes human diagnostics to stderr. `--prompt-file task.txt` and `--prompt-file -` select file/stdin input. Default permissions deny tools; only explicit `--permissions trusted` authorizes host-level file and shell access. This is not a sandbox.
 
-The first adapter isolates HOME/XDG and ignores unmanaged OpenCode settings during execution, preserving them on disk. It requires effective primary/helper routing and exact permission-rule verification before prompting. Active interruption or transport loss without a terminal response returns **4 (uncertain)**; inspect effects before trying again. There is no fallback or automatic retry. Preview remains unavailable until P2.7. See [configuration](docs/CONFIGURATION.md), [execution](docs/EXECUTION.md) and [P2.2 evidence](docs/evidence/p2-2-local-only-run.md).
+The first adapter isolates HOME/XDG and ignores unmanaged OpenCode settings during execution, preserving them on disk. It requires effective primary/helper routing and exact permission-rule verification before prompting. Active interruption or transport loss without a terminal response returns **4 (uncertain)**; inspect effects before trying again. There is no fallback or automatic retry. Use `--preview` for a read-only local plan. See [configuration](docs/CONFIGURATION.md), [execution](docs/EXECUTION.md) and [P2.2 evidence](docs/evidence/p2-2-local-only-run.md).
 
 ## Project records
 
