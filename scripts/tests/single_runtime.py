@@ -106,6 +106,9 @@ def main():
     parser.add_argument('--binary',type=Path,default=ROOT/'target/debug/ah',help='Path to the ah binary to test')
     parser.add_argument('--timeout-secs',type=int,default=300)
     args=parser.parse_args()
+    args.binary=args.binary.expanduser().resolve()
+    if not args.binary.is_file() or not os.access(args.binary,os.X_OK):
+        parser.error(f'not an executable ah binary: {args.binary}')
     assert not (args.live and args.cancel),"cancellation fixture uses the local deterministic model only"
     with server(args) as (s,endpoint),tempfile.TemporaryDirectory(prefix='ah-single-runtime-') as d, tempfile.TemporaryDirectory(prefix='ah-outside-') as outside:
         cwd=Path(d).resolve();s.cwd=cwd;s.outside=Path(outside).resolve()

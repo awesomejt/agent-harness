@@ -1,6 +1,6 @@
 # P2.6 — Installed first-slice real use
 
-Date: 2026-11-02 (America/Denver). Entry baseline: `b18c68f` (P2.5 PR #21 merged). Task: [P2.6](../../tasks/02-first-slice.md#p2-6). Completion takes effect after required PR review/merge. P2.9 remains the Phase 2 exit gate.
+Date: 2026-11-02 (America/Denver). Entry baseline: `b18c68f` (P2.5 PR #21 merged). Task: [P2.6](../../tasks/02-first-slice.md#p2-6). Completion takes effect on [PR #22](https://github.com/awesomejt/agent-harness/pull/22) merge after the review closeout below. P2.9 remains the Phase 2 exit gate.
 
 ## Published binary and prerequisites
 
@@ -50,7 +50,7 @@ Prior task evidence: [P2.1](p2-1-config-contract.md), [P2.2](p2-2-local-only-run
 
 Each path had one fresh-project trial in this task, without automatic retry or fallback. The trials overlapped at the service, so elapsed times are observations only and cannot establish comparative overhead. Both completed the task; direct OpenCode needed the manually assembled provider/tool/environment configuration. The harness supplied validated project sync, isolation, exact grants, progress, deadline and outcome handling. Neither path's successful text substitutes for verification.
 
-The harness candidate added an unnecessary bare `return` after server cleanup. Primary-agent inspection removed it before integration; the two useful changes were retained. Direct OpenCode produced the two requested changes without that extra statement. No model was asked to retry the same project. The candidate's `--help` and the following independent deterministic runtime checks passed before integration; final integrated checks repeat them after removing the unnecessary statement.
+The harness candidate added an unnecessary bare `return` after server cleanup. Primary-agent inspection removed it before integration; the two useful changes were retained. Direct OpenCode produced the two requested changes without that extra statement. No model was asked to retry the same project. The candidate's `--help` and the following independent deterministic runtime checks passed before integration; final integrated checks passed again after removing the unnecessary statement, including the unchanged default development-binary path.
 
 The published binary with the updated script completed a deterministic real-OpenCode arithmetic edit/test, exit **0**, six grants, 16 tool events, `end_turn`, cleanup confirmed. A separate fresh deterministic project cancelled after the actual edit/test: SIGINT produced `session/cancel`, backend `cancelled`, cleanup confirmed and exit **3** in about 3.1 seconds. Both the edited function and success-only marker remained; independent `python3 test_calc.py` passed after each run. This cancellation uses the local deterministic model, not external inference; remote cancellation/containment is not claimed.
 
@@ -81,6 +81,13 @@ python3 scripts/tests/preview.py
 python3 scripts/tests/worktree.py
 ```
 
+The unavailable-endpoint observation and direct OpenCode maintenance comparison were one-off manual trials; they are not covered by the repeatable commands above. The method sections record their setup and results for P2.9 assessment.
+
 For the maintenance comparison, copy the entry-baseline script into two new Git-rooted projects and ask each path to add the Path-valued `--binary` argument, preserve assertions, use the argument as the subprocess executable and run `--help`. Use the isolated configuration and observer described above; never reuse an uncertain project. The optional `--live` command above is a new arithmetic trial, not a reproduction of the maintenance prompt. No private driver, raw transcript, temporary project path or credential is needed to consume the evidence.
 
 All 38 Rust tests, formatting, locked Clippy, 55 public CLI cases plus the no-sync repetition, preview and dirty-project suites passed. Published archive smoke and the installed runtime success/cancellation checks passed. No new production binary is needed for this test-driver/documentation change. Required Grok review and PR merge complete task acceptance; the holistic review remains separate.
+
+
+## PR #22 review closeout
+
+[Grok review](https://github.com/awesomejt/agent-harness/pull/22#pullrequestreview-5744575404): 0 blockers, 0 concerns, two nits. Both addressed: binary paths expand/resolve and missing/non-executable files return an argparse error before server/project setup; the repeatability section explicitly identifies the unavailable-service and direct-comparison observations as manual trials. Missing/non-executable rejection and relative-path normalization checks passed; the final installed-binary success/cancellation and default-path checks passed again after validation was added. One review; no re-review required for nits. P2.9 remains the next gate.
