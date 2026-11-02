@@ -53,6 +53,7 @@ Support primary agent, specialized agent (reviewer/debater/etc.), and fallback (
 - PROJECT.md owns task status; docs/SPECIFICATION.md owns full goals; docs/IMPLEMENTATION.md owns phase acceptance; DECISIONS.md owns decisions and deferred choices.
 - docs/README.md indexes technical contracts; docs/FEATURE_REVIEW.md owns feature dispositions. Candidate features are not implementation authorization. Finalize each phase's interfaces and schemas before shipping it.
 - docs/DESIGN.md defines the proposed Rust module/domain blueprint and docs/ARCHITECTURE.md owns the diagrams. AC01–AC11 in docs/SPECIFICATION.md are the explicit MVP acceptance checklist; proposed internal names are not frozen public APIs.
+- docs/PROJECT_PLAN.md defines execution order and readiness; tasks/ phase cards define dependency/scope/evidence. PROJECT.md remains the only mutable status board. Default to one active implementation task/PR; selection/demand gates are required before native-adapter or optional-resource work.
 - Work in small focused phases. Ship/use the first slice before broadening it; record live evidence and friction. Mocked tests alone do not close milestones that require live integration.
 - Resolve deferred choices at their consuming phase. Do not block single-run delivery on Ralph, all provider mappings, or scheduling.
 

@@ -104,6 +104,14 @@ Entries record design intent, not implementation completion. Earlier entries rem
 - **Rationale**: Earlier shorthand could imply service management or a raw-completion coding runtime. The diagrams distinguish control configuration, runtime model traffic and external service operation.
 - **Validation**: P2.3 covers effective project routing; P3.3 records how group configuration is represented and matched to the proxy. Unsupported/unverified effective routing is refused rather than assumed.
 
+## 2026-11-01 — D017: Execution plan and single-source task structure
+
+- **Decision**: Keep mutable task status and current work in PROJECT.md. Store static per-task dependencies, scope, gates and acceptance evidence in tasks/ phase files; docs/PROJECT_PLAN.md owns recommended execution order, milestone dependencies, risk checkpoints and small PR boundaries. No additional tracker service, YAML backend or runtime queue is introduced.
+- **Task refinement**: Extract permission policy into P1.6 before the first live transport run; P1.3 remains lifecycle/route validation. Split Pi single-run acceptance P8.3 from workflow parity P8.4, which requires P6.4. These are dependency clarifications of existing scope, not new feature families.
+- **Scheduling**: Default to one active implementation task/PR. Additional native adapters require a recorded target selection; optional resource work requires demand selection and only the relevant prerequisite adapter/workflow. Do not require the entire provider portfolio for a quota increment or force scheduling into quota work.
+- **Rationale**: A phase checklist alone does not identify a next ready task, consuming decisions or reviewable evidence. Static cards avoid duplicated mutable status while retaining stable P/G/F/AC/D traceability.
+- **Validation**: Every remaining implementation task has exactly one card and resolvable dependencies; check acyclicity, conditional gates, links, phase/acceptance coverage and task order. Implementation completion remains gated by evidence and required PR/review/merge workflow.
+
 ## Deferred decision register
 
 | Choice | Owner phase | Decide when / required evidence |

@@ -38,4 +38,6 @@ Each supported release target needs an actual build and installation smoke test;
 
 ## Traceability and closeout
 
+Detailed task acceptance/dependencies are in [tasks/](../tasks/README.md); recommended milestone/PR order is in [PROJECT_PLAN.md](PROJECT_PLAN.md). P1.6 records/tests permission policy before P1.2 live execution; P1.3 validates the complete lifecycle. Pi workflow parity P8.4 runs after P6.4 even if Pi single-run acceptance happened earlier.
+
 Use G IDs for goals, F IDs for feature dispositions, AC IDs for milestone acceptance, P IDs for tasks, and D IDs for decisions. Validate the Mermaid diagrams and cross-document references when architecture changes; diagram validation is documentation tooling, not a Node.js runtime requirement for ah. Link phase evidence from PROJECT.md with date, task, tested versions, route/model, observed outcome, interventions, direct-tool comparison and limitations. A feature is complete only when its acceptance evidence is linked, docs reflect implemented behavior, and required PR review is complete.

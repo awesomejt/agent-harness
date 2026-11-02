@@ -2,6 +2,8 @@
 
 [PROJECT.md](../PROJECT.md) owns task status. [SPECIFICATION.md](SPECIFICATION.md) owns goals. Phases below define order and acceptance evidence; later decisions are made at their phase boundary.
 
+Recommended execution/PR order and cross-phase dependencies are in [PROJECT_PLAN.md](PROJECT_PLAN.md). Detailed task cards are in [tasks/README.md](../tasks/README.md); task status remains only in PROJECT.md. These cards refine the existing phases without fixing later implementation choices.
+
 ## Working method
 
 Use small feature branches/PRs following [GIT_WORKFLOW.md](GIT_WORKFLOW.md). Split each phase into focused changes; a phase is not one large PR. Every implementation change carries appropriate tests and updates its task/decision records. Ship and use each usable milestone before broadening it. Review findings can reorder later work without redefining completed evidence.
@@ -22,7 +24,7 @@ Build the smallest Rust experiment that connects to OpenCode in a disposable pro
 
 **Exit evidence:** repeatable experiment/test output, exact tested versions, and a decision selecting the transport and minimum dependencies. If the configured LiteLLM endpoint is unavailable, report that limitation and resolve live validation before declaring the local integration proven. Do not build a general framework or a library benchmark suite.
 
-**Decide here:** Cargo package name, initial development target, OpenCode transport, minimum config needs, Rust edition/MSRV, proposed module/type boundaries, permission handling (including the non-interactive default before the first live run; no implicit widening). Stable ACP versus native output is an experiment, not a preselected dependency.
+**Decide here:** Cargo package name, initial development target, OpenCode transport, minimum config needs, Rust edition/MSRV, proposed module/type boundaries, permission handling (P1.6 fixes the non-interactive default before P1.2 live work; P1.3 validates behavior without implicit widening). Stable ACP versus native output is an experiment, not a preselected dependency.
 
 ## Phase 2 — First usable local coding slice
 
@@ -90,13 +92,13 @@ Choose the first target from observed needs, then deliver Claude, Codex, Grok, a
 
 Add Pi as an alternative runtime using the same policy boundary. Evaluate its supported integration and agent/skill mapping at that time.
 
-**Exit evidence:** primary and specialized tasks, permitted route enforcement, supported workflow parity, and a documented mapping of capabilities that cannot be preserved.
+**Exit evidence:** P8.3 delivers primary/specialized single-run tasks, permitted route enforcement and documented capability limits. P8.4 verifies sequence/Ralph parity after P6.4; initial Pi use does not wait for those workflows, but full Phase 8 closeout includes this follow-up.
 
 **Decide here:** Pi transport, definition mapping, context and permission differences. Do not silently convert restrictions into advisory prompt text.
 
 ## Phase 9 — Optional quota and scheduling increments
 
-**Depends on:** Phase 7 for native quota adapters; Phase 5 for queued execution state. **Goal:** G9.
+**Depends on:** a relevant completed native adapter from Phase 7 for native quota work; Phase 5 for queued execution state. Quota/ranking and scheduling are independent demand-gated increments; full Phase 7 completion is not required. **Goal:** G9.
 
 Revisit ai-queue's usage readers, cooldown logic, prompt delays, and queue behavior as demand appears. Deliver read-only usage visibility before allocation-aware selection; deliver scheduling separately. These are not MVP or full workflow blockers.
 
