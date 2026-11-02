@@ -17,7 +17,7 @@ fn version_matches_package_metadata() {
 }
 
 #[test]
-fn help_explains_scaffold_scope() {
+fn help_explains_single_scope() {
     for args in [vec![], vec!["--help"], vec!["-h"]] {
         let output = Command::new(env!("CARGO_BIN_EXE_ah"))
             .args(args)
@@ -26,7 +26,7 @@ fn help_explains_scaffold_scope() {
         assert!(output.status.success());
         let stdout = String::from_utf8(output.stdout).unwrap();
         assert!(stdout.contains("Usage: ah [--help | --version]"));
-        assert!(stdout.contains("coding runs are not implemented yet"));
+        assert!(stdout.contains("ah single PROMPT"));
         assert!(output.stderr.is_empty());
     }
 }

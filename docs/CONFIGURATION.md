@@ -1,6 +1,6 @@
 # Configuration and agent contract
 
-Status: P2.1 fixes the first-slice input contract below and implements library validation. The public binary still supports help/version only until P2.2. P2.3 owns managed OpenCode configuration and effective-route validation; P2.7 implements preview. Phase 3 adds route/model-group details; Phase 4 fixes canonical agents.
+Status: P2.1 fixes the first-slice input contract below and implements library validation. P2.2 exposes `ah single` on tested macOS/OpenCode 1.18.30. P2.3 owns managed OpenCode configuration and effective-route validation; P2.7 implements preview. Phase 3 adds route/model-group details; Phase 4 fixes canonical agents.
 
 ## Version 1 first-slice configuration (D024)
 
@@ -29,7 +29,7 @@ Validate the whole config even if invocation flags override fields; malformed/un
 ### Selected invocation and preview syntax
 
 ```bash
-# Contract for P2.2, not a runnable command in P2.1:
+# Runnable with the P2.2 development binary:
 ah single "Fix the parser and run tests" --mode local-only --permissions trusted
 ah single --prompt-file task.txt --project ./repo --config ./repo/ah.json
 cat task.txt | ah single --prompt-file -
@@ -99,3 +99,13 @@ Markdown body plus YAML frontmatter is canonical. Names map deterministically to
 Name validation must prevent path traversal and ambiguous output names. Validate YAML structures, duplicate names/keys, collisions with user-owned definitions and unsupported restrictions. Preview output and mapping diagnostics before applying. Fixtures compare emitted content and permissions against tested backend versions.
 
 No backend is assumed to have the same subagent semantics or tools. Include a capability/mapping report and refuse unsupported required restrictions. Skills/instruction loading and MCP registration remain backend-owned; mapping an agent into a skill does not prove equivalent permissions.
+
+## P2.2 isolated OpenCode launch (D026)
+
+The first adapter consumes only the transaction's validated routing snapshot. It disables OpenCode project-config discovery, uses a private mode-0700 temporary HOME/XDG tree, clears inherited environment variables and passes a generated `OPENCODE_CONFIG_CONTENT`. Unmanaged project/global config, plugins, MCP, commands and custom agents are not loaded; their files remain untouched. Project `AGENTS.md` remains an instruction source. Runtime writes inside its private tree are removed after completion. Only PATH and the selected key value under reserved `AH_RUNTIME_API_KEY` cross the environment boundary; no provider login stores or inherited OpenCode overrides participate. Authorized shell commands inherit this restricted environment and may access host resources; this is not containment.
+
+Before applying the managed plan or launching ACP, bounded subprocess checks require version 1.18.30, effective primary/helper/provider/allowlist equality, exact generated permissions/tools and empty custom-agent/plugin/MCP settings. The build agent must have the exact ordered permission suffix. Legacy tool compatibility may not introduce auto-allows; tool-output external-directory auto-allow is explicitly suppressed. `--no-sync` still goes through every effective check. Unsupported versions/capabilities refuse, without a model turn.
+
+Trusted grants join the same-session ACP permission callback to its matching tool-call event's full raw arguments. OpenCode's read callback itself has empty metadata, so it cannot alone authorize the operation. The pinned runtime sends complete arguments in an `in_progress` update before asking; completed/failed updates retire that descriptor. Normal kinds must agree; shared callback arguments and normalized filepath aliases must match the tool event. Generated diff metadata remains trusted runtime data. Omitted/null callback metadata is accepted for all supported normal kinds only with the complete correlated tool-event descriptor; present shared fields still undergo consistency checks. External-directory requests use separately verified file/shell metadata shapes and a supported underlying tool. Grant only advertised allow-once, bind the complete joined descriptor, and never reuse a grant. Unsupported/unknown callbacks receive denial; malformed, duplicate or wrong-session requests fail the attempt. An optional editor-sync write callback for an already authorized edit/path receives an unsupported response without client-side filesystem I/O; OpenCode's built-in edit tool performs the edit. Unexpected filesystem/terminal callbacks fail closed.
+
+`--preview` is parsed but explicitly refused until P2.7. This adapter currently discards child stderr, buffers at most 1 MB of assistant text and bounds total protocol traffic at 8 MB; progress and diagnostic hardening are P2.4. The active/preflight deadline starts after input acquisition. Synchronous filesystem transaction operations depend on OS completion; deadline/cancellation are checked again after apply and before launch. Cancellation during blocking input uses normal process signals before the async supervisor starts.

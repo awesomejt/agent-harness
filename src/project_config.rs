@@ -262,6 +262,11 @@ impl Plan {
             no_sync: r.no_sync,
         })
     }
+    /// The validated routing snapshot for an isolated runtime. Unmanaged project
+    /// settings stay on disk and are never executed by the first-slice adapter.
+    pub fn runtime_routing(&self) -> Value {
+        serde_json::to_value(&self.desired).expect("JSON values")
+    }
     pub fn needs_write(&self) -> bool {
         !self.no_sync
             && (self.before.as_deref() != Some(&self.after)
