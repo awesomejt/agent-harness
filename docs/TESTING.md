@@ -27,7 +27,7 @@ Unit and default integration tests use fakes without provider credentials or bil
 - Noninteractive permissions cannot hang indefinitely or silently approve. Test explicit grants, denial, unavailable prompt channel and stricter canonical roles.
 - Sync preserves unrelated/global content and dirty project files; malformed config, manual edits, concurrent updates, interrupted writes, secret references and no-sync validation are covered.
 - Dirty/untracked user changes survive failed and cancelled attempts. Tests do not rely on resetting the user's repository.
-- Interrupted side effects yield uncertainty rather than blind retry. Sequence/Ralph resume detects stale state, changed inputs, competing writers, false completion and exhausted limits.
+- Interrupted side effects yield uncertainty rather than blind retry, with a distinct exit status and explicit stderr diagnostic before machine output is available. Sequence/Ralph resume detects stale state, changed inputs, competing writers, false completion and exhausted limits.
 - Reported usage has provenance; missing usage is unknown. No guessed billing balance drives mandatory routing.
 
 ## Rust and release checks

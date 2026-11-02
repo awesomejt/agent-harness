@@ -36,6 +36,6 @@ Retain enough sanitized attempt and verification information to explain routing/
 
 ## Release and maintenance
 
-Follow the repository PR/Grok review workflow. Release documentation must list supported harness/runtime versions, platform constraints, schema/output changes and migration needs. Version machine output in Phase 4 and durable state before Phase 5; do not silently reinterpret unknown future versions.
+Follow the repository PR/Grok review workflow. Release documentation must list supported harness/runtime versions, platform constraints, schema/output changes and migration needs. Version machine output in Phase 4 and durable state in Phase 5, before persistence ships; do not silently reinterpret unknown future versions.
 
 Upgrades must preserve user-owned config and workflow evidence. Document recovery/downgrade limitations for incompatible state rather than imply every version is reversible. New adapters require their own tests/live evidence and capability documentation before being advertised as supported.

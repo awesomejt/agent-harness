@@ -22,7 +22,7 @@ Outcomes distinguish validation rejection, launch failure, runtime/provider fail
 
 Human diagnostics go to stderr when stdout carries a final response or structured records. The Phase 4 machine contract must specify envelope version, IDs, timestamps/order, event types, optional provider fields, redaction, and a terminal record. Do not expose chain-of-thought as a required normalized field. Bound output buffering and document truncation rather than silently dropping completion or permission events.
 
-Numeric exit codes are fixed in Phase 2; success, failed/rejected execution, and cancellation are distinct. Later structured-output additions must preserve documented shell behavior.
+Numeric exit codes are fixed in Phase 2; success, failed/rejected execution, cancellation with known outcome, and uncertain completion have distinct exit statuses. Uncertainty takes precedence when cancellation or timeout may have left side effects; report that uncertainty explicitly on stderr in Phase 2 rather than waiting for Phase 4 machine records. Later structured-output additions must preserve documented shell behavior.
 
 ## Adapter capability contract
 
