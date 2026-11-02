@@ -14,10 +14,10 @@ The [working P1.2 experiment](p1-2-live-acp.md) proves installed OpenCode 1.18.3
 
 Published archives were downloaded from crates.io and inspected, including normalized manifests, source and VCS metadata. Versions were not inferred from repository HEAD.
 
-| Candidate | Published release / VCS commit | Manifest / archive SHA-256 |
-|---|---|---|
-| [Official ACP SDK 3.6.0](https://docs.rs/crate/agent-client-protocol/3.6.0/source/) | 2026-10-28; `a978f01e8cde58a7976666a713531d8c9342fb51`, `src/agent-client-protocol` | Rust 1.88.0, edition 2024; `89b41f18aeb4a6d1a463b994cb880cc562cdea7d616ea3e22f9c6f2a438fc4f6` |
-| [cli-stream 0.5.0](https://docs.rs/crate/cli-stream/0.5.0/source/) | 2026-09-05; `cd42566aab9e21903e96b4d59ab7e674f7fb415d`, `crates/cli-stream` | Rust 1.88, edition 2024; `26b460d6a2696c255a2802418ebf0fb2b1a31e440e9658fe4a9bae0389b0b257` |
+| Candidate | Published release / VCS commit | MSRV / edition | .crate archive SHA-256 |
+|---|---|---|---|
+| [Official ACP SDK 3.6.0](https://docs.rs/crate/agent-client-protocol/3.6.0/source/) | 2026-10-28; `a978f01e8cde58a7976666a713531d8c9342fb51`, `src/agent-client-protocol` | Rust 1.88.0 / 2024 | `89b41f18aeb4a6d1a463b994cb880cc562cdea7d616ea3e22f9c6f2a438fc4f6` |
+| [cli-stream 0.5.0](https://docs.rs/crate/cli-stream/0.5.0/source/) | 2026-09-05; `cd42566aab9e21903e96b4d59ab7e674f7fb415d`, `crates/cli-stream` | Rust 1.88 / 2024 | `26b460d6a2696c255a2802418ebf0fb2b1a31e440e9658fe4a9bae0389b0b257` |
 
 Both exceed the current Rust 1.85.0 baseline. Neither was compiled here; no compatibility claim follows from source inspection. An older release was not selected simply to retain the current pin. A justified MSRV change is allowed by D019 but belongs with the actual dependency experiment and its locked build evidence.
 
@@ -46,6 +46,10 @@ SDK 3.6.0 declares Apache-2.0 and ships the Apache license in its archive. `cli-
 
 ## Repeatable inspection and validation
 
-Download `https://crates.io/api/v1/crates/agent-client-protocol/3.6.0/download` and `https://crates.io/api/v1/crates/cli-stream/0.5.0/download`; verify the hashes above, extract, and inspect `Cargo.toml`, `.cargo_vcs_info.json` and the linked source files. This requires no credentials, installation or model turn.
+Download `https://crates.io/api/v1/crates/agent-client-protocol/3.6.0/download` and `https://crates.io/api/v1/crates/cli-stream/0.5.0/download`; verify the SHA-256 of each downloaded crates.io `.crate` archive against the table above and its sparse-index `cksum` (both matched in this evaluation), extract, and inspect `Cargo.toml`, `.cargo_vcs_info.json` and the linked source files. This requires no credentials, installation or model turn.
 
 The unchanged no-prompt preflight was rerun on OpenCode 1.18.30: deny-all/tool-disable resolved configuration, protocol-1 initialize, disposable session with sole synthetic model and no MCP, then direct-child shutdown. No prompt or model traffic. Rust 1.85.0 formatting, locked Clippy and all 11 tests passed. These checks protect the baseline; they do not validate either candidate crate. Phase 1 remains open; P1.3 is next.
+
+## PR review
+
+[Grok review on PR #10](https://github.com/awesomejt/agent-harness/pull/10#pullrequestreview-5732900873): one review, 0 blockers, 0 concerns, 1 nit. Addressed by splitting MSRV/edition from archive SHA-256, explicitly identifying the hashed download, and checking both hashes against the crates.io sparse-index `cksum`. Documentation links and whitespace checks passed. No re-review required under the Git workflow.
