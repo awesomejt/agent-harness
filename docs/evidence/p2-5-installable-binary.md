@@ -29,3 +29,9 @@ sh scripts/release/smoke.sh dist/candidate 0.1.0-alpha.1
 The smoke extracts and checksum-verifies the archive, installs into a disposable HOME, verifies its ad hoc signature and invokes the installed `ah` with only its own bin directory on PATH. Rust, Python, Node, Git and OpenCode are unavailable on that PATH. Version/help and read-only preview pass; preview reports missing OpenCode without launching it or contacting the unreachable fixture endpoint, omits prompt/key/endpoint and leaves only the original config file. Unsupported cloud mode and missing key return 2. No language toolchain is required by binary users; requested coding/test tasks may need their own tools.
 
 Final asset checksum and exact source commit are supplied by the published `SHA256SUMS` and archive `BUILD-INFO.json`, avoiding a circular source-document checksum. Publication targets the reviewed merged commit, followed by a fresh download/install smoke. Release: [v0.1.0-alpha.1](https://github.com/awesomejt/agent-harness/releases/tag/v0.1.0-alpha.1).
+
+Build-host adjustment: the initial release build hit a macOS 27 dylib loader
+failure in proc macros (`mis-aligned LINKEDIT string pool`). Packaging explicitly
+sets `CARGO_PROFILE_RELEASE_STRIP=none`, avoiding Rust's stripping path; see
+[upstream Rust issue #157750](https://github.com/rust-lang/rust/issues/157750).
+The MSRV and dependency pins remain unchanged.

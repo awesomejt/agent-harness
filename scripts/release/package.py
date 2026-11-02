@@ -39,7 +39,7 @@ def main():
     commit = run('git', 'rev-parse', 'HEAD')
     args.output.mkdir(parents=True, exist_ok=False)
     env = dict(os.environ, MACOSX_DEPLOYMENT_TARGET='14.0', RUSTFLAGS='',
-               CARGO_ENCODED_RUSTFLAGS='', CARGO_TARGET_DIR=str(ROOT / 'target/release-build'))
+               CARGO_ENCODED_RUSTFLAGS='', CARGO_PROFILE_RELEASE_STRIP='none', CARGO_TARGET_DIR=str(ROOT / 'target/release-build'))
     subprocess.run(['cargo', 'build', '--release', '--locked', '--target', TARGET],
                    cwd=ROOT, env=env, check=True)
     metadata = json.loads(run('cargo', 'metadata', '--locked', '--format-version', '1',
@@ -123,7 +123,7 @@ def main():
         (notices / 'inventory.json').write_text(json.dumps(inventory, indent=2) + '\n')
         info = dict(version=version, source_commit=commit, target=TARGET,
                     cargo_lock_sha256=sha(ROOT / 'Cargo.lock'), rustc=run('rustc', '-Vv'),
-                    macos=platform.mac_ver()[0], deployment_target='14.0',
+                    macos=platform.mac_ver()[0], deployment_target='14.0', strip='none',
                     linker=run('xcodebuild', '-version'), dylibs=dylibs,
                     binary_sha256=sha(bundle / 'ah'), registry_packages=len(inventory))
         (bundle / 'BUILD-INFO.json').write_text(json.dumps(info, indent=2) + '\n')
