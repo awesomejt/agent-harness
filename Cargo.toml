@@ -2,7 +2,7 @@
 name = "awesomejt-agent-harness"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 description = "CLI scaffold for orchestrating coding agents with explicit model routing"
 license = "Apache-2.0"
 repository = "https://github.com/awesomejt/agent-harness"

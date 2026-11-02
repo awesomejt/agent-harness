@@ -2,7 +2,7 @@
 
 Start with the [specification](SPECIFICATION.md), [feature review](FEATURE_REVIEW.md), and [implementation plan](IMPLEMENTATION.md). [PROJECT.md](../PROJECT.md) owns task status; [DECISIONS.md](../DECISIONS.md) owns accepted and deferred decisions.
 
-These documents are implementation contracts and planning records. No CLI, serialized schema, tested platform matrix, or operational procedure is claimed implemented yet.
+These documents are implementation contracts and planning records. The informational Rust CLI and disposable integration probes are implemented; coding-run schemas, release support and production runbooks remain phase-gated. [Phase 1 acceptance preparation](evidence/p1-5-integration-acceptance.md) records selected transport/dependencies and the tested macOS boundary.
 
 | Document | Coverage | What remains phase-gated |
 |---|---|---|

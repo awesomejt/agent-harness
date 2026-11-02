@@ -6,11 +6,11 @@ The goal is to run real project work with explicit routing, portable agent defin
 
 ## Status
 
-Phase 1 integration experiment: a minimal Rust scaffold provides `ah --help` and `ah --version`. Coding runs are not implemented yet. Rust is the accepted implementation language, with prebuilt platform binaries as the intended installation path. Specific libraries and transport choices remain subject to a small integration experiment.
+Phase 1 integration experiment: a minimal Rust scaffold provides `ah --help` and `ah --version`. Coding runs are not implemented yet. Rust is the accepted implementation language, with prebuilt platform binaries as the intended installation path. ACP protocol 1 and the minimal Rust stack are selected in [P1.5](docs/evidence/p1-5-integration-acceptance.md); the holistic Phase 1 review remains open.
 
 ## Development scaffold
 
-Install [Rust with rustup](https://rust-lang.org/tools/install/) and the platform's native linker tools (Xcode Command Line Tools on macOS). The repository pins Rust 1.85.0 with rustfmt and Clippy; rustup selects it in this directory. Ensure `~/.cargo/bin` is on PATH, or run `source "$HOME/.cargo/env"` for the current shell.
+Install [Rust with rustup](https://rust-lang.org/tools/install/) and the platform's native linker tools (Xcode Command Line Tools on macOS). The repository pins Rust 1.88.0 with rustfmt and Clippy; rustup selects it in this directory. Ensure `~/.cargo/bin` is on PATH, or run `source "$HOME/.cargo/env"` for the current shell.
 
 ```bash
 cargo build --locked
@@ -22,7 +22,7 @@ cargo test --locked
 
 The Cargo package is `awesomejt-agent-harness`; the binary is `ah`. The initial verified development target is Apple Silicon macOS (`aarch64-apple-darwin`). Other platforms and release installation remain unverified. See [P1.1 evidence](docs/evidence/p1-1-rust-scaffold.md) for the tested baseline. Prebuilt distribution starts in Phase 2.
 
-The separate [P1.3 ACP lifecycle experiment](docs/evidence/p1-3-lifecycle.md) uses Rust 1.88.0 via explicit `cargo +1.88.0` commands and its own manifest/lockfile under `scripts/experiments/acp_lifecycle/`. It verifies SDK wire compatibility and macOS lifecycle behavior without changing the public scaffold toolchain or adding coding-run commands.
+The separate [P1.3 ACP lifecycle experiment](docs/evidence/p1-3-lifecycle.md) uses Rust 1.88.0 via explicit `cargo +1.88.0` commands and its own manifest/lockfile under `scripts/experiments/acp_lifecycle/`. It verifies SDK wire compatibility and macOS lifecycle behavior with the same toolchain now selected for the public scaffold. The SDK remains in the isolated experiment until Phase 2 implements the adapter; no coding-run commands are added here.
 
 ## Delivery milestones
 
