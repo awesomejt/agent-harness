@@ -3,7 +3,7 @@ name = "awesomejt-agent-harness"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.88"
-description = "CLI scaffold for orchestrating coding agents with explicit model routing"
+description = "CLI for orchestrating coding agents with explicit model routing"
 license = "Apache-2.0"
 repository = "https://github.com/awesomejt/agent-harness"
 publish = false
@@ -13,6 +13,9 @@ name = "ah"
 path = "src/main.rs"
 
 [dependencies]
+agent-client-protocol = { version = "=3.6.0", default-features = false }
+tokio = { version = "=1.48.0", features = ["macros", "rt", "process", "io-util", "time", "sync", "signal"] }
+tokio-util = { version = "=0.7.16", features = ["compat", "rt"] }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "=1.0.145", features = ["raw_value"] }
 url = "=2.5.8"

@@ -6,7 +6,7 @@ The goal is to run real project work with explicit routing, portable agent defin
 
 ## Status
 
-Phase 2 has started after the accepted [Phase 1 review](docs/reviews/phase-01.md) merged in [PR #13](https://github.com/awesomejt/agent-harness/pull/13). P2.1 defines and validates [first-slice configuration and inputs](docs/CONFIGURATION.md); the public `ah` binary still provides help/version only. Coding runs, managed configuration and preview are not implemented yet. Rust is the accepted implementation language, with prebuilt platform binaries as the intended installation path.
+Phase 2 is in progress after the accepted [Phase 1 review](docs/reviews/phase-01.md). `ah single` now runs OpenCode **1.18.30** over ACP against the configured LiteLLM alias on macOS. Managed project routing and explicit inline/file/stdin inputs are implemented. Progress hardening, preview, dirty-project reporting and distribution remain later Phase 2 tasks; this is a development binary, not a first-slice release.
 
 ## Development scaffold
 
@@ -22,7 +22,7 @@ cargo test --locked
 
 The Cargo package is `awesomejt-agent-harness`; the binary is `ah`. The initial verified development target is Apple Silicon macOS (`aarch64-apple-darwin`). Other platforms and release installation remain unverified. See [P1.1 evidence](docs/evidence/p1-1-rust-scaffold.md) for the tested baseline. Prebuilt distribution starts in Phase 2.
 
-The separate [P1.3 ACP lifecycle experiment](docs/evidence/p1-3-lifecycle.md) uses Rust 1.88.0 via explicit `cargo +1.88.0` commands and its own manifest/lockfile under `scripts/experiments/acp_lifecycle/`. It verifies SDK wire compatibility and macOS lifecycle behavior with the same toolchain now selected for the public scaffold. The SDK remains in the isolated experiment until Phase 2 implements the adapter; no coding-run commands are added here.
+The separate [P1.3 ACP lifecycle experiment](docs/evidence/p1-3-lifecycle.md) uses Rust 1.88.0 via explicit `cargo +1.88.0` commands and its own manifest/lockfile under `scripts/experiments/acp_lifecycle/`. It verifies SDK wire compatibility and macOS lifecycle behavior with the same toolchain now selected for the public scaffold. The production adapter now consumes the same pinned SDK 3.6.0/Tokio 1.48.0 transport stack; the standalone experiment remains separate regression tooling.
 
 ## Delivery milestones
 
@@ -49,15 +49,18 @@ For local coding runs, OpenCode supplies tools and the agent loop while using Li
 
 The harness owns its LiteLLM routing configuration and managed project-level OpenCode settings. It preserves unrelated project settings and global configuration. Canonical agent definitions use Markdown with YAML frontmatter, mapped by name to supported backends.
 
-## Planned first-slice experience
+## Development coding run
 
 ```bash
-# Selected contract; not implemented yet. Run from the target project.
+# Build with cargo build --locked, then put target/debug/ah on PATH.
+# Create ah.json in the target project using docs/CONFIGURATION.md.
 # Replace <configured-alias> with an alias already configured in LiteLLM.
 ah single "Fix the parser and run its tests" --mode local-only --model "<configured-alias>" --permissions trusted
 ```
 
-The run should show the selected route/model, stream agent activity, preserve project changes, and provide a meaningful exit status. Cancellation and missing/unreachable dependencies must be understandable. Setup instructions must distinguish installing `ah` from installing OpenCode and configuring LiteLLM.
+The command requires an existing LiteLLM alias and nonempty environment key reference. It reports the selected route/model, buffers bounded assistant text until successful completion, and writes human diagnostics to stderr. `--prompt-file task.txt` and `--prompt-file -` select file/stdin input. Default permissions deny tools; only explicit `--permissions trusted` authorizes host-level file and shell access. This is not a sandbox.
+
+The first adapter isolates HOME/XDG and ignores unmanaged OpenCode settings during execution, preserving them on disk. It requires effective primary/helper routing and exact permission-rule verification before prompting. Active interruption or transport loss without a terminal response returns **4 (uncertain)**; inspect effects before trying again. There is no fallback or automatic retry. Preview remains unavailable until P2.7. See [configuration](docs/CONFIGURATION.md), [execution](docs/EXECUTION.md) and [P2.2 evidence](docs/evidence/p2-2-local-only-run.md).
 
 ## Project records
 

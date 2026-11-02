@@ -225,8 +225,8 @@ fn validate_timeout(seconds: u64) -> Result<()> {
 }
 
 impl Invocation {
-    /// Parse the selected future `single` interface without exposing a runnable
-    /// command before P2.2. Paths are relative to invocation cwd, never project.
+    /// Parse `single` input without side effects. Paths are relative to
+    /// invocation cwd, never project.
     pub fn parse(args: impl IntoIterator<Item = OsString>, cwd: &Path) -> Result<Self> {
         let mut args = args.into_iter();
         if args.next().as_deref() != Some(std::ffi::OsStr::new("single")) {
