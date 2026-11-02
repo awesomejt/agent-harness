@@ -9,7 +9,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - Current prerequisite: P0.13 holistic planning review. After its accepted pass, next ready implementation task is P1.1, then P1.6 permission policy → P1.2 transport experiment.
 - External prerequisites: CLI versions, LiteLLM/model availability and login are unverified; no external blocker has been diagnosed by this planning pass.
 - Remaining implementation/review backlog: 59 tasks across Phases 1–9; Phase 9 increments remain demand-gated.
-- Phase 0 review: PR #1 received 0 blockers, 2 concerns, and 2 nits; all four addressed. No critical/high findings; no re-review required under docs/GIT_WORKFLOW.md.
+- Phase 0 PR #1 review: received 0 blockers, 2 concerns, and 2 nits; all four addressed. No critical/high findings; no re-review required under docs/GIT_WORKFLOW.md.
 - Implementation: none yet.
 - Direction: Rust CLI with prebuilt binaries; OpenCode first, LiteLLM route plus native route.
 - Execution plan: [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); per-task dependencies, boundaries and evidence: [tasks/README.md](tasks/README.md). Feature/contract review (PR #2) and Rust architecture/alignment review (PR #3) are complete; task-planning review (PR #4) is complete: 0 blockers, 1 concern and 2 nits addressed; explicit holistic phase-review gates are being added before implementation.
