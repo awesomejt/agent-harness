@@ -4,6 +4,7 @@ use std::ffi::OsString;
 
 pub mod config;
 pub mod permission;
+pub mod project_config;
 
 const HELP: &str = "agent-harness (ah)\n\nUsage: ah [--help | --version]\n\nOptions:\n  -h, --help     Show this help\n  -V, --version  Show package version\n\nScaffold only; coding runs are not implemented yet.\n";
 
