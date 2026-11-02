@@ -88,7 +88,7 @@ for case, expected in [('version', 2), ('before-prompt', 3), ('cancel-ack', 3),
 
 print('dirty-project fixtures passed; no model traffic')
 
-for scenario in ['clean', 'unborn', 'nonrepo', 'linked']:
+for scenario in ['clean', 'unborn', 'nonrepo', 'linked', 'filter-local', 'filter-included', 'filter-worktree']:
     with tempfile.TemporaryDirectory(prefix='ah-baseline-') as directory:
         base = Path(directory).resolve()
         project = base / 'project'
@@ -108,12 +108,29 @@ for scenario in ['clean', 'unborn', 'nonrepo', 'linked']:
                 linked = base / 'linked'
                 git(project, 'worktree', 'add', '-qb', 'fixture-linked', str(linked))
                 project = linked
+        if scenario.startswith('filter-'):
+            hook = base / 'filter-trap'
+            hook.write_text('#!/bin/sh\ntouch "' + str(base / 'FILTER_RAN') + '"\ncat\n')
+            hook.chmod(0o755)
+            (project / '.gitattributes').write_text('case filter=trap\n')
+            # Ensure status would re-hash this tracked file.
+            (project / 'case').write_text('version\n')
+            if scenario == 'filter-included':
+                included = base / 'included-config'
+                included.write_text('[filter "trap"]\n clean = ' + str(hook) + '\n')
+                git(project, 'config', 'include.path', str(included))
+            elif scenario == 'filter-worktree':
+                git(project, 'config', 'extensions.worktreeConfig', 'true')
+                git(project, 'config', '--worktree', 'filter.trap.process', str(hook))
+            else:
+                git(project, 'config', 'filter.trap.clean', str(hook))
         before = tree(base)
         result = subprocess.run([str(BINARY), 'single', 'Task', '--project', str(project)],
             env={**os.environ, 'PATH': str(base) + ':' + os.environ['PATH'], 'TEST_KEY': 'sentinel'},
             capture_output=True, text=True, timeout=15)
         assert result.returncode == 2, result.stderr
-        expected = ('unavailable' if scenario == 'nonrepo' else
+        expected = ('unavailable (Git filter configuration present' if scenario.startswith('filter-') else
+                    'unavailable' if scenario == 'nonrepo' else
                     'dirty; staged=0 unstaged=0 untracked=2;' if scenario == 'unborn' else
                     'clean; staged=0 unstaged=0 untracked=0;')
         assert 'project baseline: ' + expected in result.stderr, result.stderr

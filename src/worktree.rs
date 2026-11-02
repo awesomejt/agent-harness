@@ -37,12 +37,15 @@ fn counts(bytes: &[u8]) -> Option<Counts> {
     Some(result)
 }
 
-pub(crate) async fn report(
+async fn observe(
     project: &Path,
-    deadline: tokio::time::Instant,
+    args: &[&str],
+    bound: tokio::time::Instant,
     progress: &crate::progress::Progress,
-) -> Result<(), Exit> {
-    progress.event("project preservation: no automatic stash/reset/clean/commit/rollback; authorized runtime edits may change existing files; attribution unknown");
+) -> Result<Option<(std::process::ExitStatus, Vec<u8>)>, Exit> {
+    if tokio::time::Instant::now() >= bound {
+        return Ok(None);
+    }
     // Fixed system Git, cleared routing/config environment, no optional index
     // locks or fsmonitor hook. Never echo filenames or raw Git diagnostics.
     let mut command = Command::new("/usr/bin/git");
@@ -59,19 +62,11 @@ pub(crate) async fn report(
             "core.fsmonitor=false",
             "-c",
             "core.untrackedCache=false",
-            "status",
-            "--porcelain=v1",
-            "-z",
-            "--untracked-files=all",
-            "--ignore-submodules=all",
-        ]);
+        ])
+        .args(args);
     let Ok(mut child) = OwnedChild::spawn(&mut command) else {
-        progress.event(
-            "project baseline: unavailable (system Git missing); preservation policy still applies",
-        );
-        return Ok(());
+        return Ok(None);
     };
-    let bound = deadline.min(tokio::time::Instant::now() + Duration::from_secs(2));
     let observed = tokio::time::timeout_at(bound, async {
         let mut bytes = Vec::new();
         child
@@ -85,10 +80,7 @@ pub(crate) async fn report(
         if bytes.len() > LIMIT {
             return None;
         }
-        if !child.child.wait().await.ok()?.success() {
-            return None;
-        }
-        counts(&bytes)
+        Some((child.child.wait().await.ok()?, bytes))
     })
     .await
     .ok()
@@ -97,13 +89,65 @@ pub(crate) async fn report(
         progress.event("project baseline: Git cleanup unconfirmed; refusing runtime launch");
         return Err(Exit::Uncertain);
     }
+    Ok(observed)
+}
+
+pub(crate) async fn report(
+    project: &Path,
+    deadline: tokio::time::Instant,
+    progress: &crate::progress::Progress,
+) -> Result<(), Exit> {
+    progress.event("project preservation: no automatic stash/reset/clean/commit/rollback; authorized runtime edits may change existing files; attribution unknown");
+    let bound = deadline.min(tokio::time::Instant::now() + Duration::from_secs(2));
+    // Status can run clean/process filters while comparing stat-dirty files.
+    // Inspect effective config (including includes and worktree config) first;
+    // any driver configuration makes status unsafe for this observation.
+    let filters = observe(
+        project,
+        &[
+            "config",
+            "--includes",
+            "--null",
+            "--name-only",
+            "--get-regexp",
+            "^filter\\.",
+        ],
+        bound,
+        progress,
+    )
+    .await?;
+    if !matches!(filters, Some((status, ref bytes)) if status.code() == Some(1) && bytes.is_empty())
+    {
+        progress.event("project baseline: unavailable (Git filter configuration present or config inspection incomplete); status skipped to avoid filter execution");
+        return Ok(());
+    }
+    let observed = observe(
+        project,
+        &[
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=all",
+            "--ignore-submodules=all",
+        ],
+        bound,
+        progress,
+    )
+    .await?;
+    let observed = observed.and_then(|(status, bytes)| {
+        if status.success() {
+            counts(&bytes)
+        } else {
+            None
+        }
+    });
     match observed {
         Some(c) => progress.event(format!(
             "project baseline: {}; staged={} unstaged={} untracked={}; repository-wide counts; submodule contents excluded; paths omitted",
             if c == Counts::default() { "clean" } else { "dirty" },
             c.staged, c.unstaged, c.untracked,
         )),
-        None => progress.event("project baseline: unavailable (not a Git worktree, Git error, or bounded status incomplete); preservation policy still applies"),
+        None => progress.event("project baseline: unavailable (not a Git worktree, Git error, or bounded status incomplete; requires macOS Command Line Tools Git); preservation policy still applies"),
     }
     Ok(())
 }
