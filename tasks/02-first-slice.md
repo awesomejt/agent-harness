@@ -6,8 +6,8 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 ## P2.1 — First-slice configuration and CLI contract
 
 - **Depends on:** [P1.7](01-integration.md#p1-7)
-- **Deliverable and boundary:** Fix minimal config format/location/precedence, environment key reference, prompt-input syntax, explicit mode/model selection, exits, deadlines and preview semantics. Add validation without generalizing later schemas.
-- **Acceptance evidence:** Config/input validation fixtures and a decision entry specify success/failure/known-cancelled/uncertain exits. Empty/conflicting inputs reject before launch; literal keys are excluded from serializable config.
+- **Deliverable and boundary:** Fix minimal config format/location/precedence, environment key reference, prompt-input syntax, explicit mode/model selection, exits, deadlines, headless coding permissions and preview semantics. Specify enforceable read/write/shell scope and unsupported-policy refusal before the first coding launch. Add validation without generalizing later schemas.
+- **Acceptance evidence:** Config/input validation fixtures and a decision entry specify success/failure/known-cancelled/uncertain exits. Empty/conflicting inputs and unsupported permission policies reject before launch; literal keys are excluded from serializable config. Record how the selected coding permissions are enforced, rather than inheriting the text-only probe policy.
 - **Decision/readiness gate:** AC04–AC07; no unsupported mode or optional metadata can silently widen policy.
 - **Contract:** [docs/CONFIGURATION.md](../docs/CONFIGURATION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
@@ -24,8 +24,8 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 ## P2.2 — Local-only single coding run
 
 - **Depends on:** [P2.3](02-first-slice.md#p2-3)
-- **Deliverable and boundary:** Wire prompt input, project/model selection, policy, project preparation and selected OpenCode adapter into ah single. Support inline/file/stdin; reject unimplemented modes. Runtime owns tool turns.
-- **Acceptance evidence:** CLI/integration checks show a validated LiteLLM-only route and a real project task path rather than a text-only completion; prompt-source errors cannot start work.
+- **Deliverable and boundary:** Wire prompt input, project/model selection, policy, project preparation and selected OpenCode adapter into ah single. Support inline/file/stdin; reject unimplemented modes. Runtime owns tool turns. Before any real coding prompt, implement and verify the P2.1 permission contract and minimum bounded cancellation/cleanup with failure/uncertainty handling; P2.4 completes progress, outcome and adversarial hardening. Never temporarily launch with unenforced permissions or the probe supervisor treated as production-ready.
+- **Acceptance evidence:** CLI/integration checks show a validated LiteLLM-only route and a real project task path rather than a text-only completion; prompt-source errors cannot start work. Include controlled permission-denial and cleanup checks before exercising authorized edit/test tools.
 - **Decision/readiness gate:** AC01, AC02, AC05; no cloud fallback in this slice.
 - **Contract:** [docs/SPECIFICATION.md](../docs/SPECIFICATION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
