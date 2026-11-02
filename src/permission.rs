@@ -36,7 +36,9 @@ pub enum PermissionResponse {
     Refused,
 }
 
-/// Fresh per attempt. An explicit grant is trusted caller input, never model text.
+/// Intentionally at most one grant per policy instance for this experiment.
+/// The driver owns attempt isolation; it must not move instances across attempts.
+/// An explicit grant is trusted caller input, never model text.
 /// Grants bind the entire request and are consumed on the next request, even on
 /// mismatch. No persistent, category, wildcard, or allow-always grant exists.
 #[derive(Default)]

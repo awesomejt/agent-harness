@@ -45,7 +45,7 @@ fn headless_default_denies_reads_writes_commands_network_and_unknown_actions() {
 }
 
 #[test]
-fn explicit_grant_is_once_only_and_cannot_leak_to_another_attempt() {
+fn explicit_grant_is_once_only() {
     let req = request();
     let mut policy = PermissionPolicy::grant_next_request(req.clone());
     assert_eq!(
@@ -54,10 +54,6 @@ fn explicit_grant_is_once_only_and_cannot_leak_to_another_attempt() {
     );
     assert_eq!(
         policy.respond(&req),
-        PermissionResponse::Selected("reject".into())
-    );
-    assert_eq!(
-        PermissionPolicy::default().respond(&req),
         PermissionResponse::Selected("reject".into())
     );
 }
@@ -124,8 +120,14 @@ fn malformed_requests_refuse_even_with_an_explicit_grant() {
     malformed[1].action = "  ".into();
     malformed[2].options[0].id.clear();
     malformed[3].options[0].id = "once".into();
-    for req in malformed {
+    for bad in malformed {
+        let mut policy = PermissionPolicy::grant_next_request(bad.clone());
+        assert_eq!(policy.respond(&bad), PermissionResponse::Refused);
         let mut policy = PermissionPolicy::grant_next_request(req.clone());
-        assert_eq!(policy.respond(&req), PermissionResponse::Refused);
+        assert_eq!(policy.respond(&bad), PermissionResponse::Refused);
+        assert_eq!(
+            policy.respond(&req),
+            PermissionResponse::Selected("reject".into())
+        );
     }
 }

@@ -1,12 +1,12 @@
 # P1.6 — Permission policy evidence
 
-Date: 2026-11-01 (America/Denver). Task: [P1.6](../../tasks/01-integration.md#p1-6). Decision: [D020](../../DECISIONS.md#2026-11-01--d020-fail-closed-experiment-permissions). Branch: `feature/p1-6-permission-policy`. Prerequisite P1.1 merged in PR #6; baseline `2fb7b8f`.
+Date: 2026-11-01 (America/Denver). Task: [P1.6](../../tasks/01-integration.md#p1-6). Decision: [D020](../../DECISIONS.md#2026-11-01--d020-fail-closed-experiment-permissions). Branch: `feature/p1-6-permission-policy`; [PR #7](https://github.com/awesomejt/agent-harness/pull/7). Prerequisite P1.1 merged in PR #6; baseline `2fb7b8f`.
 
 ## Scope and results
 
 Added a dependency-free, transport-independent permission policy and synthetic normalized request fixtures. Default denies all tool actions. A trusted caller can grant one exact request once; changed identity, action or options consumes the grant without approval. Persistent grants and interactive prompting are unsupported. Missing denial options cancel; malformed identities/options refuse. The policy performs no I/O and has no TTY/stdin/approval wait path. Its Rust types are experimental, not a public transport or config schema.
 
-Six permission tests cover default denial across read/write/shell/network/unknown actions and approval-like backend text; explicit allow-once and consumed/repeated grants; fresh-attempt isolation; request mutation; missing denial/empty/unknown options; allow-always refusal; malformed IDs/actions and duplicate options. Existing five scaffold tests also pass.
+Six permission tests cover default denial across read/write/shell/network/unknown actions and approval-like backend text; explicit allow-once and consumed/repeated grants; attempt-identity mismatch; request mutation; missing denial/empty/unknown options; allow-always refusal; malformed IDs/actions and duplicate options. Existing five scaffold tests also pass.
 
 Tested on Darwin arm64 / `aarch64-apple-darwin`, Rust/Cargo 1.85.0 pinned by rust-toolchain.toml. From the repository, with `source "$HOME/.cargo/env"` if needed:
 
@@ -29,4 +29,4 @@ Before a live P1.2 prompt, verify the actual adapter option/cancellation mapping
 
 ## PR review
 
-Pending required Grok review. Completion takes effect on merge.
+Grok completed one review on PR #7: 0 blockers, 0 concerns, 3 nits. All addressed: documented intentional one-grant-per-policy scope and caller-owned attempt isolation; removed a trivial fresh-default assertion and narrowed its test name; verified malformed requests consume a previously valid grant as well as refusing an explicitly malformed grant. All checks passed again after fixes. No re-review required under the Git workflow. Completion takes effect on merge.

@@ -5,7 +5,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 ## Current state
 
 - Active phase: 1 — integration experiment started; minimal Rust scaffold implemented (P1.1 completion effective on [PR #6](https://github.com/awesomejt/agent-harness/pull/6) merge).
-- Active implementation task/PR: P1.6 on `feature/p1-6-permission-policy`, required Grok review pending. Proposed completion takes effect only on PR merge; then no active implementation task. Default work-in-progress limit: one focused task/PR.
+- Active implementation task/PR: none after [PR #7](https://github.com/awesomejt/agent-harness/pull/7) merge. P1.6 Grok review: 0 blockers, 0 concerns, 3 nits; all addressed, no re-review required. Default work-in-progress limit: one focused task/PR.
 - Phase 0 holistic review P0.13: pass recorded in [review report](docs/reviews/phase-00.md), effective on PR #5 merge. P1.1 is merged. Next after P1.6 merge: P1.2 transport experiment (actual permission mapping/enforcement preflight required before live prompts).
 - External prerequisites: CLI versions, LiteLLM/model availability and login are unverified; no external blocker has been diagnosed by this planning pass.
 - Remaining implementation/review backlog after P1.6 merges: 57 tasks across Phases 1–9; Phase 9 increments remain demand-gated.
@@ -39,7 +39,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 Detailed scope, dependencies and evidence: [Phase 1 cards](tasks/01-integration.md).
 
 - [x] P1.1 Create a minimal Rust package; select package name, edition/MSRV and initial target. Proposed completion on [PR #6](https://github.com/awesomejt/agent-harness/pull/6) merge; [evidence](docs/evidence/p1-1-rust-scaffold.md), [D019](DECISIONS.md#2026-11-01--d019-minimal-rust-scaffold-baseline).
-- [x] P1.6 Define and test permission-request policy/noninteractive behavior before the first live integration run. Proposed completion on PR merge; [D020](DECISIONS.md#2026-11-01--d020-fail-closed-experiment-permissions), [evidence](docs/evidence/p1-6-permission-policy.md), [card](tasks/01-integration.md#p1-6).
+- [x] P1.6 Define and test permission-request policy/noninteractive behavior before the first live integration run. Completion effective on [PR #7](https://github.com/awesomejt/agent-harness/pull/7) merge; [D020](DECISIONS.md#2026-11-01--d020-fail-closed-experiment-permissions), [evidence](docs/evidence/p1-6-permission-policy.md), [card](tasks/01-integration.md#p1-6).
 - [ ] P1.2 Exercise OpenCode ACP with a disposable project; compare native structured output if needed ([card](tasks/01-integration.md#p1-2)).
 - [ ] P1.4 Evaluate a small reusable adapter/process dependency against direct SDK/runtime use; inspect license, release/API compatibility, and platform behavior ([card](tasks/01-integration.md#p1-4)).
 - [ ] P1.3 After the P1.6 permission decision, verify no implicit widening, LiteLLM model selection, project instructions, progress, cancellation, and child cleanup ([card](tasks/01-integration.md#p1-3)).
