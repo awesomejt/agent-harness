@@ -22,6 +22,16 @@ Prioritize a useful first slice and learn from actual runs before designing ever
 | G8 | Multiple runtimes | OpenCode first; native Claude, Codex, Grok, Gemini and Pi added with documented capability differences. | Phases 7–8 |
 | G9 | Optional resource-aware operation | Where supported, expose quota/cooldown information and optional scheduling without overriding mode policy. | Phase 9; demand-driven |
 
+## Feature coverage and supporting contracts
+
+The [feature landscape review](FEATURE_REVIEW.md) compares eight upstream projects and assigns F01–F26 to committed, backend-owned, candidate, or excluded scope. It supplements G1–G9 rather than claiming parity with every tool. [The documentation map](README.md) links the technical contracts and the phase responsible for finalizing each one.
+
+Within existing goals, include inline/file/stdin prompt input; basic prerequisite diagnostics and a read-only resolved-plan/sync preview in Phase 2; versioned machine output and headless/CI guidance by Phase 4; and explicit verification gates in Phases 5–6. Show transient attempt outcomes initially and persist workflow records when resume arrives. Model-effort mapping is added only for supported adapters with documented handling of approximations.
+
+Preserve dirty/untracked user changes and expose effective permissions. Do not automatically stash/reset/commit/roll back the project. Backend-owned skills, MCP, instructions, context management and compaction remain available only when their behavior is supported and consistent with harness routing/constraints. The harness does not implement replacement subsystems for them.
+
+Native session continuation/fork, richer history/export, workflow recipes, hooks and plugins remain candidates for later decisions. Provider auto-installation, silent self-update, a workflow marketplace, automatic worktrees, parallel teams and a general DAG scheduler are not added to the roadmap by this review.
+
 ## Operational modes
 
 - `local-only`: the model route is LiteLLM only. Never select a native cloud-subscription route, including on error.

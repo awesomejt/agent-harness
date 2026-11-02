@@ -44,6 +44,8 @@ The run should show the selected route/model, stream agent activity, preserve pr
 
 ## Project records
 
+[Documentation map](docs/README.md) indexes technical contracts and their finalization phases. [Feature landscape review](docs/FEATURE_REVIEW.md) records upstream comparisons, scope gaps, optional candidates and exclusions.
+
 - [Specification](docs/SPECIFICATION.md): complete goals, boundaries, and success criteria.
 - [Implementation plan](docs/IMPLEMENTATION.md): focused phases and exit evidence.
 - [Project tracker](PROJECT.md): actionable tasks and current status.

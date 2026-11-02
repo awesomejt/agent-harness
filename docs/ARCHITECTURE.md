@@ -71,3 +71,12 @@ Each adapter reports supported features. Missing permission or tool restrictions
 Early single runs need observable attempts and final outcomes, not a mandatory database. Sequence and Ralph durable state is filesystem-based; schema and interrupted-run semantics are decided before those phases ship. Child processes and descendants must terminate correctly on cancellation/deadline. Pipe draining, event backpressure, and partial output are part of the adapter acceptance criteria.
 
 No long-running daemon is required. Prebuilt binaries remove the harness language runtime requirement, but selected agent CLIs and the LiteLLM service remain external prerequisites.
+
+## Detailed contracts
+
+- [Execution](EXECUTION.md): input, lifecycle, outcomes, adapters, permissions, headless use and process cleanup.
+- [Configuration](CONFIGURATION.md): resolution, preview, managed writes and canonical agents.
+- [Workflow state](WORKFLOWS.md): sequencing, verification, bounded loops and recovery.
+- [Validation](TESTING.md) and [operations](OPERATIONS.md): evidence, release and support requirements.
+
+These contracts specify behavior; concrete Rust APIs and serialized shapes remain owned by their consuming phase. The [feature review](FEATURE_REVIEW.md) distinguishes harness features from backend-owned capabilities and uncommitted candidates.
