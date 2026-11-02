@@ -6,7 +6,21 @@ The goal is to run real project work with explicit routing, portable agent defin
 
 ## Status
 
-Planning; no executable implementation yet. Rust is the accepted implementation language, with prebuilt platform binaries as the intended installation path. Specific libraries and transport choices remain subject to a small integration experiment.
+Phase 1 integration experiment: a minimal Rust scaffold provides `ah --help` and `ah --version`. Coding runs are not implemented yet. Rust is the accepted implementation language, with prebuilt platform binaries as the intended installation path. Specific libraries and transport choices remain subject to a small integration experiment.
+
+## Development scaffold
+
+Install [Rust with rustup](https://rust-lang.org/tools/install/) and the platform's native linker tools (Xcode Command Line Tools on macOS). The repository pins Rust 1.85.0 with rustfmt and Clippy; rustup selects it in this directory. Ensure `~/.cargo/bin` is on PATH, or run `source "$HOME/.cargo/env"` for the current shell.
+
+```bash
+cargo build --locked
+cargo run --locked -- --version
+cargo fmt --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
+```
+
+The Cargo package is `awesomejt-agent-harness`; the binary is `ah`. The initial verified development target is Apple Silicon macOS (`aarch64-apple-darwin`). Other platforms and release installation remain unverified. See [P1.1 evidence](docs/evidence/p1-1-rust-scaffold.md) for the tested baseline. Prebuilt distribution starts in Phase 2.
 
 ## Delivery milestones
 

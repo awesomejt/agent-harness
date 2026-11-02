@@ -120,6 +120,15 @@ Entries record design intent, not implementation completion. Earlier entries rem
 - **Rationale**: The user explicitly requires holistic review and remediation for each phase before moving on. Existing acceptance/closeout tasks alone did not schedule this complete review or enforce predecessor review dependencies.
 - **Evidence**: Use docs/PHASE_REVIEW.md and tasks/PHASE_REVIEW_TEMPLATE.md; store reports in docs/reviews/ with scope, findings, correction and verification links. Status stays in PROJECT.md; use Critical/High/Medium/Low with impact-based mapping of incoming labels. Reopening unchecks the same task, retains prior accepted report links and creates phase-NN-r2.md (then -r3.md, etc.) rather than overwriting history. A pass requires no unresolved finding and completed required review/fix PRs; the Git workflow's review limits still apply per PR.
 
+## 2026-11-01 — D019: Minimal Rust scaffold baseline
+
+- **Decision**: P1.1 uses a single package named `awesomejt-agent-harness` with an explicit `ah` binary and a testable library boundary. Keep version 0.1.0 and `publish = false` during the experiment; retain the repository's Apache-2.0 license. No external Rust dependencies are needed for informational help/version handling.
+- **Name evidence**: On 2026-11-01 the crates.io sparse-index path `https://index.crates.io/aw/es/awesomejt-agent-harness` returned HTTP 404 / `NoSuchKey`. This distinguishes the package from occupied `agent-harness`; it does not reserve a name. Recheck before any publication.
+- **Toolchain**: Rust edition 2024, `rust-version = "1.85"`, and pinned Rust 1.85.0 with rustfmt/Clippy. [Rust 1.85 introduced edition 2024](https://blog.rust-lang.org/2025/02/20/Rust-1.85.0/); using that floor allows the scaffold's MSRV to be verified directly. Commit Cargo.lock for reproducible application builds. Reassess the pin/MSRV when P1.4 selects real dependencies; this is an experiment baseline, not a permanent toolchain freeze.
+- **Platform**: Initial tested development target is `aarch64-apple-darwin` on Apple Silicon macOS with Xcode linker tools. No cross-platform support or distributable release is claimed; those gates remain P2.5/P4.5.
+- **Boundary**: Only help/version and rejection of unsupported inputs exist. Exit 2 denotes scaffold usage errors; Phase 2 still owns the coding-run exit contract. No speculative `single`, route, agent or workflow commands, transport, model call, or agent loop is introduced.
+- **Evidence**: [P1.1 checks](docs/evidence/p1-1-rust-scaffold.md); no earlier routing or transport decision changes.
+
 ## Deferred decision register
 
 | Choice | Owner phase | Decide when / required evidence |
