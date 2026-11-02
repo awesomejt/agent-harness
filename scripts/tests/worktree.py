@@ -114,22 +114,35 @@ for scenario in ['clean', 'unborn', 'nonrepo', 'linked', 'filter-local', 'filter
             hook.chmod(0o755)
             (project / '.gitattributes').write_text('case filter=trap\n')
             # Ensure status would re-hash this tracked file.
-            (project / 'case').write_text('version\n')
+            (project / 'case').write_text('version')
+            stamp = (project / 'case').stat().st_mtime_ns + 2_000_000_000
+            os.utime(project / 'case', ns=(stamp, stamp))
             if scenario == 'filter-included':
                 included = base / 'included-config'
                 included.write_text('[filter "trap"]\n clean = ' + str(hook) + '\n')
                 git(project, 'config', 'include.path', str(included))
             elif scenario == 'filter-worktree':
                 git(project, 'config', 'extensions.worktreeConfig', 'true')
+                hook.write_text('#!/bin/sh\ntouch "' + str(base / 'FILTER_RAN') + '"\nexit 1\n')
                 git(project, 'config', '--worktree', 'filter.trap.process', str(hook))
             else:
                 git(project, 'config', 'filter.trap.clean', str(hook))
+            # Positive control: identical bytes with a changed mtime force a
+            # re-hash. The process trap deliberately exits at handshake; either
+            # filter path must execute without our guard. Never refresh index.
+            subprocess.run(['/usr/bin/git', '-C', str(project), '--no-optional-locks',
+                '-c', 'core.fsmonitor=false', 'status', '--porcelain=v1', '-z'],
+                capture_output=True, timeout=10)
+            # A deliberately failed process handshake can make Git exit 128;
+            # the marker, rather than status success, proves command execution.
+            assert (base / 'FILTER_RAN').exists(), scenario
+            (base / 'FILTER_RAN').unlink()
         before = tree(base)
         result = subprocess.run([str(BINARY), 'single', 'Task', '--project', str(project)],
             env={**os.environ, 'PATH': str(base) + ':' + os.environ['PATH'], 'TEST_KEY': 'sentinel'},
             capture_output=True, text=True, timeout=15)
         assert result.returncode == 2, result.stderr
-        expected = ('unavailable (Git filter configuration present' if scenario.startswith('filter-') else
+        expected = ('unavailable (system Git missing, filter configuration present' if scenario.startswith('filter-') else
                     'unavailable' if scenario == 'nonrepo' else
                     'dirty; staged=0 unstaged=0 untracked=2;' if scenario == 'unborn' else
                     'clean; staged=0 unstaged=0 untracked=0;')

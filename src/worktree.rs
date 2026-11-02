@@ -118,7 +118,7 @@ pub(crate) async fn report(
     .await?;
     if !matches!(filters, Some((status, ref bytes)) if status.code() == Some(1) && bytes.is_empty())
     {
-        progress.event("project baseline: unavailable (Git filter configuration present or config inspection incomplete); status skipped to avoid filter execution");
+        progress.event("project baseline: unavailable (system Git missing, filter configuration present, or config inspection incomplete; requires macOS Command Line Tools Git); status skipped to avoid filter execution");
         return Ok(());
     }
     let observed = observe(
