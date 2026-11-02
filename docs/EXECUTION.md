@@ -4,7 +4,7 @@ Status: design contract, not a published Rust API or wire schema. See [architect
 
 ## Request resolution
 
-Resolve one project path, prompt source, operational mode, runtime, and model alias, plus an optional canonical agent once supported. Record whether each effective choice came from the invocation or configuration. Accept inline text, a file, or stdin; reject conflicting sources and empty content before launching work. Exact flag names and byte limits are a Phase 2 choice. A missing input must not unexpectedly launch an interactive coding session in CI.
+Resolve one project path, prompt source, operational mode, runtime, and model alias, plus an optional canonical agent once supported. Record whether each effective choice came from the invocation or configuration. Accept inline text, a file, or stdin; reject conflicting sources and empty content before launching work. D024 and [the first-slice configuration contract](CONFIGURATION.md#selected-invocation-and-preview-syntax) fix flag names, limits and defaults. A missing input must not unexpectedly launch an interactive coding session in CI.
 
 Keep primary versus specialized role separate from route and runtime. A request to review without writes must become enforceable runtime restrictions; advisory system text is insufficient.
 
@@ -24,7 +24,7 @@ Outcomes distinguish validation rejection, launch failure, runtime/provider fail
 
 Human diagnostics go to stderr when stdout carries a final response or structured records. The Phase 4 machine contract must specify envelope version, IDs, timestamps/order, event types, optional provider fields, redaction, and a terminal record. Do not expose chain-of-thought as a required normalized field. Bound output buffering and document truncation rather than silently dropping completion or permission events.
 
-Numeric exit codes are fixed in Phase 2; success, failed/rejected execution, cancellation with known outcome, and uncertain completion have distinct exit statuses. Uncertainty takes precedence when cancellation or timeout may have left side effects; report that uncertainty explicitly on stderr in Phase 2 rather than waiting for Phase 4 machine records. Later structured-output additions must preserve documented shell behavior.
+D024 fixes numeric exits: 0 = successful backend turn plus confirmed cleanup; 1 = launch/runtime/provider/output failure with known outcome; 2 = rejected input/configuration/unsupported capability; 3 = cancellation/deadline with known terminal outcome and confirmed cleanup; 4 = uncertain completion or cleanup. Uncertainty overrides other outcomes, even after a backend success marker. Cancellation is known only with affirmative evidence of termination/effects; missing tool events do not prove it. A successful agent turn does not mean tests passed. These values are represented in the validation library; P2.2/P2.4 implement runtime classification. Uncertainty takes precedence when cancellation or timeout may have left side effects; report that uncertainty explicitly on stderr in Phase 2 rather than waiting for Phase 4 machine records. Later structured-output additions must preserve documented shell behavior.
 
 ## Adapter capability contract
 

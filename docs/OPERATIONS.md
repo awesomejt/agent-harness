@@ -14,7 +14,7 @@ Initial binary support covers one tested platform; the core MVP declares its bro
 
 ## Startup and diagnosis
 
-Diagnostics should identify missing binaries, runtime/version incompatibility, unavailable model aliases, unreadable/conflicting config, missing key references, denied permissions and unreachable permitted services. Read-only resolved-plan/sync preview is separate from launching a task. Exact CLI spelling remains a Phase 2 choice.
+Diagnostics should identify missing binaries, runtime/version incompatibility, unavailable model aliases, unreadable/conflicting config, missing key references, denied permissions and unreachable permitted services. Read-only resolved-plan/sync preview is separate from launching a task. D024 fixes `--preview` for P2.7 implementation, using the selected first-slice input contract; preview and runtime diagnostics are not available in P2.1.
 
 Errors explain what failed, which attempt/route was affected, whether tools may have run, and a next action that does not silently change mode or credentials. Do not suggest cloud fallback as the automatic fix to local-only unavailability.
 
