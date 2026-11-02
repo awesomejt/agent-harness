@@ -7,7 +7,7 @@ All work here is demand-driven. OR/selection gates below take precedence over th
 <a id="p9-1"></a>
 ## P9.1 — Optional non-spending quota visibility
 
-- **Depends on:** [P7.1](07-native-adapters.md#p7-1)
+- **Depends on:** Conditional: any one relevant completed adapter [P7.2](07-native-adapters.md#p7-2) OR [P7.3](07-native-adapters.md#p7-3) OR [P7.4](07-native-adapters.md#p7-4) OR [P7.5](07-native-adapters.md#p7-5), plus demand selection.
 - **Deliverable and boundary:** When demand selects this increment, reassess ai-queue usage readers for at least one relevant supported native adapter. Add read-only measurements with units/source/freshness.
 - **Acceptance evidence:** Fixtures and an authorized non-spending read show unknown/unsupported usage remains unknown; official auth retained and no prompt spent by default.
 - **Decision/readiness gate:** Demand gate plus at least one relevant adapter P7.2/P7.3/P7.4/P7.5 complete; do not require the entire portfolio.

@@ -12,7 +12,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - Phase 0 review: PR #1 received 0 blockers, 2 concerns, and 2 nits; all four addressed. No critical/high findings; no re-review required under docs/GIT_WORKFLOW.md.
 - Implementation: none yet.
 - Direction: Rust CLI with prebuilt binaries; OpenCode first, LiteLLM route plus native route.
-- Execution plan: [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); per-task dependencies, boundaries and evidence: [tasks/README.md](tasks/README.md). Feature/contract review (PR #2) and Rust architecture/alignment review (PR #3) are complete; task-planning PR review is pending.
+- Execution plan: [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); per-task dependencies, boundaries and evidence: [tasks/README.md](tasks/README.md). Feature/contract review (PR #2) and Rust architecture/alignment review (PR #3) are complete; task-planning review (PR #4) is complete: 0 blockers, 1 concern and 2 nits addressed; no critical/high findings.
 - Feature coverage: docs/FEATURE_REVIEW.md records eight upstream projects and F01–F26 dispositions; docs/README.md indexes technical contracts. No implementation has started.
 - First usable milestone: end of Phase 2. Core MVP: end of Phase 4.
 - Task IDs are stable references, not execution order; phase validation/closeout depends on every other task in that phase.
@@ -31,7 +31,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - [x] P0.9 Align full scope and AC01–AC11 acceptance with the Rust software blueprint, architecture diagrams and detailed contracts.
 - [x] P0.10 Validate diagrams/document consistency and complete PR review of the Rust architecture pass (PR #3; 0 blockers, 2 concerns and 3 nits addressed; no critical/high findings).
 - [x] P0.11 Draft the remaining-phase execution plan, dependency gates, detailed task cards and immediate ready queue.
-- [ ] P0.12 Validate task/dependency/contract consistency and complete required PR review of the planning structure.
+- [x] P0.12 Validate task/dependency/contract consistency and complete required PR review of the planning structure (PR #4; all three minor findings addressed; completion effective on merge).
 
 ## Phase 1 — Integration experiment
 
@@ -110,7 +110,7 @@ Choose order from use; finish one adapter's contract before starting the next.
 - [ ] P7.3 Codex adapter: execution, events, constraints, named mapping, tests, and live example ([card](tasks/07-native-adapters.md#p7-3)).
 - [ ] P7.4 Grok adapter: execution, events, constraints, named mapping, tests, and live example ([card](tasks/07-native-adapters.md#p7-4)).
 - [ ] P7.5 Gemini adapter: execution, events, constraints, named mapping, tests, and live example ([card](tasks/07-native-adapters.md#p7-5)).
-- [ ] P7.6 Maintain adapter capability/version matrix and installation instructions as each ships ([card](tasks/07-native-adapters.md#p7-6)).
+- [ ] P7.6 Audit final capability/version/install coverage after all four committed adapters pass; incremental docs belong to each adapter task ([card](tasks/07-native-adapters.md#p7-6)).
 
 ## Phase 8 — Pi
 

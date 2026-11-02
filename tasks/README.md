@@ -18,7 +18,8 @@ This directory plans work on agent-harness. It is not the runtime queue/state us
 
 ## Status, readiness and ownership
 
-- A checked item in PROJECT.md means accepted evidence and required PR review/merge are complete. An unchecked item is not done; it may be ready, waiting on dependencies, selected for current work, externally blocked, or deliberately deferred.
+- On main, a checked item in PROJECT.md means accepted evidence and required PR review/merge are complete. An unchecked item is not done; it may be ready, waiting on dependencies, selected for current work, externally blocked, or deliberately deferred.
+- In an open PR, completion checkmarks are proposed post-merge state. They take effect only when the PR merges; do not report them as completed on main before then. Review findings can keep the task open until addressed.
 - PROJECT.md's current-work section records the one active task/PR and any real blocker. Do not copy mutable status or checkboxes into the phase cards.
 - A task is ready when its prerequisite evidence exists, the owner phase's required decisions are recorded, and any selection/external gate is satisfied. Use merged prerequisites by default. Tightly coupled tasks may share a PR, but consuming work must wait for prerequisite evidence and status remains unchecked until review/merge.
 - Phase 1 permission-policy evidence must exist before any live run. For P7.2–P7.5, select one provider before activation. For Phase 9, dependency completion alone does not activate optional work. P9.4 has conditional OR dependencies, not a requirement to implement quota and scheduling together.

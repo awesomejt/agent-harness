@@ -53,7 +53,7 @@ Adapter tasks share the core dependency but are activated one at a time by a rec
 ## P7.6 — Native adapter portfolio closeout
 
 - **Depends on:** [P7.2](07-native-adapters.md#p7-2), [P7.3](07-native-adapters.md#p7-3), [P7.4](07-native-adapters.md#p7-4), [P7.5](07-native-adapters.md#p7-5)
-- **Deliverable and boundary:** Maintain aggregate capability/version/install coverage as each adapter lands, then audit the complete committed four-target portfolio. Per-adapter docs/tests remain mandatory inside each adapter task.
+- **Deliverable and boundary:** Audit aggregate capability/version/install coverage across the complete committed four-target portfolio. Incremental per-adapter docs/tests remain mandatory inside each adapter task; this task is only the final portfolio audit/closeout.
 - **Acceptance evidence:** Each committed adapter has linked fixture/live evidence and setup/capability docs; select the next target only after current adapter review/use. Portfolio closure waits for all four.
 - **Decision/readiness gate:** Partial adapter milestones are usable independently; Phase 7 as a whole is not complete until all committed targets pass.
 - **Contract:** [docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
