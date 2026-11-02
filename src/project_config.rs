@@ -272,6 +272,21 @@ impl Plan {
             && (self.before.as_deref() != Some(&self.after)
                 || self.owner_before.as_deref() != Some(&self.owner_after))
     }
+    /// Static field names only: never expose old user values or credentials.
+    pub fn preview_changes(&self) -> Vec<&'static str> {
+        let mut changes = Vec::new();
+        if !self.no_sync {
+            if self.before.as_deref() != Some(&self.after) {
+                changes.push(
+                    "opencode.json: provider.ah-litellm, enabled_providers, model, small_model",
+                );
+            }
+            if self.owner_before.as_deref() != Some(&self.owner_after) {
+                changes.push(".ah-opencode-owner.json: managed routing receipt");
+            }
+        }
+        changes
+    }
     /// Inspect the adapter-observed effective config after isolated launch setup.
     /// P2.2 must separately verify tools, agents, plugins and permission policy.
     pub fn validate_effective(&self, effective: &Value) -> Result<()> {

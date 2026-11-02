@@ -14,7 +14,7 @@ Initial binary support covers one tested platform; the core MVP declares its bro
 
 ## Startup and diagnosis
 
-Diagnostics should identify missing binaries, runtime/version incompatibility, unavailable model aliases, unreadable/conflicting config, missing key references, denied permissions and unreachable permitted services. Read-only resolved-plan/sync preview is separate from launching a task. D024 fixes `--preview` for P2.7 implementation, using the selected first-slice input contract; preview and runtime diagnostics are not available in P2.1.
+Diagnostics should identify missing binaries, runtime/version incompatibility, unavailable model aliases, unreadable/conflicting config, missing key references, denied permissions and unreachable permitted services. Read-only resolved-plan/sync preview is separate from launching a task. `ah single PROMPT --preview` uses the execution resolver/planner and reports local binary discovery, expected OpenCode 1.18.30, choice sources, permissions and planned managed changes. It launches no child and performs no health checks. Runtime/service/alias availability remains unverified; normal execution performs effective preflight. Set the environment variable named by `litellm.api_key_env` for missing-key errors; install the pinned OpenCode on an absolute PATH entry when discovery reports it missing.
 
 Errors explain what failed, which attempt/route was affected, whether tools may have run, and a next action that does not silently change mode or credentials. Do not suggest cloud fallback as the automatic fix to local-only unavailability.
 
