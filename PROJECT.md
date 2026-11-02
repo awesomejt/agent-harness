@@ -5,7 +5,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 ## Current state
 
 - Active phase: 1 — integration experiment; P1.1 and P1.6 merged (PRs #6–7). P1.2 no-prompt ACP preflight passes on macOS arm64; live transport acceptance is blocked by existing LiteLLM model discovery/authentication failures.
-- Active implementation task/PR: P1.2 transport preflight/evidence on `feature/p1-2-opencode-transport`; live acceptance remains open. Default work-in-progress limit: one focused task/PR.
+- Active implementation task/PR: none after [PR #8](https://github.com/awesomejt/agent-harness/pull/8) merge. P1.2 preflight/evidence reviewed: 0 blockers, 0 concerns, 4 nits addressed; live acceptance remains externally blocked. Default work-in-progress limit: one focused task/PR.
 - Phase 0 holistic review P0.13: pass recorded in [review report](docs/reviews/phase-00.md), effective on PR #5 merge. P1.1/P1.6 are merged. Next: restore access to an existing LiteLLM alias, complete actual permission mapping/enforcement preflight, then resume P1.2 live work.
 - External prerequisite blocker (2026-11-01): OpenCode 1.18.30 responds to ACP, but existing loopback LiteLLM `/v1/models` returns HTTP 400 `no_db_connection` with either configured key and HTTP 500 without authentication. Liveness/readiness do not establish model usability. Next validation: proxy owner restores valid model discovery/authentication and identifies an existing alias; repeat discovery before model work. See [P1.2 evidence](docs/evidence/p1-2-opencode-transport.md).
 - Remaining implementation/review backlog: 57 tasks across Phases 1–9; Phase 9 increments remain demand-gated.

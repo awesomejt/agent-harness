@@ -15,7 +15,7 @@ The probe creates a temporary project and HOME/XDG directories, starts with a mi
 Observed sequence:
 
 1. `opencode --version` → `1.18.30`.
-2. `opencode debug config --pure` → expected deny-all permission, sole synthetic enabled provider/model, empty MCP/plugins.
+2. `opencode debug config --pure` → expected deny-all permission, sole synthetic enabled provider/model, empty MCP/plugins; the helper model, sharing and autoupdate settings are also checked.
 3. `opencode acp --pure --cwd <temporary-project>` → JSON-RPC on stdio.
 4. `initialize` with protocol version 1, filesystem read/write capabilities false, terminal capability false → protocol 1; agent `OpenCode` version `1.18.30`; capabilities include session load/close/fork/list/resume, HTTP/SSE MCP, embedded context and images.
 5. `session/new` with absolute disposable cwd and `mcpServers: []` → session identity and `configOptions` with model `harness-preflight/unavailable`, mode `build`. This installed version reports the model through `configOptions`, not a `models` field.
@@ -51,3 +51,7 @@ Before live work, still verify fully described attempt/request identity, actual 
 ## Validation
 
 The final no-prompt probe passed on the installed runtime. Existing Rust formatting, Clippy (`--all-targets --locked -- -D warnings`) and all 11 tests passed. No Rust dependencies, lockfile, CLI interface or runtime behavior changed.
+
+## PR review
+
+[Grok review on PR #8](https://github.com/awesomejt/agent-harness/pull/8): one review, 0 blockers, 0 concerns, 4 nits. All addressed: verify helper-model/share/autoupdate settings; report only stderr byte count on failure; tolerate blank lines and describe malformed JSON/non-object messages; handle the kill escalation race and preserve the original error if final reaping times out. The final live no-prompt probe passed again. Help and missing-executable checks pass (the latter refuses before launch with exit 2). No re-review required under docs/GIT_WORKFLOW.md. This closes the preflight PR only; P1.2 live acceptance remains open.

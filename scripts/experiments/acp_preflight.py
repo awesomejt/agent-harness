@@ -12,6 +12,7 @@ import selectors
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -57,6 +58,9 @@ def main():
         if (resolved.get('permission') != {'*': 'deny'}
                 or resolved.get('enabled_providers') != ['harness-preflight']
                 or resolved.get('model') != 'harness-preflight/unavailable'
+                or resolved.get('small_model') != 'harness-preflight/unavailable'
+                or resolved.get('share') != 'disabled'
+                or resolved.get('autoupdate') is not False
                 or resolved.get('mcp') or resolved.get('plugin')):
             raise RuntimeError('Resolved configuration differs from probe restrictions')
         print('Resolved config: deny all; synthetic provider only; no MCP/plugins.', flush=True)
@@ -86,7 +90,15 @@ def main():
                             raise RuntimeError('ACP response exceeded probe limit')
                     while b'\n' in pending:
                         line, pending = pending.split(b'\n', 1)
-                        message = json.loads(line)
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            message = json.loads(line)
+                        except json.JSONDecodeError:
+                            raise RuntimeError('Non-JSON line on ACP stdout') from None
+                        if not isinstance(message, dict):
+                            raise RuntimeError('ACP message must be a JSON object')
                         if 'method' in message:
                             # This probe never implements client filesystem/terminal/approval operations.
                             if 'id' in message:
@@ -118,7 +130,13 @@ def main():
                 print('session/new: session identity and synthetic model confirmed', flush=True)
                 print('session config:', json.dumps({k: v for k, v in session.items() if k != 'sessionId'}, sort_keys=True), flush=True)
                 print('No session/prompt sent; synthetic route only.', flush=True)
+            except Exception:
+                # Report size only: arbitrary child stderr must not leak raw secrets.
+                errors.seek(0, os.SEEK_END)
+                print(f'ACP stderr: {errors.tell()} bytes (content withheld).', file=sys.stderr)
+                raise
             finally:
+                original_failure = sys.exc_info()[0] is not None
                 selector.close()
                 # Bound shutdown and reap this process even if protocol startup fails.
                 try:
@@ -128,11 +146,20 @@ def main():
                 try:
                     child.wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    os.killpg(child.pid, signal.SIGKILL)
-                    child.wait(timeout=5)
+                    try:
+                        os.killpg(child.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        child.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        print('ACP direct child could not be reaped within deadline.', file=sys.stderr)
                 child.stdin.close()
                 child.stdout.close()
-                print('ACP process reaped; descendant cleanup is not proven.', flush=True)
+                if child.returncode is not None:
+                    print('ACP process reaped; descendant cleanup is not proven.', flush=True)
+                elif not original_failure:
+                    raise RuntimeError('ACP direct-child cleanup deadline exceeded')
 
 
 if __name__ == '__main__':
