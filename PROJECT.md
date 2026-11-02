@@ -5,12 +5,12 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 ## Current state
 
 - Active phase: 1 — integration experiment started; minimal Rust scaffold implemented (P1.1 completion effective on [PR #6](https://github.com/awesomejt/agent-harness/pull/6) merge).
-- Active implementation task/PR: none after [PR #6](https://github.com/awesomejt/agent-harness/pull/6) merge. P1.1 Grok review: 0 blockers, 0 concerns, 3 nits; all addressed, no re-review required. Default work-in-progress limit: one focused task/PR.
-- Phase 0 holistic review P0.13: pass recorded in [review report](docs/reviews/phase-00.md), effective on PR #5 merge. Next after P1.1 merge: P1.6 permission policy → P1.2 transport experiment.
+- Active implementation task/PR: none after [PR #7](https://github.com/awesomejt/agent-harness/pull/7) merge. P1.6 Grok review: 0 blockers, 0 concerns, 3 nits; all addressed, no re-review required. Default work-in-progress limit: one focused task/PR.
+- Phase 0 holistic review P0.13: pass recorded in [review report](docs/reviews/phase-00.md), effective on PR #5 merge. P1.1 is merged. Next after P1.6 merge: P1.2 transport experiment (actual permission mapping/enforcement preflight required before live prompts).
 - External prerequisites: CLI versions, LiteLLM/model availability and login are unverified; no external blocker has been diagnosed by this planning pass.
-- Remaining implementation/review backlog after [PR #6](https://github.com/awesomejt/agent-harness/pull/6) merges: 58 tasks across Phases 1–9; Phase 9 increments remain demand-gated.
+- Remaining implementation/review backlog after P1.6 merges: 57 tasks across Phases 1–9; Phase 9 increments remain demand-gated.
 - Phase 0 PR #1 review: received 0 blockers, 2 concerns, and 2 nits; all four addressed. No critical/high findings; no re-review required under docs/GIT_WORKFLOW.md.
-- Implementation: dependency-free Rust package and informational `ah` binary; coding runs are not implemented.
+- Implementation: dependency-free Rust package, informational `ah` binary and transport-independent permission experiment with synthetic fixtures; coding runs are not implemented.
 - Direction: Rust CLI with prebuilt binaries; OpenCode first, LiteLLM route plus native route.
 - Execution plan: [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md); per-task dependencies, boundaries and evidence: [tasks/README.md](tasks/README.md). Feature/contract review (PR #2) and Rust architecture/alignment review (PR #3) are complete; task-planning review (PR #4) is complete: 0 blockers, 1 concern and 2 nits addressed; explicit holistic phase-review gates are recorded in PR #5 (two Grok reviews; all findings resolved).
 - Feature coverage: docs/FEATURE_REVIEW.md records eight upstream projects and F01–F26 dispositions; docs/README.md indexes technical contracts. P1.1 introduces the minimal Rust scaffold.
@@ -39,7 +39,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 Detailed scope, dependencies and evidence: [Phase 1 cards](tasks/01-integration.md).
 
 - [x] P1.1 Create a minimal Rust package; select package name, edition/MSRV and initial target. Proposed completion on [PR #6](https://github.com/awesomejt/agent-harness/pull/6) merge; [evidence](docs/evidence/p1-1-rust-scaffold.md), [D019](DECISIONS.md#2026-11-01--d019-minimal-rust-scaffold-baseline).
-- [ ] P1.6 Define and test permission-request policy/noninteractive behavior before the first live integration run (decision subtask extracted from P1.3) ([card](tasks/01-integration.md#p1-6)).
+- [x] P1.6 Define and test permission-request policy/noninteractive behavior before the first live integration run. Completion effective on [PR #7](https://github.com/awesomejt/agent-harness/pull/7) merge; [D020](DECISIONS.md#2026-11-01--d020-fail-closed-experiment-permissions), [evidence](docs/evidence/p1-6-permission-policy.md), [card](tasks/01-integration.md#p1-6).
 - [ ] P1.2 Exercise OpenCode ACP with a disposable project; compare native structured output if needed ([card](tasks/01-integration.md#p1-2)).
 - [ ] P1.4 Evaluate a small reusable adapter/process dependency against direct SDK/runtime use; inspect license, release/API compatibility, and platform behavior ([card](tasks/01-integration.md#p1-4)).
 - [ ] P1.3 After the P1.6 permission decision, verify no implicit widening, LiteLLM model selection, project instructions, progress, cancellation, and child cleanup ([card](tasks/01-integration.md#p1-3)).

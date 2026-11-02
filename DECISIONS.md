@@ -129,13 +129,21 @@ Entries record design intent, not implementation completion. Earlier entries rem
 - **Boundary**: Only help/version and rejection of unsupported inputs exist. Exit 2 denotes scaffold usage errors; Phase 2 still owns the coding-run exit contract. No speculative `single`, route, agent or workflow commands, transport, model call, or agent loop is introduced.
 - **Evidence**: [P1.1 checks](docs/evidence/p1-1-rust-scaffold.md); no earlier routing or transport decision changes.
 
+## 2026-11-01 — D020: Fail-closed experiment permissions
+
+- **Decision**: Before P1.2 live work, use a headless default-deny policy for all tool actions. Allow only an explicit trusted grant bound to one complete attempt-specific request and an advertised allow-once option. Consume grants on the next request; never persist them or select allow-always. Prompting is unsupported in the experiment and policies requiring it must fail before launch, regardless of TTY availability.
+- **Responses**: Select an advertised denial for ungranted actions; otherwise cancel, or stop if the transport cannot represent cancellation. Malformed identities/options fail the attempt. Response delivery failure triggers cleanup and possible uncertainty, never approval or a more permissive retry.
+- **Rationale / alternatives**: Blanket project-write or shell grants would widen permission beyond a reviewed action. A TUI/approval timeout is unnecessary for the narrow experiment; default denial is deterministic and works headlessly. Interactive UX and broader declarative policies remain consuming-phase choices, not implicit runtime defaults.
+- **Boundary**: [Execution contract](docs/EXECUTION.md#permissions-and-headless-operation) specifies the adapter preflight gate. `src/permission.rs` is a transport-independent experiment with synthetic normalized request tests, not an ACP wire schema or live security claim. No new dependencies, commands, model calls or backend launches. P1.2 must verify actual transport mapping and enforcement before live work; P1.3 proves denied-action and lifecycle behavior. Earlier routing/transport decisions remain unchanged.
+- **Evidence**: [P1.6 policy fixtures](docs/evidence/p1-6-permission-policy.md). This resolves the pre-live permission decision only; Phase 1 remains open.
+
 ## Deferred decision register
 
 | Choice | Owner phase | Decide when / required evidence |
 |---|---|---|
 | Cargo package name, Rust edition/MSRV, initial development target | 1 | Before scaffolding/publishing; verify naming and toolchain availability. |
 | OpenCode transport, adapter/process dependencies and concrete Rust interfaces | 1 | After a narrow experiment proves model selection, project instructions, callbacks, streaming, and cancellation. |
-| ACP permission-request handling (allow/deny/prompt) | 1 | Before the first live run; document the non-interactive default and prove no implicit permission widening. |
+| ACP permission-request handling (allow/deny/prompt) | 1 | Policy resolved by D020/P1.6; verify actual transport mapping before P1.2 live prompts and runtime enforcement/lifecycle in P1.3. |
 | Config format, filename/location, precedence, exit codes, prompt-input and preview syntax | 2 | Before first-slice configuration/CLI is implemented; use the smallest schema that supports that slice. YAML is an earlier sketch, not a locked harness-config format. |
 | Project sync ownership/conflicts and no-sync validation | 2 | Before any managed project writes; prove preservation and effective routing. |
 | Release tooling and initial binary target | 2 | Before first usable distribution; validate installation and external prerequisites. |
