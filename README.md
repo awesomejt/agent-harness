@@ -6,11 +6,11 @@ The goal is to run real project work with explicit routing, portable agent defin
 
 ## Status
 
-Phase 2 is in progress after the accepted [Phase 1 review](docs/reviews/phase-01.md). `ah single` now runs OpenCode **1.18.30** over ACP against the configured LiteLLM alias on macOS. Managed project routing and explicit inline/file/stdin inputs are implemented. Bounded progress/cancellation, read-only preview and dirty-project reporting are implemented. P2.5 prepares the first Apple Silicon macOS pre-release via the [installation runbook](docs/OPERATIONS.md); real-use acceptance and holistic Phase 2 review remain open.
+Phase 2 is in progress after the accepted [Phase 1 review](docs/reviews/phase-01.md). `ah single` now runs OpenCode **1.18.30** over ACP against the configured LiteLLM alias on macOS. Managed project routing and explicit inline/file/stdin inputs are implemented. Bounded progress/cancellation, read-only preview and dirty-project reporting are implemented. The first Apple Silicon macOS pre-release is published via the [installation runbook](docs/OPERATIONS.md); [real-use evidence](docs/evidence/p2-6-first-use.md) prepares acceptance, and holistic Phase 2 review remains required.
 
 ## Install
 
-The Apple Silicon macOS prebuilt binary is published after P2.5 PR merge as [v0.1.0-alpha.1](https://github.com/awesomejt/agent-harness/releases/tag/v0.1.0-alpha.1). Follow the [checksum, installation and prerequisite instructions](docs/OPERATIONS.md). Binary users need no Rust or Python; coding runs separately require OpenCode 1.18.30 and an existing LiteLLM service. Only macOS 27.0.1 on Apple Silicon has been release-tested.
+The Apple Silicon macOS prebuilt binary is published as [v0.1.0-alpha.1](https://github.com/awesomejt/agent-harness/releases/tag/v0.1.0-alpha.1). Follow the [checksum, installation and prerequisite instructions](docs/OPERATIONS.md). Binary users need no Rust or Python; coding runs separately require OpenCode 1.18.30 and an existing LiteLLM service. Only macOS 27.0.1 on Apple Silicon has been release-tested.
 
 ## Development scaffold
 
