@@ -8,6 +8,7 @@ pub mod config;
 pub mod permission;
 #[cfg(target_os = "macos")]
 mod process;
+mod progress;
 pub mod project_config;
 #[cfg(target_os = "macos")]
 mod runtime;

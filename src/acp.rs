@@ -91,7 +91,12 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
     let mut command = runtime.command(project, &["acp", "--pure", "--cwd", project_arg]);
     let mut owned = match OwnedChild::spawn(&mut command) {
         Ok(child) => child,
-        Err(_) => return Exit::Failed,
+        Err(_) => {
+            runtime
+                .progress
+                .event("attempt=1 launch failed; no prompt submitted");
+            return Exit::Failed;
+        }
     };
     let input = owned.child.stdin.take().unwrap();
     let output = owned.child.stdout.take().unwrap();
@@ -111,6 +116,11 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
     let notifications = observed.clone();
     let permissions = observed.clone();
     let foreground = observed.clone();
+    let notification_progress = runtime.progress.clone();
+    let permission_progress = runtime.progress.clone();
+    let permission_cancel = runtime.cancelled.clone();
+    let permission_deadline = runtime.deadline;
+    let foreground_progress = runtime.progress.clone();
     let active = Arc::new(AtomicBool::new(false));
     let sent = active.clone();
     let terminal = Arc::new(AtomicU8::new(0));
@@ -136,8 +146,12 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                     return Err(notification_failure.fail());
                 }
                 match kind {
+                    Some("usage_update") => notification_progress.usage(&value["update"]),
                     Some("agent_message_chunk") => {
                         state.chunks += 1;
+                        if state.chunks == 1 || state.chunks % 128 == 0 {
+                            notification_progress.event(format!("attempt=1 assistant activity; chunks={}", state.chunks));
+                        }
                         if let Some(text) = value["update"]["content"]["text"].as_str() {
                             if state.text.len() + text.len() > 1_000_000 {
                                 return Err(notification_failure.fail());
@@ -147,6 +161,9 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                     }
                     Some("tool_call" | "tool_call_update") => {
                         state.tools += 1;
+                        if state.tools <= 16 || state.tools % 128 == 0 {
+                            notification_progress.event(format!("attempt=1 tool activity; events={}", state.tools));
+                        }
                         let update = &value["update"];
                         if let Some(id) = update["toolCallId"].as_str() {
                             if (update["status"].is_null()
@@ -241,7 +258,10 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                 let external = verified_external(&value["toolCall"], descriptor);
                 let described = complete;
                 let mut policy =
-                    if policy == Permissions::Trusted && (supported || external) && described {
+                    if policy == Permissions::Trusted
+                        && !permission_cancel.is_cancelled()
+                        && tokio::time::Instant::now() < permission_deadline
+                        && (supported || external) && described {
                         PermissionPolicy::grant_next_request(normalized.clone())
                     } else {
                         PermissionPolicy::default()
@@ -277,6 +297,9 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                     PermissionResponse::Refused => return Err(permission_failure.fail()),
                 };
                 state.permissions += 1;
+                if state.permissions <= 16 || state.permissions % 128 == 0 {
+                    permission_progress.event(format!("attempt=1 headless permission response; requests={}; grants={}", state.permissions, state.granted));
+                }
                 responder
                     .respond(RequestPermissionResponse::new(outcome))
                     .map_err(|_| permission_failure.fail())
@@ -383,45 +406,83 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                 return Err(agent_client_protocol::Error::internal_error());
             }
             foreground.lock().unwrap().session = Some(session.session_id.to_string());
+            // Session IDs are opaque backend data: JSON escaping and a length
+            // bound prevent terminal injection and unbounded diagnostics.
+            foreground_progress.event(format!("attempt=1 session={}", serde_json::to_string(&session.session_id.to_string().chars().take(128).collect::<String>()).unwrap()));
+            if runtime.cancelled.is_cancelled() || tokio::time::Instant::now() >= runtime.deadline {
+                return Err(agent_client_protocol::Error::internal_error());
+            }
             sent.store(true, Ordering::SeqCst);
-            let result = cx
+            foreground_progress.event("attempt=1 prompt submitted");
+            let response = cx
                 .send_request(PromptRequest::new(
                     session.session_id.clone(),
                     vec![ContentBlock::Text(TextContent::new(prompt.clone()))],
                 ))
-                .block_task()
-                .await?;
-            let stop = serde_json::to_value(&result)?;
-            finished.store(
-                match stop["stopReason"].as_str() {
-                    Some("end_turn") => 1,
-                    Some("cancelled") => 3,
-                    _ => 2,
+                .block_task();
+            tokio::pin!(response);
+            let result = tokio::select! {
+                result = &mut response => result?,
+                _ = runtime.cancelled.cancelled() => {
+                    foreground_progress.event("attempt=1 signal; sending session/cancel (5s response budget)");
+                    cx.send_notification(CancelNotification::new(session.session_id.clone()))?;
+                    tokio::time::timeout(std::time::Duration::from_secs(5), &mut response).await
+                        .map_err(|_| agent_client_protocol::Error::internal_error())??
                 },
-                Ordering::SeqCst,
-            );
-            if stop["stopReason"] != "end_turn" {
-                return Err(agent_client_protocol::Error::internal_error());
-            }
+                _ = tokio::time::sleep_until(runtime.deadline) => {
+                    foreground_progress.event("attempt=1 deadline; sending session/cancel (5s response budget)");
+                    cx.send_notification(CancelNotification::new(session.session_id.clone()))?;
+                    tokio::time::timeout(std::time::Duration::from_secs(5), &mut response).await
+                        .map_err(|_| agent_client_protocol::Error::internal_error())??
+                },
+            };
+            let stop = serde_json::to_value(&result)?;
+            foreground_progress.event(match stop["stopReason"].as_str() {
+                Some("end_turn") => "attempt=1 backend terminal=end_turn",
+                Some("cancelled") => "attempt=1 backend terminal=cancelled; project effects may remain",
+                _ => "attempt=1 backend terminal=failure (turn limit or refusal)",
+            });
+            finished.store(match stop["stopReason"].as_str() {
+                Some("end_turn") => 1,
+                Some("cancelled") => 3,
+                _ => 2,
+            }, Ordering::SeqCst);
             Ok(())
         });
-    let result = tokio::select! {
-        value = tokio::time::timeout_at(runtime.deadline, connection) => value.ok().and_then(Result::ok).is_some(),
-        _ = runtime.cancelled.cancelled() => false,
-        _ = violation.wake.notified() => false,
+    tokio::pin!(connection);
+    let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(5));
+    heartbeat.tick().await;
+    let result = loop {
+        tokio::select! {
+            value = &mut connection => break value.is_ok(),
+            // Once active, the foreground sends session/cancel and awaits a
+            // terminal response. Before active, interruption needs no protocol ACK.
+            _ = runtime.cancelled.cancelled(), if !active.load(Ordering::SeqCst) => { if !active.load(Ordering::SeqCst) { break false; } },
+            _ = tokio::time::sleep_until(runtime.deadline), if !active.load(Ordering::SeqCst) => { if !active.load(Ordering::SeqCst) { break false; } },
+            _ = violation.wake.notified() => {
+                runtime.progress.event("attempt=1 protocol/callback/output limit failure");
+                break false;
+            },
+            _ = heartbeat.tick() => {
+                let state = observed.lock().unwrap();
+                runtime.progress.event(format!("attempt=1 active; chunks={}; tools={}; permissions={}", state.chunks, state.tools, state.permissions));
+            }
+        }
     };
+    if !result && !violation.failed.load(Ordering::SeqCst) {
+        runtime.progress.event(if active.load(Ordering::SeqCst) {
+            "attempt=1 runtime/provider/transport failure or cancellation response timeout; effects unknown"
+        } else { "attempt=1 setup stopped before prompt submission" });
+    }
+    runtime.progress.event("attempt=1 process cleanup started");
     let cleanup = owned.cleanup().await;
     {
         let state = observed.lock().unwrap();
-        eprintln!(
-            "ah: attempt cleanup={cleanup}; terminal={}; protocol_violation={}; deadline={}; permission requests: {}; grants: {}; tool events: {}",
-            terminal.load(Ordering::SeqCst),
-            violation.failed.load(Ordering::SeqCst),
-            tokio::time::Instant::now() >= runtime.deadline,
-            state.permissions,
-            state.granted,
-            state.tools
-        );
+        runtime.progress.event(format!(
+            "attempt=1 cleanup={cleanup}; terminal={}; protocol_violation={}; permission requests: {}; grants: {}; tool events: {}; stderr_bytes={} (raw withheld; count capped at 1048577)",
+            terminal.load(Ordering::SeqCst), violation.failed.load(Ordering::SeqCst),
+            state.permissions, state.granted, state.tools, owned.stderr_bytes()
+        ));
     }
     if !cleanup
         || (active.load(Ordering::SeqCst)
@@ -447,17 +508,12 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
             Exit::Failed
         };
     }
-    use std::io::Write;
-    let state = observed.lock().unwrap();
-    eprintln!(
-        "ah: backend end_turn; cleanup confirmed; permission requests: {}; grants: {}; tool events: {}",
-        state.permissions, state.granted, state.tools
+    runtime.progress.event(
+        "attempt=1 backend end_turn; cleanup confirmed; delivering response (2s output budget)",
     );
-    if std::io::stdout()
-        .lock()
-        .write_all(state.text.as_bytes())
-        .is_err()
-    {
+    let text = std::mem::take(&mut observed.lock().unwrap().text);
+    if !crate::progress::response(text).await {
+        runtime.progress.event("attempt=1 final response delivery failed or blocked; backend completed, output may be partial");
         return Exit::Failed;
     }
     Exit::Success

@@ -43,7 +43,7 @@ if 'debug' in sys.argv:
 (cwd / 'launched').touch()
 child = subprocess.Popen([sys.executable, '-c',
     'import signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); time.sleep(120)'],
-    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    stdin=subprocess.DEVNULL, stdout=None if case=='held-pipes' else subprocess.DEVNULL, stderr=None if case=='held-pipes' else subprocess.DEVNULL)
 time.sleep(.05)
 (cwd / 'pids.json').write_text(json.dumps([os.getpid(), child.pid]))
 
@@ -71,14 +71,39 @@ for line in sys.stdin:
     elif method == 'session/prompt':
         prompt_id = m['id']
         (cwd / 'prompted').touch()
-        if case in ['deadline', 'interrupt']:
+        if case in ['deadline', 'interrupt','cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission']:
             continue
         if case == 'deny-progress':
             for status in ['in_progress','failed']:
                 send(dict(jsonrpc='2.0',method='session/update',params=dict(sessionId='test',update=dict(sessionUpdate='tool_call_update',toolCallId='t',status=status))))
             reply(prompt_id,dict(stopReason='end_turn'))
             continue
-        if case == 'eof':
+        if case in ['usage','usage-invalid-cost']:
+            send(dict(jsonrpc='2.0',method='session/update',params=dict(sessionId='test',update=dict(sessionUpdate='usage_update',used=123,size=32000,cost=dict(amount=0.25,currency='USD' if case=='usage' else 'SECRET_SENTINEL')))))
+        if case == 'stderr-noise':
+            os.write(2, b'SECRET_SENTINEL\xff' * 150000)
+        if case == 'truncated-json':
+            os.write(1, b'{"jsonrpc":')
+            break
+        if case == 'invalid-utf8':
+            os.write(1, b'\xff\n')
+            break
+        if case == 'rpc-error':
+            send(dict(jsonrpc='2.0',id=prompt_id,error=dict(code=-32603,message='SECRET_SENTINEL')))
+            continue
+        if case == 'known-failure':
+            reply(prompt_id,dict(stopReason='max_tokens'))
+            continue
+        if case in ['blocked-stdout','blocked-stderr','progress']:
+            for i in range(30000 if case == 'blocked-stderr' else 1):
+                send(dict(jsonrpc='2.0',method='session/update',params=dict(sessionId='test',update=dict(sessionUpdate='agent_message_chunk',content=dict(type='text',text='x' * (900000 if case=='blocked-stdout' else 1))))))
+            if case == 'progress':
+                (cwd/'streamed').touch()
+                time.sleep(1)
+            (cwd/'terminal').touch()
+            reply(prompt_id,dict(stopReason='end_turn'))
+            continue
+        if case in ['eof','held-pipes']:
             break
         if case == 'oversized':
             print('x' * 8_000_001, flush=True)
@@ -106,9 +131,19 @@ for line in sys.stdin:
             send(dict(jsonrpc='2.0', method='session/update', params=dict(
                 sessionId='wrong' if case == 'wrong-session' else 'test', update=dict(sessionUpdate='agent_message_chunk',content=dict(type='text',text='OK')))))
             reply(prompt_id, dict(stopReason='cancelled' if case == 'backend-cancelled' else 'end_turn'))
+    elif method == 'session/cancel':
+        (cwd / 'cancelled').touch()
+        if case in ['cancel-ack','cancel-deadline','cancel-success']:
+            reply(prompt_id,dict(stopReason='end_turn' if case=='cancel-success' else 'cancelled'))
+        elif case == 'cancel-permission':
+            send(dict(jsonrpc='2.0',method='session/update',params=dict(sessionId='test',update=dict(sessionUpdate='tool_call',toolCallId='tool-1',title='Tool',kind='read',rawInput=dict(filePath='/tmp/example'),status='pending'))))
+            send(dict(jsonrpc='2.0',id=100,method='session/request_permission',params=dict(sessionId='test',toolCall=dict(toolCallId='tool-1',title='Tool',kind='read',rawInput=dict(filePath='/tmp/example')),options=[dict(optionId='once',name='Once',kind='allow_once'),dict(optionId='reject',name='Deny',kind='reject_once')])) )
+        elif case == 'cancel-ack-only':
+            # A notification/ACK is not a trustworthy terminal response.
+            send(dict(jsonrpc='2.0',method='session/update',params=dict(sessionId='test',update=dict(sessionUpdate='agent_message_chunk',content=dict(type='text',text='cancel acknowledged')))))
     elif m.get('id') == 100:
         (cwd / 'permission-result.json').write_text(json.dumps(m))
         if case == 'unexpected-write':
             send(dict(jsonrpc='2.0',id=200,method='fs/write_text_file',params=dict(sessionId='test',path='/tmp/ungranted-write',content='must not write')))
         else:
-            reply(prompt_id, dict(stopReason='end_turn'))
+            reply(prompt_id, dict(stopReason='cancelled' if case=='cancel-permission' else 'end_turn'))
