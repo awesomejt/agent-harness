@@ -1,6 +1,6 @@
 # Rust software design
 
-Status: implementation blueprint for the accepted Rust direction. Module/type names below are proposed internal vocabulary, not published Rust APIs, wire schemas, selected dependencies or existing files. Phase 1 validates concrete boundaries with the first integration. [Architecture diagrams](ARCHITECTURE.md) describe control and model traffic; [specification](SPECIFICATION.md) owns the first-slice/core-MVP requirements.
+Status: implementation blueprint for the accepted Rust direction. Module/type names below are proposed internal vocabulary, not published Rust APIs, wire schemas or existing files. Phase 1 validates responsibilities with the first integration; D023 selects its transport/dependency stack, summarized below. [Architecture diagrams](ARCHITECTURE.md) describe control and model traffic; [specification](SPECIFICATION.md) owns the first-slice/core-MVP requirements.
 
 ## Delivery and design priorities
 
@@ -10,7 +10,7 @@ Rust and prebuilt binaries are accepted. A Python scaffold, embedded Python agen
 
 ## Proposed package structure
 
-Start with one Cargo package, a thin executable entry point and a library/module boundary usable by tests. Do not create a multi-crate workspace solely to mirror this table. P1.1 selects `awesomejt-agent-harness`, the `ah` binary, Rust 2024 / MSRV 1.85, and `aarch64-apple-darwin` as the initial verified development target (D019). The scaffold has `src/main.rs` over a testable `src/lib.rs` informational argument boundary, with no external dependencies. Remaining modules below are proposals, introduced only when their consuming task needs them.
+Start with one Cargo package, a thin executable entry point and a library/module boundary usable by tests. Do not create a multi-crate workspace solely to mirror this table. P1.1 selects `awesomejt-agent-harness`, the `ah` binary, Rust 2024 / initial MSRV 1.85 (raised to 1.88 by D023), and `aarch64-apple-darwin` as the initial verified development target (D019). The scaffold has `src/main.rs` over a testable `src/lib.rs` informational argument boundary, with no external dependencies. Remaining modules below are proposals, introduced only when their consuming task needs them.
 
 | Proposed module | Responsibility | Dependency direction / first phase |
 |---|---|---|
@@ -51,7 +51,7 @@ Do not place literal credentials inside diagnostic/serializable domain values. C
 
 Keep pure policy/config transformations separate from subprocess/network I/O. The application coordinator owns attempt ordering and cancellation scope. One supervisor owns the active child/connection, stream readers, permission-response channel and shutdown outcome. Dropping a stream/future must not be treated as evidence that descendants stopped; termination and reaping need explicit confirmation or uncertainty reporting.
 
-Read stdout and stderr concurrently with bounded buffers and record/frame limits. Preserve mandatory lifecycle/permission/terminal events under backpressure; do not hold locks across blocking I/O or call synchronous child reads on the async execution thread. Exact runtime/channel libraries are Phase 1 decisions. Reusable process engines must prove these properties with fake-child integration tests.
+Read stdout and stderr concurrently with bounded buffers and record/frame limits. Preserve mandatory lifecycle/permission/terminal events under backpressure; do not hold locks across blocking I/O or call synchronous child reads on the async execution thread. D023 selects Tokio 1.48.0 with caller-owned pipes, ACP SDK 3.6.0 without optional features and tokio-util compatibility adapters; production channels/budgets are finalized by P2.4. Reusable process engines must prove these properties with fake-child integration tests.
 
 A transport-level success acknowledgement may precede model work. Normalize events only after identifying backend semantics. Distinguish child exit, session completion and cleanup; EOF alone is not success. End all live activity within documented cancellation/cleanup bounds or expose the unresolved condition.
 
@@ -80,3 +80,9 @@ Borrow ai-queue's test injection, error/HTTP patterns and later quota readers as
 The [test plan](TESTING.md) covers policy, fixtures, fake children, sync conflicts/secrets, CLI output, releases and live use. Each core-MVP acceptance row in [SPECIFICATION.md](SPECIFICATION.md) maps to tracked tasks and concrete evidence.
 
 Phase 1 fixes package/toolchain, transport, libraries and permission handling. Phase 2 fixes harness config/CLI/exits, transactional writes, deadlines and initial packaging. Phase 3 fixes fallback eligibility, native isolation and model groups. Phase 4 fixes agent schema, machine output and declared platform support. Workflow schemas and completion protocols stay deferred to Phases 5–6. Record choices and superseded assumptions in DECISIONS.md before shipping their consumers.
+
+## Phase 1 validated boundaries
+
+[D023](../DECISIONS.md#2026-11-02--d023-select-acp-and-the-tested-rust-integration-boundaries) selects ACP protocol 1 and Rust 1.88.0. The [P1.5 evidence](evidence/p1-5-integration-acceptance.md) maps tested responsibilities to the proposed modules. `src/permission.rs` remains SDK-independent; OpenCode callback validation, option-kind mapping and sticky protocol failures belong in the adapter. The supervisor owns child/group identity, connection progress, cancellation, bounded I/O and explicit cleanup; application owns outcome/uncertainty and eventual retry policy. SDK schema types stop at the adapter boundary.
+
+The isolated probe confirms these responsibility boundaries, not all proposed domain types. No production supervisor or `single` request/config/outcome API exists yet. Port behavior with the Phase 2 consumers; do not copy the probe's raw JSON event parsing, discarded stderr, marker assertions, Python recorder or fixed 300 ms shutdown delay as production contracts. P2.4 must verify useful bounded diagnostics, event backpressure and shutdown with coding tools enabled. Keep other table entries proposed until their consuming implementation supplies evidence.
