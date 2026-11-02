@@ -46,3 +46,10 @@ packaged from `c89e0ec` passed the archive install smoke. Its archive SHA-256 wa
 signature verification and installed version/help/preview succeeded. Final
 publication rebuilds the merged commit and repeats the same smoke; its checksum
 will differ because source/build provenance and archive metadata are refreshed.
+
+The independent packaging review's two build-provenance concerns are resolved:
+use a fresh temporary Cargo target directory, explicit Cargo/Rust 1.88.0, reject
+ambient compiler/linker/profile overrides, and verify/record actual Mach-O arm64
+architecture and `minos 14.0`. The updated package from `860c41f` passed the same
+archive smoke with these guards. Cargo user/project configuration remains part
+of the maintainer's trusted build environment; this is not a hermetic build.
