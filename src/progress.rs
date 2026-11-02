@@ -27,14 +27,15 @@ impl Progress {
         let terminal = Arc::new(Mutex::new(None::<String>));
         let final_line = terminal.clone();
         std::thread::spawn(move || {
-            let mut stderr = std::io::stderr().lock();
+            // Never retain the global stderr lock while idle. Active paths must
+            // still use Progress instead of synchronous stderr writes.
             while let Ok(line) = receiver.recv() {
-                if writeln!(stderr, "{line}").is_err() {
+                if writeln!(std::io::stderr().lock(), "{line}").is_err() {
                     break;
                 }
             }
             if let Some(line) = final_line.lock().unwrap().take() {
-                let _ = writeln!(stderr, "{line}");
+                let _ = writeln!(std::io::stderr().lock(), "{line}");
             }
             let _ = done.send(());
         });

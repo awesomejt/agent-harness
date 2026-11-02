@@ -1,6 +1,6 @@
 # P2.4 — Progress, outcomes and bounded supervision
 
-Date: 2026-11-02 (America/Denver). Entry baseline: `6b15e8a` (P2.2 PR #17 merged). Task: [P2.4](../../tasks/02-first-slice.md#p2-4). Platform: Apple Silicon macOS, `aarch64-apple-darwin`; Rust/Cargo 1.88.0, OpenCode 1.18.30, Python 3.14.7. Acceptance is effective after required PR review and merge.
+Date: 2026-11-02 (America/Denver). Entry baseline: `6b15e8a` (P2.2 PR #17 merged). Task: [P2.4](../../tasks/02-first-slice.md#p2-4). Platform: Apple Silicon macOS, `aarch64-apple-darwin`; Rust/Cargo 1.88.0, OpenCode 1.18.30, Python 3.14.7. Acceptance is effective on [PR #18](https://github.com/awesomejt/agent-harness/pull/18) merge after the required review closeout below.
 
 ## Delivered behavior
 
@@ -12,7 +12,7 @@ Subprocess stderr drains concurrently using 8 KiB and retains only a saturated b
 
 ## Verification
 
-Rust formatting, locked Clippy with warnings denied, all 37 Rust tests and the locked standalone lifecycle experiment check pass. The public-CLI suite has 54 cases plus its existing matching-no-sync repetition. It preserves prior routing/permission/input checks and adds:
+Rust formatting, locked Clippy with warnings denied, all 37 Rust tests and the locked standalone lifecycle experiment check pass. The public-CLI suite has 55 cases plus its existing matching-no-sync repetition. It preserves prior routing/permission/input checks and adds:
 
 - Ongoing assistant activity before terminal response; present/absent usage, valid currency cost and invalid-cost redaction.
 - Noisy binary stderr exceeding 1 MiB, malformed/truncated JSON, invalid UTF-8, RPC/provider failure, known non-success stop and unexpected EOF.
@@ -45,3 +45,8 @@ zsh -ic 'python3 scripts/tests/single_runtime.py --live'
 ```
 
 Only `--live` forwards to the existing external service. All projects, config files and runtime HOME/XDG trees are disposable. This is a development binary, not an installable release. Detached groups, remote inference and arbitrary authorized shell effects remain outside process-group containment; unread/broken stderr may prevent final diagnostic delivery even though cleanup and numeric exits remain bounded. Machine output, preview, dirty-worktree reporting and packaging retain their later task boundaries. Phase 2 remains open.
+
+
+## PR #18 review closeout
+
+[Grok review](https://github.com/awesomejt/agent-harness/pull/18#pullrequestreview-5742403505): 0 blockers, one minor concern and one nit. The diagnostic writer now holds the global stderr lock only for each write, releasing it while idle; active supervision continues to use the bounded queue. Session diagnostics escape non-ASCII C1 controls and bidi characters before JSON encoding, retaining the bounded identity representation. A new Unicode/control session fixture verifies no raw terminal controls escape into diagnostics. Formatting, Clippy, Rust tests and all 55 public-CLI cases pass after these fixes. No critical/high finding remains; the workflow requires no re-review for these minor changes. One Grok review total.

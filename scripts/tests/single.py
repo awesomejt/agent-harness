@@ -115,6 +115,9 @@ def check(case, expected, trusted=False, source='inline'):
             assert 'attempt=1' in err and 'usage=' in err and 'outcome=' in err, (case,err)
         if case in ['cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission']:
             assert (base/'cancelled').exists(),case
+        if case == 'session-controls':
+            assert not any(c in err for c in ['\u009b','\u202e','\x1b']),repr(err)
+            assert r'\\u{9b}' in err and r'\\u{202e}' in err,err
         if case == 'blocked-stderr':
             omitted=re.search(r'diagnostics_omitted=(\d+)',err)
             assert omitted and int(omitted[1]) > 0,err[-1000:]
@@ -161,3 +164,4 @@ check('cancel-permission',3,trusted=True)
 check('usage',0)
 check('usage-invalid-cost',0)
 check('held-pipes',4)
+check('session-controls',0)

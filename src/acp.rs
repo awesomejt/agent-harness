@@ -407,8 +407,9 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
             }
             foreground.lock().unwrap().session = Some(session.session_id.to_string());
             // Session IDs are opaque backend data: JSON escaping and a length
-            // bound prevent terminal injection and unbounded diagnostics.
-            foreground_progress.event(format!("attempt=1 session={}", serde_json::to_string(&session.session_id.to_string().chars().take(128).collect::<String>()).unwrap()));
+            // bound plus non-ASCII escaping prevent terminal injection and
+            // unbounded diagnostics (including C1 controls and bidi overrides).
+            foreground_progress.event(format!("attempt=1 session={}", serde_json::to_string(&session.session_id.to_string().chars().take(128).map(|c| if c.is_ascii() { c.to_string() } else { c.escape_unicode().to_string() }).collect::<String>()).unwrap()));
             if runtime.cancelled.is_cancelled() || tokio::time::Instant::now() >= runtime.deadline {
                 return Err(agent_client_protocol::Error::internal_error());
             }
