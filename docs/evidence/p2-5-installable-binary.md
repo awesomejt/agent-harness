@@ -35,3 +35,14 @@ failure in proc macros (`mis-aligned LINKEDIT string pool`). Packaging explicitl
 sets `CARGO_PROFILE_RELEASE_STRIP=none`, avoiding Rust's stripping path; see
 [upstream Rust issue #157750](https://github.com/rust-lang/rust/issues/157750).
 The MSRV and dependency pins remain unchanged.
+
+## Verified candidate
+
+All listed Rust checks passed (38 Rust tests total), along with the existing
+public single-run, preview and dirty-project preservation suites. The candidate
+packaged from `c89e0ec` passed the archive install smoke. Its archive SHA-256 was
+`6561320852b156f48eb295ffe5b9636a63d392cd04af65f48ab40ab86ae86b64`
+(12 MiB compressed). The packaging build with stripping disabled passed; ad hoc
+signature verification and installed version/help/preview succeeded. Final
+publication rebuilds the merged commit and repeats the same smoke; its checksum
+will differ because source/build provenance and archive metadata are refreshed.
