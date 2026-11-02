@@ -10,6 +10,7 @@ use tokio::{io::AsyncReadExt, process::Command};
 
 pub(crate) struct Runtime {
     _home: PrivateHome,
+    pub progress: crate::progress::Progress,
     pub deadline: tokio::time::Instant,
     pub cancelled: tokio_util::sync::CancellationToken,
     signals: tokio::task::JoinHandle<()>,
@@ -48,6 +49,7 @@ impl Runtime {
         request: &Resolved,
         plan: &Plan,
         deadline: tokio::time::Instant,
+        progress: crate::progress::Progress,
     ) -> Result<Self, Exit> {
         let executable = std::env::var_os("PATH")
             .into_iter()
@@ -112,6 +114,7 @@ impl Runtime {
         });
         Ok(Self {
             _home: home,
+            progress,
             cancelled,
             signals,
             env,
@@ -129,6 +132,7 @@ impl Runtime {
         command
     }
     async fn inspect(&self, project: &Path, args: &[&str]) -> Result<Vec<u8>, Exit> {
+        self.progress.event("preflight check started");
         let mut owned =
             OwnedChild::spawn(&mut self.command(project, args)).map_err(|_| Exit::Failed)?;
         let mut bytes = Vec::new();

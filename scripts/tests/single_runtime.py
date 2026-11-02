@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import signal
 import tempfile
 import threading
 import urllib.request
@@ -57,6 +58,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                        ('read',dict(filePath=str(self.server.cwd/'calc.py'))),
                        ('edit',dict(filePath=str(self.server.cwd/'calc.py'),oldString='return a - b',newString='return a + b')),
                        ('bash',dict(command='cat '+str(self.server.outside/'outside.txt')+' && python3 test_calc.py && touch verified',description='Run arithmetic test'))]
+                if self.server.cancel and stage == len(calls):
+                    event(dict(role='assistant',content='Waiting for cancellation'))
+                    self.server.waiting.set()
+                    self.server.release.wait(15)
                 if stage < len(calls):
                     name,arguments=calls[stage]
                     assert name in tools
@@ -82,21 +87,25 @@ def server(args):
     s.upstream=args.endpoint if args.live else None
     s.key=os.environ[args.key_env] if args.live else 'unused'
     s.records=[];s.failed=False;s.stage=0
+    s.cancel=args.cancel; s.waiting=threading.Event(); s.release=threading.Event()
     t=threading.Thread(target=s.serve_forever,daemon=True);t.start()
     try:
         yield s,'http://127.0.0.1:'+str(s.server_port)+'/v1'
     finally:
+        s.release.set()
         s.shutdown();s.server_close();t.join(timeout=2)
 
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--live',action='store_true')
+    parser.add_argument('--cancel',action='store_true',help='cancel the installed runtime after the deterministic edit/test')
     parser.add_argument('--endpoint',default='http://litellm:4000/v1')
     parser.add_argument('--model',default='macmini-qwen3-coder-30b')
     parser.add_argument('--key-env',default='LITELLM_API_KEY')
     parser.add_argument('--timeout-secs',type=int,default=300)
     args=parser.parse_args()
+    assert not (args.live and args.cancel),"cancellation fixture uses the local deterministic model only"
     with server(args) as (s,endpoint),tempfile.TemporaryDirectory(prefix='ah-single-runtime-') as d, tempfile.TemporaryDirectory(prefix='ah-outside-') as outside:
         cwd=Path(d).resolve();s.cwd=cwd;s.outside=Path(outside).resolve()
         (s.outside/'outside.txt').write_text('OUTSIDE_READ_OK')
@@ -106,17 +115,21 @@ def main():
         (cwd/'calc.py').write_text('def add(a, b):\n    return a - b\n')
         (cwd/'test_calc.py').write_text('from calc import add\nassert add(2, 3) == 5\nprint("PASS arithmetic")\n')
         prompt='Fix add in calc.py so it adds correctly. Read calc.py, edit it with the edit tool, then use bash to run python3 test_calc.py and touch verified only if it passes. Do not change test_calc.py. Do not use subagents. Reply briefly.'
-        p=subprocess.run([str(ROOT/'target/debug/ah'),'single',prompt,'--project',str(cwd),'--permissions','trusted','--timeout-secs',str(args.timeout_secs)],
-            env={**os.environ,'TEST_KEY':s.key},capture_output=True,text=True,timeout=args.timeout_secs+20)
-        print('CLI exit:',p.returncode,'; stderr:',p.stderr.strip(),flush=True)
+        p=subprocess.Popen([str(ROOT/'target/debug/ah'),'single',prompt,'--project',str(cwd),'--permissions','trusted','--timeout-secs',str(args.timeout_secs)],
+            env={**os.environ,'TEST_KEY':s.key},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+        if args.cancel:
+            assert s.waiting.wait(60),'runtime did not reach post-edit/test cancellation point'
+            p.send_signal(signal.SIGINT)
+        stdout,stderr=p.communicate(timeout=args.timeout_secs+20)
+        print('CLI exit:',p.returncode,'; stderr:',stderr.strip(),flush=True)
         print('Wire:',json.dumps(s.records),flush=True)
         print('Observed project effects:',json.dumps(dict(edited='return a + b' in (cwd/'calc.py').read_text(), verified=(cwd/'verified').exists())),flush=True)
-        assert p.returncode == 0 and not s.failed
+        assert p.returncode == (3 if args.cancel else 0) and not s.failed
         assert 'return a + b' in (cwd/'calc.py').read_text()
         assert (cwd/'verified').exists()
         verify=subprocess.run(['python3','test_calc.py'],cwd=cwd,capture_output=True,text=True)
         assert verify.returncode == 0
-        print('PASS actual project edit and independent arithmetic test; '+('live LiteLLM' if args.live else 'local deterministic model stub'),flush=True)
+        print(('PASS confirmed cancellation after ' if args.cancel else 'PASS ')+ 'actual project edit and independent arithmetic test; '+('live LiteLLM' if args.live else 'local deterministic model stub'),flush=True)
 
 
 if __name__=='__main__':

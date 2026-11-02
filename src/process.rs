@@ -1,4 +1,8 @@
 //! Unix process ownership with bounded escalation, reap and group verification.
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 use std::{io, process::Stdio, time::Duration};
 use tokio::process::{Child, Command};
 
@@ -6,21 +10,41 @@ pub(crate) struct OwnedChild {
     pub child: Child,
     group: i32,
     escalated: bool,
+    stderr_bytes: Arc<AtomicUsize>,
+    stderr_drain: tokio::task::JoinHandle<()>,
 }
 impl OwnedChild {
     pub fn spawn(command: &mut Command) -> io::Result<Self> {
-        let child = command
+        let mut child = command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .kill_on_drop(true)
             .process_group(0)
             .spawn()?;
         let group = child.id().ok_or_else(|| io::Error::other("missing pid"))? as i32;
+        let mut stderr = child.stderr.take().unwrap();
+        let stderr_bytes = Arc::new(AtomicUsize::new(0));
+        let count = stderr_bytes.clone();
+        let stderr_drain = tokio::spawn(async move {
+            use tokio::io::AsyncReadExt;
+            let mut buf = [0u8; 8192];
+            while let Ok(n) = stderr.read(&mut buf).await {
+                if n == 0 {
+                    break;
+                }
+                // Retain no raw backend data; cap counters as well as storage.
+                let _ = count.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| {
+                    Some(v.saturating_add(n).min(1_048_577))
+                });
+            }
+        });
         Ok(Self {
             child,
             group,
             escalated: false,
+            stderr_bytes,
+            stderr_drain,
         })
     }
     fn signal(&self, signal: i32) {
@@ -30,11 +54,14 @@ impl OwnedChild {
             }
         }
     }
+    pub fn stderr_bytes(&self) -> usize {
+        self.stderr_bytes.load(Ordering::Relaxed)
+    }
     pub async fn cleanup(&mut self) -> bool {
         let reaped = matches!(self.child.try_wait(), Ok(Some(_)));
         self.signal(libc::SIGTERM);
         if !reaped {
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            let _ = tokio::time::timeout(Duration::from_secs(2), self.child.wait()).await;
         }
         self.signal(libc::SIGKILL);
         self.escalated = true;
@@ -43,6 +70,12 @@ impl OwnedChild {
             Ok(Ok(_))
         ) {
             return false;
+        }
+        if tokio::time::timeout(Duration::from_millis(500), &mut self.stderr_drain)
+            .await
+            .is_err()
+        {
+            self.stderr_drain.abort();
         }
         // A reaped leader alone says nothing about descendants. ps is bounded,
         // invoked without a shell, and zombies count as terminated.
@@ -102,6 +135,7 @@ impl OwnedChild {
 }
 impl Drop for OwnedChild {
     fn drop(&mut self) {
+        self.stderr_drain.abort();
         if !self.escalated {
             self.signal(libc::SIGKILL);
         }
