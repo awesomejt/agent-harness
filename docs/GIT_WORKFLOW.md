@@ -2,13 +2,13 @@
 
 Multi-agent Git workflow for **agent-harness**. All agents (and humans) must follow this process.
 
-Grok acts as the automated Pull Request reviewer. The existing Grok bot uses the source branch name to distinguish normal PRs from phase reviews. Phase-review branches bypass the normal automated PR review process; feature and patch PRs use it.
+Grok acts as the automated Pull Request reviewer. The existing Grok bot uses the source branch name to distinguish normal PRs from phase reviews. Feature PRs are reviewed automatically on open. Phase-review and patch branches skip automatic review on open; patch PRs require an explicit `/grok review` request.
 
 ## Core rules
 
 - **No direct commits to `main`.** All work happens on a task branch using the naming patterns below.
 - **One task per branch / PR** when practical.
-- **Grok reviews feature and patch PRs** (automatically on open, and on demand via comment). `review/` branches bypass the normal PR review process; the holistic phase-review requirements still apply.
+- **Grok reviews feature PRs automatically on open.** `patch/` PRs require an explicit `/grok review` comment after opening. `review/` branches bypass the normal PR review process; the holistic phase-review requirements still apply.
 - **Maximum 3 Grok reviews per PR.** After the third review, further automated review stops and a human must take over.
 - On feature and patch PRs, agents must wait for Grok review to finish before addressing its findings.
 
@@ -42,7 +42,7 @@ When the task is complete:
 git push -u origin HEAD
 ```
 
-Open a PR targeting `main`. For `feature/` and `patch/` source branches, the existing Grok bot starts its normal automated review. For `review/` source branches, complete the holistic review/report and findings verification under [PHASE_REVIEW.md](PHASE_REVIEW.md); do not wait for or request a normal Grok PR review as a phase-review prerequisite.
+Open a PR targeting `main`. For `feature/` source branches, the existing Grok bot starts its normal automated review. For `patch/` source branches, post `/grok review` after opening the PR; automatic review on open is skipped, so do not wait for it. For `review/` source branches, complete the holistic review/report and findings verification under [PHASE_REVIEW.md](PHASE_REVIEW.md); do not wait for or request a normal Grok PR review as a phase-review prerequisite.
 
 ### 3. Grok review (feature and patch PRs)
 
@@ -63,12 +63,12 @@ For Grok findings on feature and patch PRs:
 | Minor or nitpick | Fix if straightforward; **no re-review required**. |
 | No findings of note | Proceed to merge approval. |
 
-Fix findings within an active feature/task PR on the **same branch**. Standalone remediation outside that process uses `patch/<task>` and its own PR, with links to the originating finding. Phase-review findings may be corrected in the review PR or a linked patch PR; all required fixes must be verified and merged before phase acceptance.
+Fix findings within an active feature/task PR on the **same branch**. Standalone remediation outside that process uses `patch/<task>` and its own PR, with links to the originating finding. Keep report/documentation corrections in the phase-review PR. Put code fixes found during a phase review in linked `patch/<task>` PRs and explicitly request Grok review there. All required fixes must be verified and merged before phase acceptance.
 
 ### 5. Re-review limits
 
 - Grok may review a PR at most **3 times**.
-- Count includes the initial automatic review plus any `/grok review` requests.
+- Count includes the initial automatic review (feature PRs) and all `/grok review` requests, including the first request on a patch PR.
 - After the third review, if critical/high issues remain or another review seems necessary:
   - Leave a clear comment on the PR stating that the automated review limit has been reached and human review is required.
   - Note the same condition in the agent’s session output.
@@ -115,7 +115,7 @@ When the 3-review limit is reached and further review is still needed:
 
 - [ ] Branch created from up-to-date `main`
 - [ ] Work committed only on the correctly named task branch
-- [ ] PR opened to `main` (feature/patch: normal Grok review; review: holistic phase-review process)
+- [ ] PR opened to `main` (feature: automatic Grok review; patch: request `/grok review`; review: holistic phase-review process)
 - [ ] Required review completed (Grok for feature/patch; holistic report for review)
 - [ ] Critical/high Grok findings fixed and re-review requested (if any, and under limit); holistic phase-review findings resolved and verified
 - [ ] Minor/nitpick findings handled without mandatory re-review
