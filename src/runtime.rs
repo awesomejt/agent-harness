@@ -44,12 +44,21 @@ pub(crate) fn profile(policy: Permissions, home: &Path) -> (Value, Value) {
     (permissions, tools)
 }
 impl Runtime {
-    pub fn new(request: &Resolved, plan: &Plan) -> Result<Self, Exit> {
+    pub fn new(
+        request: &Resolved,
+        plan: &Plan,
+        deadline: tokio::time::Instant,
+    ) -> Result<Self, Exit> {
         let executable = std::env::var_os("PATH")
             .into_iter()
             .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
+            .filter(|p| p.is_absolute())
             .map(|p| p.join("opencode"))
-            .find(|p| p.is_file())
+            .find(|p| {
+                use std::os::unix::fs::PermissionsExt;
+                p.metadata()
+                    .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+            })
             .and_then(|p| p.canonicalize().ok())
             .ok_or(Exit::Invalid)?;
         let home = PrivateHome::new().map_err(|_| Exit::Failed)?;
@@ -107,7 +116,7 @@ impl Runtime {
             signals,
             env,
             executable,
-            deadline: tokio::time::Instant::now() + Duration::from_secs(request.timeout_secs),
+            deadline,
         })
     }
     pub fn command(&self, project: &Path, args: &[&str]) -> Command {

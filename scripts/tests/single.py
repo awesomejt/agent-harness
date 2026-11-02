@@ -20,7 +20,7 @@ def check(case, expected, trusted=False, source='inline'):
         (base / 'case').write_text(case)
         (base / 'ah.json').write_text(json.dumps(dict(version=1, mode='local-only',model='fixture',
             litellm=dict(api_base='http://127.0.0.1:9/v1',api_key_env='TEST_KEY'))))
-        args = [str(BINARY),'single','--project',str(base),'--timeout-secs','4' if case == 'deadline' else '15']
+        args = [str(BINARY),'single','--project',str(base),'--timeout-secs','4' if case == 'deadline' else ('1' if case=='preflight-deadline' else '15')]
         if trusted:
             args += ['--permissions','trusted']
         text = 'Task' if case != 'empty' else ' '
@@ -37,7 +37,13 @@ def check(case, expected, trusted=False, source='inline'):
             args += ['--prompt-file',str(base/'missing')]
         env = {**os.environ,'PATH':str(base)+':'+os.environ['PATH'],'TEST_KEY':'SECRET_SENTINEL',
                'ANTHROPIC_API_KEY':'poison','OPENCODE_CONFIG_CONTENT':'poison'}
-        p = subprocess.Popen(args,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+        if case in ['relative-path','empty-path']:
+            (base/'bin').mkdir()
+            (base/'opencode').rename(base/'bin/opencode')
+            (base/'opencode').write_text('#!/bin/sh\ntouch rogue\nexit 1\n')
+            (base/'opencode').chmod(0o755)
+            env['PATH']=('.' if case=='relative-path' else '')+':'+str(base/'bin')+':'+os.environ['PATH']
+        p = subprocess.Popen(args,cwd=base if case in ['relative-path','empty-path'] else None,env=env,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
         if case in ['interrupt','before-prompt']:
             marker = base / ('prompted' if case == 'interrupt' else 'pids.json')
             until = time.monotonic()+10
@@ -57,6 +63,7 @@ def check(case, expected, trusted=False, source='inline'):
             if case not in ['duplicate','empty-id']:
                 option = result['result']['outcome'].get('optionId')
                 assert option == ('once' if trusted and case in ['read','edit','execute','search','external','unexpected-write'] else 'reject'), (case,result)
+        assert not (base/'rogue').exists()
         if expected == 2:
             assert not (base/'launched').exists()
             assert not (base/'opencode.json').exists()
@@ -77,7 +84,7 @@ for case in ['version','route','widened','agent-widened','agent-reversed','empty
 check('text',2,source='missing')
 for source in ['inline','file','stdin']:
     check('text',0,source=source)
-for case in ['read','edit','execute','search','external','other','no-once','kind-mismatch','unbound']:
+for case in ['read','edit','execute','search','external','other','no-once','kind-mismatch','unbound','argument-mismatch']:
     check(case,0,trusted=True)
 check('deny',0)
 check('deny-progress',4)
@@ -86,3 +93,6 @@ for case in ['duplicate','empty-id','wrong-session','eof','oversized','deadline'
 check('before-prompt',3)
 check('backend-cancelled',3)
 check('session-model',1)
+check('relative-path',0)
+check('empty-path',0)
+check('preflight-deadline',3)

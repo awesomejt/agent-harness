@@ -228,12 +228,13 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                             .to_string(),
                     options,
                 };
-                let supported = descriptor
-                    .is_some_and(|tool| tool["kind"] == value["toolCall"]["kind"])
-                    && matches!(
-                        value["toolCall"]["kind"].as_str(),
-                        Some("read" | "search" | "edit" | "execute")
-                    );
+                let supported = descriptor.is_some_and(|tool| {
+                    tool["kind"] == value["toolCall"]["kind"]
+                        && consistent_metadata(&value["toolCall"]["rawInput"], &tool["rawInput"])
+                }) && matches!(
+                    value["toolCall"]["kind"].as_str(),
+                    Some("read" | "search" | "edit" | "execute")
+                );
                 // Only external_directory can produce `other` in this verified
                 // profile. Pin its exact v1.18.30 metadata shape; never approve
                 // arbitrary `other` tools or infer semantics from their titles.
@@ -437,7 +438,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
     if terminal.load(Ordering::SeqCst) == 2 {
         return Exit::Failed;
     }
-    if !result {
+    if terminal.load(Ordering::SeqCst) == 0 && !result {
         return if runtime.cancelled.is_cancelled()
             || tokio::time::Instant::now() >= runtime.deadline
         {
@@ -518,10 +519,46 @@ fn verified_external(permission: &Value, descriptor: Option<&Value>) -> bool {
         })
 }
 
+/// Pinned callbacks can add generated metadata (e.g. an edit diff), while read
+/// metadata is empty. Shared arguments and normalized path aliases must agree.
+fn consistent_metadata(metadata: &Value, arguments: &Value) -> bool {
+    let (Some(metadata), Some(arguments)) = (metadata.as_object(), arguments.as_object()) else {
+        return false;
+    };
+    metadata.iter().all(|(key, value)| {
+        if let Some(argument) = arguments.get(key) {
+            return argument == value;
+        }
+        if key == "filepath" {
+            return arguments.get("filePath") == Some(value);
+        }
+        true
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use super::verified_external;
+    use super::{consistent_metadata, verified_external};
     use serde_json::json;
+
+    #[test]
+    fn permission_metadata_rejects_changed_arguments_and_path_aliases() {
+        let args = json!({"filePath":"/tmp/file","command":"true"});
+        assert!(consistent_metadata(&json!({}), &args));
+        assert!(consistent_metadata(
+            &json!({"filepath":"/tmp/file","diff":"generated"}),
+            &args
+        ));
+        assert!(!consistent_metadata(
+            &json!({"filePath":"/tmp/other"}),
+            &args
+        ));
+        assert!(!consistent_metadata(
+            &json!({"filepath":"/tmp/other"}),
+            &args
+        ));
+        assert!(!consistent_metadata(&json!({"command":"false"}), &args));
+    }
 
     #[test]
     fn external_shell_metadata_must_bind_command_and_each_directory_pattern() {

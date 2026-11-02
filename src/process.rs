@@ -5,6 +5,7 @@ use tokio::process::{Child, Command};
 pub(crate) struct OwnedChild {
     pub child: Child,
     group: i32,
+    escalated: bool,
 }
 impl OwnedChild {
     pub fn spawn(command: &mut Command) -> io::Result<Self> {
@@ -16,7 +17,11 @@ impl OwnedChild {
             .process_group(0)
             .spawn()?;
         let group = child.id().ok_or_else(|| io::Error::other("missing pid"))? as i32;
-        Ok(Self { child, group })
+        Ok(Self {
+            child,
+            group,
+            escalated: false,
+        })
     }
     fn signal(&self, signal: i32) {
         if self.group > 0 {
@@ -26,9 +31,13 @@ impl OwnedChild {
         }
     }
     pub async fn cleanup(&mut self) -> bool {
+        let reaped = matches!(self.child.try_wait(), Ok(Some(_)));
         self.signal(libc::SIGTERM);
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        if !reaped {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
         self.signal(libc::SIGKILL);
+        self.escalated = true;
         if !matches!(
             tokio::time::timeout(Duration::from_secs(5), self.child.wait()).await,
             Ok(Ok(_))
@@ -93,7 +102,9 @@ impl OwnedChild {
 }
 impl Drop for OwnedChild {
     fn drop(&mut self) {
-        self.signal(libc::SIGKILL);
+        if !self.escalated {
+            self.signal(libc::SIGKILL);
+        }
         let _ = self.child.start_kill();
     }
 }

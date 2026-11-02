@@ -17,6 +17,7 @@ assert os.environ['HOME'] != str(cwd)
 config['provider']['ah-litellm']['options']['apiKey'] = os.environ['AH_RUNTIME_API_KEY']
 config.update(agent={}, mode={})
 if '--version' in sys.argv:
+    if case=='preflight-deadline': time.sleep(10)
     print('wrong' if case == 'version' else '1.18.30')
     sys.exit()
 if 'debug' in sys.argv:
@@ -82,7 +83,7 @@ for line in sys.stdin:
         if case == 'oversized':
             print('x' * 8_000_001, flush=True)
             continue
-        if case in ['read','edit','execute','search','other','external','duplicate','deny','no-once','empty-id','kind-mismatch','unbound','unexpected-write']:
+        if case in ['read','edit','execute','search','other','external','duplicate','deny','no-once','empty-id','kind-mismatch','unbound','unexpected-write','argument-mismatch']:
             kind = case if case in ['read','edit','execute','search','other'] else ('other' if case == 'external' else 'read')
             if case == 'kind-mismatch': kind='execute'
             raw = dict(filepath='/tmp/outside', parentDir='/tmp') if case == 'external' else dict(filePath='/tmp/example', command='true')
@@ -96,6 +97,7 @@ for line in sys.stdin:
             if case != 'unbound':
                 send(dict(jsonrpc='2.0', method='session/update', params=dict(sessionId='test', update=dict(
                     sessionUpdate='tool_call',toolCallId='tool-1',title='Tool',kind='read' if kind=='other' or case=='kind-mismatch' else kind,rawInput=dict(filePath='/tmp/outside') if case=='external' else raw,status='pending'))))
+            if case=='argument-mismatch': raw={**raw,'filePath':'/tmp/different'}
             send(dict(jsonrpc='2.0', id=100, method='session/request_permission', params=dict(
                 sessionId='test', toolCall=dict(toolCallId='' if case == 'empty-id' else 'tool-1', title='Arbitrary', kind=kind, rawInput=raw), options=options)))
         else:

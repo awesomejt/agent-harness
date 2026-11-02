@@ -38,6 +38,8 @@ pub fn run(args: Vec<OsString>) -> Exit {
     }
     #[cfg(target_os = "macos")]
     {
+        let deadline =
+            tokio::time::Instant::now() + std::time::Duration::from_secs(request.timeout_secs);
         let plan = match Plan::prepare(&request) {
             Ok(plan) => plan,
             Err(error) => {
@@ -45,6 +47,9 @@ pub fn run(args: Vec<OsString>) -> Exit {
                 return Exit::Invalid;
             }
         };
+        if tokio::time::Instant::now() >= deadline {
+            return Exit::Cancelled;
+        }
         let runtime = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -53,7 +58,7 @@ pub fn run(args: Vec<OsString>) -> Exit {
             Err(_) => return Exit::Failed,
         };
         runtime.block_on(async {
-            let adapter = match crate::runtime::Runtime::new(&request, &plan) { Ok(adapter) => adapter, Err(exit) => return exit };
+            let adapter = match crate::runtime::Runtime::new(&request, &plan, deadline) { Ok(adapter) => adapter, Err(exit) => return exit };
             // Preflight consumes an isolated routing snapshot; no project code or
             // plugins execute. Only then persist the already validated plan.
             if let Err(exit) = adapter.preflight(&request, &plan).await { eprintln!("ah: OpenCode preflight failed (requires 1.18.30 and exact isolated routing/permissions)"); return exit; }
