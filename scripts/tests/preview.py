@@ -10,8 +10,8 @@ BINARY = Path(__file__).resolve().parents[2] / 'target/debug/ah'
 
 
 def snapshot(base):
-    return {str(p.relative_to(base)): p.read_bytes()
-            for p in base.rglob('*') if p.is_file()}
+    return {str(p.relative_to(base)): p.read_bytes() if p.is_file() else None
+            for p in base.rglob('*')}
 
 
 with tempfile.TemporaryDirectory(prefix='ah-preview-') as directory:
@@ -58,6 +58,7 @@ with tempfile.TemporaryDirectory(prefix='ah-preview-') as directory:
     assert 'opencode.json: provider.ah-litellm' in out
     assert '.ah-opencode-owner.json: managed routing receipt' in out
     assert 'health checks: none' in out
+    assert 'managed project sync (default)' in out
     assert 'deny: no file/shell grants (default)' in out
     out, _ = run(['--permissions', 'trusted', '--model', 'override', '--timeout-secs', '9'])
     assert 'override (invocation)' in out and '9 seconds (invocation)' in out
@@ -79,7 +80,7 @@ with tempfile.TemporaryDirectory(prefix='ah-preview-') as directory:
                'small_model': 'ah-litellm/fixture'}
     (project / 'opencode.json').write_text(json.dumps(desired))
     out, err = run(['--no-sync'])
-    assert 'exact disk route validated' in out and 'planned changes: none' in out
+    assert 'exact disk route validated (invocation)' in out and 'planned changes: none' in out
     desired['model'] = 'ah-litellm/other'
     (project / 'opencode.json').write_text(json.dumps(desired))
     run(['--no-sync'], expected=2)

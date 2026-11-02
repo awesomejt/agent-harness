@@ -31,7 +31,7 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
         Ok(request) => request,
         Err(error) => {
             progress.event(format!("{}; use --help", error.0));
-            if error.0 == "API key environment reference is missing or empty" {
+            if error.0 == crate::config::MISSING_KEY {
                 progress.event(
                     "set the environment variable named by litellm.api_key_env before retrying",
                 );

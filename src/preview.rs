@@ -63,7 +63,7 @@ pub(crate) fn render(r: &Resolved, plan: &Plan, config: &Path) -> String {
          credentials: environment reference present (config); value and endpoint omitted\n\
          permissions: {scope} ({}); external tools/subagents/network tools disabled\n\
          timeout: {} seconds ({})\n\
-         sync: {} (invocation/default); planned changes: {changes}\n\
+         sync: {} ({}); planned changes: {changes}\n\
          prompt: validated; contents omitted\n\
          health checks: none; LiteLLM reachability, alias availability, runtime version and effective capabilities unverified\n\
          before execution: ensure configured LiteLLM /v1 service is reachable and selected alias exists; execution preflight verifies runtime routing/permissions\n",
@@ -86,5 +86,6 @@ pub(crate) fn render(r: &Resolved, plan: &Plan, config: &Path) -> String {
         } else {
             "managed project sync"
         },
+        if r.no_sync { "invocation" } else { "default" },
     )
 }
