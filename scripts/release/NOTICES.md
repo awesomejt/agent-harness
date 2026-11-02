@@ -2,7 +2,7 @@
 
 This distribution includes agent-harness under Apache-2.0 (see LICENSE).
 `third-party/inventory.json` records the locked registry packages reachable in
-Cargo's target-filtered resolve graph, including build/proc-macro dependencies.
+Cargo's target-filtered resolve graph, including dev/build/proc-macro dependencies.
 This conservative inventory does not claim all packages are linked into `ah`.
 
 For dual-licensed dependencies, choose MIT where offered; otherwise Apache-2.0

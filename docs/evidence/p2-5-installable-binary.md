@@ -6,7 +6,7 @@ Date: 2026-11-02 (America/Denver). Entry baseline: `21404fc` (P2.8 PR #20 merged
 
 The [installation runbook](../OPERATIONS.md) supplies versioned download/checksum commands, installation without a language toolchain, separate pinned OpenCode and existing LiteLLM setup, preview, trusted execution, exits, upgrade/rollback/removal and release limitations. The README links it and removes stale pre-preview/development-only instructions.
 
-`scripts/release/package.py` builds a clean checkout with pinned Rust 1.88.0 and locked production dependencies. It fixes the native Apple Silicon target and deployment setting, checks system-only dylibs, packages an executable with provenance and notices, and emits `SHA256SUMS`. The release graph contains 128 registry crates (including conservative build/proc-macro reachability), plus the harness. Registry source archives are verified against Cargo.lock and included unchanged to preserve embedded notices; recursive attribution files and selected embedded BSD/MIT/lexical notice files are directly readable. License selections are recorded per package. The schema crate's missing license text comes from its pinned upstream commit; missing attribution/unreviewed license expressions fail packaging. Rust standard-library/toolchain copyright/license resources are included conservatively. This refreshes the production graph rather than reusing the experiment inventory. An independent read-only notice review identified the source-embedded notices and Unicode requirements now included.
+`scripts/release/package.py` builds a clean checkout with pinned Rust 1.88.0 and locked production dependencies. It fixes the native Apple Silicon target and deployment setting, checks system-only dylibs, packages an executable with provenance and notices, and emits `SHA256SUMS`. The release graph contains 128 registry crates (including conservative build/proc-macro reachability), plus the harness. Registry source archives are verified against Cargo.lock and included unchanged to preserve embedded notices; recursive attribution files and selected embedded BSD/MIT/lexical notice files are directly readable. License selections are recorded per package. The schema crate's missing license text comes from its pinned upstream commit; missing attribution/unreviewed license expressions fail packaging. Rust standard-library/toolchain copyright/license resources are included conservatively. This refreshes the target-filtered resolve graph (including dev/build dependencies) rather than reusing the experiment inventory. An independent read-only notice review identified the source-embedded notices and Unicode requirements now included.
 
 Maintainer tools: Rust/Cargo 1.88.0, Python 3.14.7, Xcode 27.1 (27A9275). Host: Apple Silicon macOS 27.0.1 (26A434). Build deployment setting 14.0 is not evidence for earlier macOS support. No Intel/Linux/Windows, Developer ID/notarization, browser-quarantine flow, new model call or completed Phase 2 acceptance is claimed.
 
@@ -53,3 +53,14 @@ ambient compiler/linker/profile overrides, and verify/record actual Mach-O arm64
 architecture and `minos 14.0`. The updated package from `860c41f` passed the same
 archive smoke with these guards. Cargo user/project configuration remains part
 of the maintainer's trusted build environment; this is not a hermetic build.
+
+## PR review follow-up
+
+Grok's initial review reported 0 blockers, 1 concern and 5 nits. The concern is
+resolved with exact reviewed license-expression mappings; unsupported AND/MIT-0
+expressions now refuse packaging. Nits are addressed by explicitly describing
+dev/build reachability, rewriting bundled installation links to the exact source
+commit, normalizing tar ownership/timestamps (and gzip timestamp), checking both
+preview output streams for redaction, and making pre-publication wording
+conditional. The guarded build/provenance improvements from the independent
+review are included. Fresh packaging/install verification follows these fixes.

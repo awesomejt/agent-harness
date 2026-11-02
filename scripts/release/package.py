@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Build the reviewed, locked Apple Silicon macOS prerelease (maintainers only)."""
 import argparse
+import gzip
 import hashlib
 import json
 import os
 from pathlib import Path
 import platform
+import posixpath
+import re
 import shutil
 import subprocess
 import tarfile
@@ -14,6 +17,24 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET = 'aarch64-apple-darwin'
+REVIEWED_LICENSES = {
+    'MIT': 'MIT',
+    'Apache-2.0': 'Apache-2.0',
+    'MIT OR Apache-2.0': 'MIT',
+    'Apache-2.0 OR MIT': 'MIT',
+    'MIT/Apache-2.0': 'MIT',
+    'Unlicense OR MIT': 'MIT',
+    'Zlib OR Apache-2.0 OR MIT': 'MIT',
+    'Apache-2.0 OR BSL-1.0': 'Apache-2.0',
+    '(MIT OR Apache-2.0) AND Unicode-3.0': 'MIT AND Unicode-3.0',
+    'Unicode-3.0': 'Unicode-3.0',
+}
+
+
+def select_license(expression):
+    if expression not in REVIEWED_LICENSES:
+        raise RuntimeError(f'unreviewed license: {expression}')
+    return REVIEWED_LICENSES[expression]
 
 
 def run(*args, env=None):
@@ -80,6 +101,15 @@ def build_package(output_directory, version, commit, build_directory):
         for source, target in [('LICENSE', 'LICENSE'), ('docs/OPERATIONS.md', 'INSTALL.md'),
                                ('scripts/release/NOTICES.md', 'THIRD_PARTY_NOTICES.md')]:
             shutil.copy2(ROOT / source, bundle / target)
+        install = bundle / 'INSTALL.md'
+        def repository_link(match):
+            target = match.group(2)
+            if ':' in target or target.startswith(('#', '/')):
+                return match.group(0)
+            path = posixpath.normpath('docs/' + target)
+            return f'[{match.group(1)}](https://github.com/awesomejt/agent-harness/blob/{commit}/{path})'
+        install.write_text(re.sub(r'\[([^\]]+)\]\(([^)]+)\)', repository_link,
+                                  install.read_text()))
         notices = bundle / 'third-party'
         sources = notices / 'sources'
         sources.mkdir(parents=True)
@@ -114,16 +144,7 @@ def build_package(output_directory, version, commit, build_directory):
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(manifest.parent / relative, dest)
             license_expression = dep['license'] or ''
-            if 'MIT' in license_expression:
-                selected = 'MIT'
-                if 'AND Unicode-3.0' in license_expression:
-                    selected += ' AND Unicode-3.0'
-            elif 'Apache-2.0' in license_expression:
-                selected = 'Apache-2.0'
-            elif license_expression == 'Unicode-3.0':
-                selected = 'Unicode-3.0'
-            else:
-                raise RuntimeError(f'unreviewed license: {license_expression}')
+            selected = select_license(license_expression)
             inventory.append(dict(name=dep['name'], version=dep['version'], selected_license=selected,
                                   license=dep['license'], source=dep['source'], sha256=checksum))
         shutil.copytree(ROOT / 'scripts/release/licenses', notices / 'supplemental')
@@ -142,14 +163,23 @@ def build_package(output_directory, version, commit, build_directory):
         info = dict(version=version, source_commit=commit, target=TARGET,
                     cargo_lock_sha256=sha(ROOT / 'Cargo.lock'), rustc=run('rustc', '+1.88.0', '-Vv'),
                     cargo=run('cargo', '+1.88.0', '-V'), architecture=architecture,
-                    macho_build_version=build_version,
+                    macho_build_version='\n'.join(build_version.splitlines()[1:]),
                     macos=platform.mac_ver()[0], deployment_target='14.0', strip='none',
-                    linker=run('xcodebuild', '-version'), dylibs=dylibs,
+                    linker=run('xcodebuild', '-version'), dylibs='\n'.join(dylibs.splitlines()[1:]),
                     binary_sha256=sha(bundle / 'ah'), registry_packages=len(inventory))
         (bundle / 'BUILD-INFO.json').write_text(json.dumps(info, indent=2) + '\n')
         output = output_directory / f'{name}.tar.gz'
-        with tarfile.open(output, 'w:gz') as archive:
-            archive.add(bundle, arcname=name)
+        epoch = int(run('git', 'show', '-s', '--format=%ct', commit))
+        def normalize(entry):
+            entry.uid = entry.gid = 0
+            entry.uname = entry.gname = ''
+            entry.mtime = epoch
+            entry.pax_headers = {}
+            return entry
+        with output.open('xb') as raw:
+            with gzip.GzipFile(filename='', fileobj=raw, mode='wb', mtime=epoch) as compressed:
+                with tarfile.open(fileobj=compressed, mode='w') as archive:
+                    archive.add(bundle, arcname=name, filter=normalize)
         (output_directory / 'SHA256SUMS').write_text(f'{sha(output)}  {output.name}\n')
     print(output.resolve())
 
