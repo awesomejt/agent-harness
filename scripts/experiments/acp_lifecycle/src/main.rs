@@ -9,7 +9,10 @@ use serde_json::{Value, json};
 use std::collections::HashSet;
 use std::io;
 use std::process::Stdio;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 use std::time::Duration;
 use tokio::io::{AsyncRead, ReadBuf};
 use tokio::process::{Child, Command};
@@ -70,6 +73,21 @@ impl Drop for OwnedChild {
     fn drop(&mut self) {
         self.signal(libc::SIGKILL);
         let _ = self.child.start_kill();
+    }
+}
+
+// SDK callback errors are peer responses, not necessarily connection failures.
+// Keep a sticky attempt-level failure and wake the owner for immediate cleanup.
+#[derive(Default)]
+struct Violation {
+    failed: AtomicBool,
+    wake: tokio::sync::Notify,
+}
+impl Violation {
+    fn fail(&self) -> agent_client_protocol::Error {
+        self.failed.store(true, Ordering::SeqCst);
+        self.wake.notify_one();
+        agent_client_protocol::Error::internal_error()
     }
 }
 
@@ -151,6 +169,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .compat(),
     );
     let observed = Arc::new(Mutex::new(Observed::default()));
+    let violation = Arc::new(Violation::default());
+    let notification_failure = violation.clone();
+    let permission_failure = violation.clone();
     let notifications = observed.clone();
     let permissions = observed.clone();
     let foreground = observed.clone();
@@ -160,19 +181,25 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .on_receive_notification(async move |notification: SessionNotification, _cx| {
             let value = serde_json::to_value(notification)?;
             let mut state = notifications.lock().unwrap();
-            if value["sessionId"].as_str() != state.session.as_deref() { return Err(agent_client_protocol::Error::internal_error()); }
-            match value["update"]["sessionUpdate"].as_str() {
+            let kind = value["update"]["sessionUpdate"].as_str();
+            if state.session.is_none() && !matches!(kind, Some("agent_message_chunk" | "tool_call" | "tool_call_update")) {
+                // Session setup metadata may race the session/new foreground continuation.
+                // It supplies no response text, tool activity or cancellation trigger.
+                return Ok(());
+            }
+            if value["sessionId"].as_str() != state.session.as_deref() { return Err(notification_failure.fail()); }
+            match kind {
                 Some("agent_message_chunk") => {
                     state.chunks += 1;
                     if let Some(text) = value["update"]["content"]["text"].as_str() {
-                        if state.text.len() + text.len() > 100_000 { return Err(agent_client_protocol::Error::internal_error()); }
+                        if state.text.len() + text.len() > 100_000 { return Err(notification_failure.fail()); }
                         state.text.push_str(text);
                     }
                     notify.notify_one();
                 }
                 Some("tool_call" | "tool_call_update") => {
                     state.tools += 1;
-                    if scenario != "deny" { return Err(agent_client_protocol::Error::internal_error()); }
+                    if scenario != "deny" { return Err(notification_failure.fail()); }
                 }
                 _ => {}
             }
@@ -183,7 +210,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             let mut state = permissions.lock().unwrap();
             let id = value["toolCall"]["toolCallId"].as_str().unwrap_or("").to_owned();
             if scenario != "deny" || value["sessionId"].as_str() != state.session.as_deref() || !state.seen.insert(id.clone()) {
-                return Err(agent_client_protocol::Error::internal_error());
+                return Err(permission_failure.fail());
             }
             let options = request.options.iter().map(|option| PolicyOption {
                 id: option.option_id.to_string(),
@@ -199,31 +226,52 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             let outcome = match PermissionPolicy::default().respond(&normalized) {
                 PermissionResponse::Selected(id) => RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(id)),
                 PermissionResponse::Cancelled => RequestPermissionOutcome::Cancelled,
-                PermissionResponse::Refused => return Err(agent_client_protocol::Error::internal_error()),
+                PermissionResponse::Refused => return Err(permission_failure.fail()),
             };
             state.permissions += 1;
-            responder.respond(RequestPermissionResponse::new(outcome))
+            responder.respond(RequestPermissionResponse::new(outcome)).map_err(|_| permission_failure.fail())
         }, agent_client_protocol::on_receive_request!())
-        .on_receive_request(async |_request: ReadTextFileRequest, _responder, _cx| {
-            Err::<(), _>(agent_client_protocol::Error::internal_error())
+        .on_receive_request({
+            let failure = violation.clone();
+            async move |_request: ReadTextFileRequest, _responder, _cx| {
+                Err::<(), _>(failure.fail())
+            }
         }, agent_client_protocol::on_receive_request!())
-        .on_receive_request(async |_request: WriteTextFileRequest, _responder, _cx| {
-            Err::<(), _>(agent_client_protocol::Error::internal_error())
+        .on_receive_request({
+            let failure = violation.clone();
+            async move |_request: WriteTextFileRequest, _responder, _cx| {
+                Err::<(), _>(failure.fail())
+            }
         }, agent_client_protocol::on_receive_request!())
-        .on_receive_request(async |_request: CreateTerminalRequest, _responder, _cx| {
-            Err::<(), _>(agent_client_protocol::Error::internal_error())
+        .on_receive_request({
+            let failure = violation.clone();
+            async move |_request: CreateTerminalRequest, _responder, _cx| {
+                Err::<(), _>(failure.fail())
+            }
         }, agent_client_protocol::on_receive_request!())
-        .on_receive_request(async |_request: TerminalOutputRequest, _responder, _cx| {
-            Err::<(), _>(agent_client_protocol::Error::internal_error())
+        .on_receive_request({
+            let failure = violation.clone();
+            async move |_request: TerminalOutputRequest, _responder, _cx| {
+                Err::<(), _>(failure.fail())
+            }
         }, agent_client_protocol::on_receive_request!())
-        .on_receive_request(async |_request: ReleaseTerminalRequest, _responder, _cx| {
-            Err::<(), _>(agent_client_protocol::Error::internal_error())
+        .on_receive_request({
+            let failure = violation.clone();
+            async move |_request: ReleaseTerminalRequest, _responder, _cx| {
+                Err::<(), _>(failure.fail())
+            }
         }, agent_client_protocol::on_receive_request!())
-        .on_receive_request(async |_request: KillTerminalRequest, _responder, _cx| {
-            Err::<(), _>(agent_client_protocol::Error::internal_error())
+        .on_receive_request({
+            let failure = violation.clone();
+            async move |_request: KillTerminalRequest, _responder, _cx| {
+                Err::<(), _>(failure.fail())
+            }
         }, agent_client_protocol::on_receive_request!())
-        .on_receive_request(async |_request: WaitForTerminalExitRequest, _responder, _cx| {
-            Err::<(), _>(agent_client_protocol::Error::internal_error())
+        .on_receive_request({
+            let failure = violation.clone();
+            async move |_request: WaitForTerminalExitRequest, _responder, _cx| {
+                Err::<(), _>(failure.fail())
+            }
         }, agent_client_protocol::on_receive_request!())
         .connect_with(transport, async move |cx| {
             let init = cx.send_request(InitializeRequest::new(ProtocolVersion::V1)).block_task().await?;
@@ -262,6 +310,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let result = tokio::select! {
         value = tokio::time::timeout(Duration::from_secs(deadline), connection) => Some(value),
         _ = tokio::signal::ctrl_c() => None,
+        _ = violation.wake.notified() => None,
     };
     let cleanup = owned.cleanup().await;
     // Successful cleanup never implies successful protocol completion.
@@ -270,6 +319,18 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         "{}",
         json!({"directChildReaped": true, "groupEscalated": true, "processGroup": group})
     );
+    {
+        let state = observed.lock().unwrap();
+        println!(
+            "{}",
+            json!({"observedChunks": state.chunks,
+            "observedPermissionDenials": state.permissions, "observedToolEvents": state.tools})
+        );
+    }
+    if violation.failed.load(Ordering::SeqCst) {
+        println!("{}", json!({"protocolViolation": true}));
+        return Err("protocol violation".into());
+    }
     result.ok_or("interrupted")???;
     let state = observed.lock().unwrap();
     if scenario == "deny" && state.permissions == 0 {

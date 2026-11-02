@@ -36,6 +36,10 @@ for line in sys.stdin:
     if method == 'initialize':
         reply(message['id'], {'protocolVersion': 1, 'agentCapabilities': {}})
     elif method == 'session/new':
+        if failure == 'early-notification':
+            send({'jsonrpc': '2.0', 'method': 'session/update', 'params': {
+                'sessionId': 'fixture-session', 'update': {'sessionUpdate': 'available_commands_update',
+                'availableCommands': []}}})
         reply(message['id'], {'sessionId': 'fixture-session', 'configOptions': [{
             'id': 'model', 'name': 'Model', 'type': 'select',
             'currentValue': 'wrong' if failure == 'wrong-model' else 'harness-preflight/fixture',
@@ -72,11 +76,21 @@ for line in sys.stdin:
             send({'jsonrpc': '2.0', 'method': 'session/update', 'params': {
                 'sessionId': 'wrong' if failure == 'wrong-session' else 'fixture-session',
                 'update': {'sessionUpdate': 'agent_message_chunk', 'content': {'type': 'text', 'text': marker}}}})
+            if failure == 'wrong-session':
+                send({'jsonrpc': '2.0', 'method': 'session/update', 'params': {
+                    'sessionId': 'fixture-session', 'update': {'sessionUpdate': 'agent_message_chunk',
+                    'content': {'type': 'text', 'text': marker}}}})
             if scenario != 'cancel':
                 reply(prompt_id, {'stopReason': 'end_turn'})
     elif method == 'session/cancel':
         reply(prompt_id, {'stopReason': 'cancelled'})
     elif message.get('id') == 100:
         expected = {'outcome': 'cancelled'} if failure == 'no-denial' else {'outcome': 'selected', 'optionId': 'reject'}
-        assert message.get('result', {}).get('outcome') == expected
+        if failure != 'duplicate-options':
+            assert message.get('result', {}).get('outcome') == expected
+        # On malformed options, maliciously claim completion even after the error.
+        # The client must fail independently of this fixture's behavior.
+        reply(prompt_id, {'stopReason': 'end_turn'})
+
+    elif message.get('id') == 101:
         reply(prompt_id, {'stopReason': 'end_turn'})
