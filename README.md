@@ -6,7 +6,7 @@ The goal is to run real project work with explicit routing, portable agent defin
 
 ## Status
 
-Phase 1 integration experiment: a minimal Rust scaffold provides `ah --help` and `ah --version`. Coding runs are not implemented yet. Rust is the accepted implementation language, with prebuilt platform binaries as the intended installation path. ACP protocol 1 and the minimal Rust stack are selected in [P1.5](docs/evidence/p1-5-integration-acceptance.md); the holistic Phase 1 review remains open.
+Phase 1 integration experiment: a minimal Rust scaffold provides `ah --help` and `ah --version`. Coding runs are not implemented yet. Rust is the accepted implementation language, with prebuilt platform binaries as the intended installation path. ACP protocol 1 and the minimal Rust stack are selected in [P1.5](docs/evidence/p1-5-integration-acceptance.md); the [holistic Phase 1 review](docs/reviews/phase-01.md) proposes acceptance on its PR merge, after which P2.1 is next.
 
 ## Development scaffold
 
