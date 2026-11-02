@@ -6,6 +6,7 @@ This directory plans work on agent-harness. It is not the runtime queue/state us
 
 | Phase | Task cards | Delivery |
 |---|---|---|
+| 0 | [Planning baseline review](00-scope.md) | Holistic goals/design/plan review before implementation |
 | 1 | [Integration experiment](01-integration.md) | Prove the Rust/OpenCode/LiteLLM path and select minimal dependencies |
 | 2 | [First usable slice](02-first-slice.md) | Ship/use one local-only coding run |
 | 3 | [Routing](03-routing.md) | All modes and configured eligible fallback |
@@ -32,7 +33,13 @@ This directory plans work on agent-harness. It is not the runtime queue/state us
 3. Work on a feature branch. Prefer one focused task/PR; split a broad card into reviewable substeps without changing its acceptance boundary. Add child tasks only when useful, keep parent ID/traceability, and update dependency links when splitting.
 4. Run checks proportional to the work and capture required live/fixture evidence. Update consuming contracts, decisions, capability/version notes and use observations.
 5. Follow [the Git workflow](../docs/GIT_WORKFLOW.md): open PR, monitor Grok, handle findings and merge/clean up under its rules. Maximum three Grok reviews per PR; unresolved critical/high issues then require human handoff.
-6. Check off completed tasks in PROJECT.md with evidence/PR links and clear active work. Close a phase only when every mandatory task and its live-use gate pass. Unselected optional scope stays deferred.
+6. Check off completed tasks in PROJECT.md with evidence/PR links and clear active work. Close a phase only when every mandatory task, live-use gate and explicit holistic phase review pass; all findings must be corrected and verified before dependent phases start. Unselected optional scope stays deferred.
+
+## Holistic phase gates
+
+Every phase file ends with a phase-review card; individual PR approvals do not satisfy this task by themselves. Follow [docs/PHASE_REVIEW.md](../docs/PHASE_REVIEW.md) and the [report template](PHASE_REVIEW_TEMPLATE.md). Review the whole integrated phase, record findings and verify every correction before an accepted pass. Reports live in docs/reviews/; status remains in PROJECT.md.
+
+The review IDs are P0.13, P1.7, P2.9, P3.6, P4.9, P5.6, P6.5, P7.7, P8.5 and P9.5. Cross-phase consumers depend on these gates rather than the old evidence-preparation tasks. Phase 9 reviews are repeated for newly selected scope; unselected increments are not forced into the review. Quota work now waits for full Phase 7 review, superseding the former first-adapter shortcut under D018.
 
 ## Evidence and changes
 
@@ -40,4 +47,4 @@ Use a compact record: task ID, date, commit/PR, test commands/results, tested ve
 
 Goals G1–G9, features F01–F26 and acceptance AC01–AC11 remain defined in docs/SPECIFICATION.md and docs/FEATURE_REVIEW.md. Decision IDs Dxxx live in DECISIONS.md. Task cards trace execution; they do not redefine scope or freeze future schemas. Native session fork, plugins, recipes and other candidates are not tasks merely because upstream tools offer them.
 
-For a genuinely new task, use [TEMPLATE.md](TEMPLATE.md), allocate a stable ID in PROJECT.md and add explicit dependencies/evidence. Existing cards are the initial plan for all 50 remaining implementation tasks; no implementation is marked complete by this planning pass.
+For a genuinely new task, use [TEMPLATE.md](TEMPLATE.md), allocate a stable ID in PROJECT.md and add explicit dependencies/evidence. Existing cards are the initial plan for 59 remaining implementation/review tasks across Phases 1–9, plus the Phase 0 baseline review; no implementation is marked complete by this planning pass.

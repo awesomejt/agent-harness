@@ -112,6 +112,14 @@ Entries record design intent, not implementation completion. Earlier entries rem
 - **Rationale**: A phase checklist alone does not identify a next ready task, consuming decisions or reviewable evidence. Static cards avoid duplicated mutable status while retaining stable P/G/F/AC/D traceability.
 - **Validation**: Every remaining implementation task has exactly one card and resolvable dependencies; check acyclicity, conditional gates, links, phase/acceptance coverage and task order. Implementation completion remains gated by evidence and required PR/review/merge workflow.
 
+## 2026-11-01 — D018: Mandatory holistic phase reviews before progression
+
+- **Decision**: Add an explicit phase-review task for every phase (P0.13, P1.7, P2.9, P3.6, P4.9, P5.6, P6.5, P7.7, P8.5, P9.5). Review the entire integrated phase, record findings, address each finding and verify corrections before an accepted pass. Individual PR reviews and use demonstrations remain required but do not replace this gate.
+- **Progression**: Rewire cross-phase consumers to accepted review tasks. Preserve independent branches after their common predecessor review; no dependent work proceeds on an unreviewed phase baseline. Phase 0's planning review is required before P1.1 begins.
+- **Supersedes**: D017's first-completed-adapter shortcut for Phase 9 quota work; it now waits for P7.7 full portfolio review. Scheduling waits for P5.6; Pi workflow parity waits for P6.5. Phase 9 reviews selected increment snapshots and reopens for newly selected scope, without implementing unselected features.
+- **Rationale**: The user explicitly requires holistic review and remediation for each phase before moving on. Existing acceptance/closeout tasks alone did not schedule this complete review or enforce predecessor review dependencies.
+- **Evidence**: Use docs/PHASE_REVIEW.md and tasks/PHASE_REVIEW_TEMPLATE.md; store reports in docs/reviews/ with scope, findings, correction and verification links. Status stays in PROJECT.md; use Critical/High/Medium/Low with impact-based mapping of incoming labels. Reopening unchecks the same task, retains prior accepted report links and creates phase-NN-r2.md (then -r3.md, etc.) rather than overwriting history. A pass requires no unresolved finding and completed required review/fix PRs; the Git workflow's review limits still apply per PR.
+
 ## Deferred decision register
 
 | Choice | Owner phase | Decide when / required evidence |

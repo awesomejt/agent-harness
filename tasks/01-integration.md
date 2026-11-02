@@ -5,10 +5,10 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 <a id="p1-1"></a>
 ## P1.1 — Minimal Rust package and toolchain
 
-- **Depends on:** Phase 0 documentation/review complete.
+- **Depends on:** [P0.13](00-scope.md#p0-13)
 - **Deliverable and boundary:** Create one Cargo package with the ah binary and minimal testable module boundary. Select a nonconflicting package name, edition/MSRV and initial target. Do not implement later commands or a workspace framework.
 - **Acceptance evidence:** Build/version smoke plus formatting/lint/test commands appropriate to the scaffold; record toolchain/target and package decision. No live model call is needed.
-- **Decision/readiness gate:** Phase 0 complete; select only the minimum toolchain/dependencies needed for the experiment.
+- **Decision/readiness gate:** Phase 0 holistic review passed; select only the minimum toolchain/dependencies needed for the experiment.
 - **Contract:** [docs/DESIGN.md](../docs/DESIGN.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
 <a id="p1-6"></a>
@@ -48,11 +48,19 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 - **Contract:** [docs/EXECUTION.md](../docs/EXECUTION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
 <a id="p1-5"></a>
-## P1.5 — Close integration experiment
+## P1.5 — Prepare integration experiment acceptance
 
 - **Depends on:** [P1.3](01-integration.md#p1-3)
 - **Deliverable and boundary:** Select the transport/minimal dependencies and confirm proposed Rust boundaries using the experiment. Write exact tested versions, results, limitations and follow-up work.
 - **Acceptance evidence:** Phase 1 exit evidence is linked from PROJECT.md; decisions and DESIGN/FRAMEWORKS/EXECUTION docs match what was actually tested. Required review is complete.
-- **Decision/readiness gate:** All Phase 1 tasks and required live evidence must be complete; unavailable LiteLLM blocks this gate.
+- **Decision/readiness gate:** All preceding Phase 1 implementation/evidence tasks and required live evidence must be complete; unavailable LiteLLM blocks this gate.
 - **Contract:** [docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
+<a id="p1-7"></a>
+## P1.7 — Phase review: holistic findings and remediation
+
+- **Depends on:** [P1.5](01-integration.md#p1-5)
+- **Deliverable and boundary:** Review all Phase 1 deliverables together, accumulated changes since its accepted entry baseline, acceptance/live evidence, Rust architecture/contracts, tests, regressions and operational limits. The preceding task prepares evidence; it does not close the phase.
+- **Acceptance evidence:** A phase-numbered report under docs/reviews/ records the reviewed commit/PR scope, goal/feature/acceptance coverage, test/live evidence, findings, remediation and verification. A pass requires no unresolved finding; review/fix PRs follow the Git workflow.
+- **Decision/readiness gate:** Dependent phase work remains gated until the whole-phase review passes, all findings are resolved/verified, and required review/fix PRs merge. Do not substitute a set of individual PR approvals.
+- **Contract:** [Phase review procedure](../docs/PHASE_REVIEW.md) and [report template](PHASE_REVIEW_TEMPLATE.md); canonical status/evidence in [PROJECT.md](../PROJECT.md).

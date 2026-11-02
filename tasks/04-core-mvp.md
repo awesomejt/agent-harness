@@ -5,7 +5,7 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 <a id="p4-1"></a>
 ## P4.1 — Canonical schema and destination contract
 
-- **Depends on:** [P3.5](03-routing.md#p3-5)
+- **Depends on:** [P3.6](03-routing.md#p3-6)
 - **Deliverable and boundary:** Choose canonical YAML fields and validate Markdown/body, names, duplicates, tools/permissions, effort/model aliases and actual OpenCode destinations.
 - **Acceptance evidence:** Schema/parser fixtures reject malformed/ambiguous/traversal inputs; decision entry and examples reflect a tested backend version.
 - **Decision/readiness gate:** AC08; do not promote speculative provider formats into guarantees.
@@ -66,11 +66,19 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 - **Contract:** [docs/OPERATIONS.md](../docs/OPERATIONS.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
 <a id="p4-6"></a>
-## P4.6 — Core MVP acceptance gate
+## P4.6 — Prepare core MVP acceptance evidence
 
 - **Depends on:** [P4.5](04-core-mvp.md#p4-5)
-- **Deliverable and boundary:** Assess all G1–G5 and AC01–AC11 against linked evidence, including all supporting Phase 2–4 tasks. Record repeated real use, limitations and next priorities.
+- **Deliverable and boundary:** Assess all G1–G5 and AC01–AC11 against linked evidence, including all supporting Phase 2–4 implementation/evidence tasks; final holistic review P4.9 remains the exit gate. Record repeated real use, limitations and next priorities.
 - **Acceptance evidence:** Acceptance matrix has evidence per row; required checks/review complete; no unverified restriction/platform advertised. First MVP release/use notes identify residual issues.
 - **Decision/readiness gate:** All Phase 4 dependencies complete; sequences/Ralph and more providers are not MVP blockers.
 - **Contract:** [docs/SPECIFICATION.md](../docs/SPECIFICATION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
+<a id="p4-9"></a>
+## P4.9 — Phase review: holistic findings and remediation
+
+- **Depends on:** [P4.6](04-core-mvp.md#p4-6)
+- **Deliverable and boundary:** Review all Phase 4 deliverables together, accumulated changes since its accepted entry baseline, acceptance/live evidence, Rust architecture/contracts, tests, regressions and operational limits. The preceding task prepares evidence; it does not close the phase.
+- **Acceptance evidence:** A phase-numbered report under docs/reviews/ records the reviewed commit/PR scope, goal/feature/acceptance coverage, test/live evidence, findings, remediation and verification. A pass requires no unresolved finding; review/fix PRs follow the Git workflow.
+- **Decision/readiness gate:** Dependent phase work remains gated until the whole-phase review passes, all findings are resolved/verified, and required review/fix PRs merge. Do not substitute a set of individual PR approvals.
+- **Contract:** [Phase review procedure](../docs/PHASE_REVIEW.md) and [report template](PHASE_REVIEW_TEMPLATE.md); canonical status/evidence in [PROJECT.md](../PROJECT.md).

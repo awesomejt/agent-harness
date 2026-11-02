@@ -50,6 +50,7 @@ The run should show the selected route/model, stream agent activity, preserve pr
 - [Specification](docs/SPECIFICATION.md): complete goals, boundaries, and success criteria.
 - [Implementation plan](docs/IMPLEMENTATION.md): focused phases and exit evidence.
 - [Project tracker](PROJECT.md): canonical task status and immediate ready work.
+- [Phase review gates](docs/PHASE_REVIEW.md): holistic review and verified remediation before dependent phases.
 - [Execution plan](docs/PROJECT_PLAN.md) and [task cards](tasks/README.md): dependencies, small work packages and acceptance evidence for remaining phases.
 - [Decisions](DECISIONS.md): accepted direction, rationale, and deferred choices.
 - [Architecture](docs/ARCHITECTURE.md): system, component, execution, fallback, lifecycle, and deployment diagrams.

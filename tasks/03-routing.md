@@ -5,7 +5,7 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 <a id="p3-1"></a>
 ## P3.1 — Failure and recovery decision
 
-- **Depends on:** [P2.6](02-first-slice.md#p2-6)
+- **Depends on:** [P2.9](02-first-slice.md#p2-9)
 - **Deliverable and boundary:** Define eligible deterministic failures, retry bounds, native fallback policy and handling of possible side effects. Define validation/auth/rate-limit/transport classifications.
 - **Acceptance evidence:** Decision table and tests distinguish pre-execution failure from uncertainty, forbid blind replay and ensure cancellation/unsupported constraints do not trigger fallback.
 - **Decision/readiness gate:** AC03; recovery policy must precede automatic native attempts.
@@ -43,7 +43,15 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 
 - **Depends on:** [P3.4](03-routing.md#p3-4)
 - **Deliverable and boundary:** Demonstrate local-only, native cloud-only and local-first eligible fallback. Capture route explanations, native-config isolation and recovery limits.
-- **Acceptance evidence:** Live examples, exact versions and known limitations close Phase 3; docs/decisions match behavior and required review is complete.
-- **Decision/readiness gate:** All Phase 3 tasks complete; use evidence may reorder later backlog, not weaken mode policy.
+- **Acceptance evidence:** Live examples, exact versions and known limitations prepare Phase 3 exit evidence for P3.6; docs/decisions match behavior and required review is complete.
+- **Decision/readiness gate:** All preceding Phase 3 implementation/evidence tasks complete; use evidence may reorder later backlog, not weaken mode policy.
 - **Contract:** [docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
+<a id="p3-6"></a>
+## P3.6 — Phase review: holistic findings and remediation
+
+- **Depends on:** [P3.5](03-routing.md#p3-5)
+- **Deliverable and boundary:** Review all Phase 3 deliverables together, accumulated changes since its accepted entry baseline, acceptance/live evidence, Rust architecture/contracts, tests, regressions and operational limits. The preceding task prepares evidence; it does not close the phase.
+- **Acceptance evidence:** A phase-numbered report under docs/reviews/ records the reviewed commit/PR scope, goal/feature/acceptance coverage, test/live evidence, findings, remediation and verification. A pass requires no unresolved finding; review/fix PRs follow the Git workflow.
+- **Decision/readiness gate:** Dependent phase work remains gated until the whole-phase review passes, all findings are resolved/verified, and required review/fix PRs merge. Do not substitute a set of individual PR approvals.
+- **Contract:** [Phase review procedure](../docs/PHASE_REVIEW.md) and [report template](PHASE_REVIEW_TEMPLATE.md); canonical status/evidence in [PROJECT.md](../PROJECT.md).
