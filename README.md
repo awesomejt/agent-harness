@@ -49,7 +49,8 @@ The run should show the selected route/model, stream agent activity, preserve pr
 
 - [Specification](docs/SPECIFICATION.md): complete goals, boundaries, and success criteria.
 - [Implementation plan](docs/IMPLEMENTATION.md): focused phases and exit evidence.
-- [Project tracker](PROJECT.md): actionable tasks and current status.
+- [Project tracker](PROJECT.md): canonical task status and immediate ready work.
+- [Execution plan](docs/PROJECT_PLAN.md) and [task cards](tasks/README.md): dependencies, small work packages and acceptance evidence for remaining phases.
 - [Decisions](DECISIONS.md): accepted direction, rationale, and deferred choices.
 - [Architecture](docs/ARCHITECTURE.md): system, component, execution, fallback, lifecycle, and deployment diagrams.
 - [Rust software design](docs/DESIGN.md): module blueprint, domain types, ownership and I/O boundaries.

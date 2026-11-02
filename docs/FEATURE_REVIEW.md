@@ -32,7 +32,7 @@ These projects are examples of feature families, not endorsements of every authe
 | F07 | Ordered prompt sequences and step recovery | Committed / 5 | G6; P5.1–P5.4 |
 | F08 | Fresh-context bounded Ralph loop | Committed / 6 | G7; P6.1–P6.4 |
 | F09 | Additional native CLI adapters | Committed / 7, one at a time | G8; P7.1–P7.6 |
-| F10 | Pi adapter and documented portability limits | Committed / 8 | G8; P8.1–P8.3 |
+| F10 | Pi adapter and documented portability limits | Committed / 8 | G8; P8.1–P8.4; workflow parity P8.4 waits for P6.4 |
 | F11 | Dependency diagnostics, resolved-plan and sync preview | Committed / basic 2, polish 4 | G1/G4; P2.7, P4.5 |
 | F12 | Inline, file, and stdin prompt inputs | Committed / 2 | G2; P2.2; mutual-exclusion/empty-input rules specified before launch |
 | F13 | Human progress plus machine-readable final result/events | Committed / human progress 2, versioned machine result/events 4 | G2/G8; P2.4, P4.7 |
@@ -46,7 +46,7 @@ These projects are examples of feature families, not endorsements of every authe
 | F21 | Plugins and user-defined lifecycle hooks | Candidate | Reassess only if adapters/workflows need an extension boundary; no current phase commitment |
 | F22 | Parameterized recipes, workflow templates, shared packages | Candidate | Reassess after 5–6 real-use findings; no marketplace or general DAG engine committed |
 | F23 | Non-spending quota visibility, cooldowns, optional scheduling | Committed as demand-driven increments / 9 | G9; P9.1–P9.4; no allocation ranking can override a mode |
-| F24 | Headless/CI operation and explicit unanswered-permission behavior | Committed / validate 1–2, package 4 | G2/G5; P1.3, P2.4, P4.7 |
+| F24 | Headless/CI operation and explicit unanswered-permission behavior | Committed / validate 1–2, package 4 | G2/G5; P1.6, P1.3, P2.4, P4.7 |
 | F25 | Platform binaries, version/capability diagnostics, install/upgrade guidance | Committed / 2, 4 | G1/G8; P2.5, P2.7, P4.5; provider auto-install and silent self-update Excluded |
 | F26 | Parallel teams, distributed execution, hosted UI, remote messaging | Excluded from current roadmap | Revisit only with a separate product decision; specialized agents alone do not imply these features |
 
