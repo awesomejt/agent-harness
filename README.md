@@ -6,7 +6,7 @@ The goal is to run real project work with explicit routing, portable agent defin
 
 ## Status
 
-Planning; no executable implementation yet. Rust is the implementation direction, with prebuilt platform binaries as the intended installation path. Specific libraries and transport choices remain subject to a small integration experiment.
+Planning; no executable implementation yet. Rust is the accepted implementation language, with prebuilt platform binaries as the intended installation path. Specific libraries and transport choices remain subject to a small integration experiment.
 
 ## Delivery milestones
 
@@ -37,7 +37,7 @@ The harness owns its LiteLLM routing configuration and managed project-level Ope
 
 ```bash
 # Proposed interface; not implemented yet. Run from the target project.
-ah single "Fix the parser and run its tests" --mode local-only --model <configured-alias>
+ah single "Fix the parser and run its tests" --mode local-only --model "configured-alias"
 ```
 
 The run should show the selected route/model, stream agent activity, preserve project changes, and provide a meaningful exit status. Cancellation and missing/unreachable dependencies must be understandable. Setup instructions must distinguish installing `ah` from installing OpenCode and configuring LiteLLM.
@@ -50,7 +50,9 @@ The run should show the selected route/model, stream agent activity, preserve pr
 - [Implementation plan](docs/IMPLEMENTATION.md): focused phases and exit evidence.
 - [Project tracker](PROJECT.md): actionable tasks and current status.
 - [Decisions](DECISIONS.md): accepted direction, rationale, and deferred choices.
-- [Architecture](docs/ARCHITECTURE.md): policy, runtime, and transport boundaries.
+- [Architecture](docs/ARCHITECTURE.md): system, component, execution, fallback, lifecycle, and deployment diagrams.
+- [Rust software design](docs/DESIGN.md): module blueprint, domain types, ownership and I/O boundaries.
+- [Documentation consistency review](docs/CONSISTENCY_REVIEW.md): agreement checks, resolved ambiguities and deferred choices.
 - [Frameworks](docs/FRAMEWORKS.md): reuse candidates and evaluation criteria.
 - [Git workflow](docs/GIT_WORKFLOW.md): branch, PR, and review requirements.
 

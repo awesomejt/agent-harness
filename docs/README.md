@@ -6,9 +6,10 @@ These documents are implementation contracts and planning records. No CLI, seria
 
 | Document | Coverage | What remains phase-gated |
 |---|---|---|
-| [Specification](SPECIFICATION.md) | G1–G9, scope, requirements, milestones | Product choices may evolve through recorded decisions |
+| [Specification](SPECIFICATION.md) | G1–G9, AC01–AC11 MVP checks, Rust constraints and milestones | Product choices may evolve through recorded decisions |
 | [Feature review](FEATURE_REVIEW.md) | Upstream evidence and F01–F26 dispositions | Candidate features require promotion; integration evidence is separate |
-| [Design](DESIGN.md) / [Architecture](ARCHITECTURE.md) | Rationale, ownership and component boundaries | Concrete Rust traits/modules after Phase 1 |
+| [Rust design](DESIGN.md) / [Architecture](ARCHITECTURE.md) | Proposed module/domain model and six system/component/behavior/deployment diagrams | Proposed vocabulary becomes concrete Rust APIs after Phase 1 validation |
+| [Consistency review](CONSISTENCY_REVIEW.md) | Scope, MVP acceptance, Rust direction and document agreement | Refresh after design-changing phases |
 | [Frameworks](FRAMEWORKS.md) | Library and example shortlist | Version/license/platform validation on adoption |
 | [Execution contract](EXECUTION.md) | Requests, lifecycle, events, outcomes, capabilities, fallback, headless execution | Transport/permissions 1; exits 2; machine schema 4 |
 | [Configuration contract](CONFIGURATION.md) | Resolution, preview, sync, secrets, canonical-agent mapping | Format/precedence 2; model groups 3; agent schema 4 |

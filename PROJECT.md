@@ -8,7 +8,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - Phase 0 review: PR #1 received 0 blockers, 2 concerns, and 2 nits; all four addressed. No critical/high findings; no re-review required under docs/GIT_WORKFLOW.md.
 - Implementation: none yet.
 - Direction: Rust CLI with prebuilt binaries; OpenCode first, LiteLLM route plus native route.
-- Next implementation task: P1.1, a narrow OpenCode integration experiment, with the feature/technical-contract review complete (PR #2).
+- Next implementation task: P1.1, a narrow OpenCode integration experiment, after the Rust architecture/alignment documentation PR closes. Feature/contract review is complete (PR #2).
 - Feature coverage: docs/FEATURE_REVIEW.md records eight upstream projects and F01–F26 dispositions; docs/README.md indexes technical contracts. No implementation has started.
 - First usable milestone: end of Phase 2. Core MVP: end of Phase 4.
 - Task IDs are stable references, not execution order; phase validation/closeout depends on every other task in that phase.
@@ -24,14 +24,16 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - [x] P0.6 Compare upstream feature families and classify committed, backend-owned, candidate and excluded scope.
 - [x] P0.7 Draft execution/configuration/workflow/testing/operations contracts and documentation index with phase-owned finalization.
 - [x] P0.8 Validate feature/task/doc traceability and complete PR review for the feature/contract pass (PR #2; 0 blockers, 2 concerns and 1 nit addressed; no critical/high findings).
+- [x] P0.9 Align full scope and AC01–AC11 acceptance with the Rust software blueprint, architecture diagrams and detailed contracts.
+- [ ] P0.10 Validate diagrams/document consistency and complete PR review of the Rust architecture pass.
 
 ## Phase 1 — Integration experiment
 
-- [ ] P1.1 Create a minimal Rust package on a feature branch; select a nonconflicting package name and initial development target.
+- [ ] P1.1 Create a minimal Rust package on a feature branch; select a nonconflicting package name, Rust edition/MSRV and initial development target.
 - [ ] P1.2 Exercise OpenCode ACP with a disposable project; compare native structured output if needed.
 - [ ] P1.3 Define permission-request handling and its non-interactive default before the first live run; verify no implicit widening, LiteLLM model selection, project instructions, progress, cancellation, and child cleanup.
 - [ ] P1.4 Evaluate a small reusable adapter/process dependency against direct SDK/runtime use; inspect license, release/API compatibility, and platform behavior.
-- [ ] P1.5 Record tested versions, live evidence, selected transport/dependencies, and unresolved limitations.
+- [ ] P1.5 Record tested versions, live evidence, selected transport/dependencies, validated Rust module/type boundaries, and unresolved limitations.
 
 ## Phase 2 — First usable slice
 
@@ -48,7 +50,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 
 - [ ] P3.1 Define eligible failures, retry limits, and partial-work recovery policy.
 - [ ] P3.2 Add explicit native OpenCode target/model and cloud-only execution isolated from managed LiteLLM routing.
-- [ ] P3.3 Add model-group references and configured local-first fallback.
+- [ ] P3.3 Add model-group references with explicit proxy-configuration handoff/validation and configured local-first fallback.
 - [ ] P3.4 Test all mode boundaries, discovery requests, inherited runtime settings, and uncertain outcomes.
 - [ ] P3.5 Demonstrate each route and eligible fallback in use; record findings.
 
@@ -61,7 +63,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - [ ] P4.5 Declare MVP platform support; build artifacts, setup diagnostics, sample agents/config, and usage documentation.
 - [ ] P4.7 Define/version machine result/event output, preserve stdout/stderr and exit contracts, and document headless/CI use.
 - [ ] P4.8 Document/test inherited skills, MCP, instructions and context capabilities without bypassing route/agent restrictions.
-- [ ] P4.6 Record repeated real-use results and close core MVP against G1–G5.
+- [ ] P4.6 Record repeated real-use results and close core MVP against G1–G5 and AC01–AC11, including all supporting Phase 2–4 tasks.
 
 ## Phase 5 — Sequences
 

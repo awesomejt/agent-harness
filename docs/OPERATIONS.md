@@ -2,6 +2,8 @@
 
 Status: intended operator experience, not an executable runbook. Installation URLs, supported targets, exact diagnostic commands and upgrade steps are finalized with tested artifacts in Phases 2/4. See [documentation map](README.md) for decision owners.
 
+The [deployment diagram](ARCHITECTURE.md) separates the release pipeline, local executable, installed runtime and external services. Rust library dependencies are linked/packaged for the target as required; binary users do not install Cargo packages manually.
+
 ## Installation and prerequisites
 
 Distribute prebuilt harness binaries for explicitly supported OS/architecture targets. Users of these binaries need no Rust/Python toolchain. Cargo source installation may be optional; it is not the only installation path. Include version information, artifact checksums, release notes and dependency/license notices as applicable.

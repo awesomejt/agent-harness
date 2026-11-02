@@ -8,6 +8,8 @@ Resolve one project path, prompt source, operational mode, runtime, and model al
 
 Keep primary versus specialized role separate from route and runtime. A request to review without writes must become enforceable runtime restrictions; advisory system text is insufficient.
 
+The proposed Rust domain model and supervisor ownership are in [DESIGN.md](DESIGN.md); lifecycle and route diagrams are in [ARCHITECTURE.md](ARCHITECTURE.md). Internal type names do not establish a public JSON schema.
+
 ## Lifecycle
 
 Conceptual lifecycle (names are not serialized enums): resolve -> validate -> preview or prepare managed configuration -> launch -> active -> terminating if cancelled -> terminal outcome. Validation rejection and spawn failure can terminate before active work. Preview ends without executing or modifying configuration. Retrying creates a new attempt linked to the original run rather than rewriting history.

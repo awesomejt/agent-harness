@@ -35,7 +35,7 @@ These projects are examples of feature families, not endorsements of every authe
 | F10 | Pi adapter and documented portability limits | Committed / 8 | G8; P8.1–P8.3 |
 | F11 | Dependency diagnostics, resolved-plan and sync preview | Committed / basic 2, polish 4 | G1/G4; P2.7, P4.5 |
 | F12 | Inline, file, and stdin prompt inputs | Committed / 2 | G2; P2.2; mutual-exclusion/empty-input rules specified before launch |
-| F13 | Human progress plus machine-readable final result/events | Committed / basic 2, versioned machine interface 4 | G2/G8; P2.4, P4.7 |
+| F13 | Human progress plus machine-readable final result/events | Committed / human progress 2, versioned machine result/events 4 | G2/G8; P2.4, P4.7 |
 | F14 | Attempt identity, outcome, reported usage, inspectable workflow records | Committed / transient 2, durable 5–6 | G2/G6/G7; P2.4, P5.3, P6.2; no full transcript archive by default |
 | F15 | Resume interrupted sequence/loop | Committed / 5–6 | G6/G7; P5.3, P6.4; native session continuation/fork remains Candidate |
 | F16 | Cancellation/deadlines, loop bounds, measured resource limits | Committed / 2, 6, 9 respectively | G2/G7/G9; P2.4, P6.3, P9.2; no guessed dollar cap guarantee |
@@ -54,7 +54,7 @@ These projects are examples of feature families, not endorsements of every authe
 
 The earlier goals covered the main workflows but underspecified input handling, plan preview, machine consumers, backend feature ownership, and dirty-project behavior. F11–F14, F17–F20, F24–F25 now have explicit task/contract coverage. This adds completeness around existing goals without moving sequences/Ralph into the first slice or adding another runtime.
 
-Candidates remain visible here instead of becoming unchecked implementation promises. Promote one only with a use case, owner phase, acceptance evidence, decision entry, and task. Architecture details that depend on the integration experiment remain deferred under D011.
+Candidates remain visible here instead of becoming unchecked implementation promises. Promote one only with a use case, owner phase, acceptance evidence, decision entry, and task. Architecture details that depend on the integration experiment remain deferred under D011. The Rust blueprint and diagrams do not promote any candidate feature; AC01–AC11 in SPECIFICATION.md provide the explicit MVP acceptance boundary.
 
 ## Limits and next evidence
 

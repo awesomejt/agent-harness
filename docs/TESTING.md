@@ -38,4 +38,4 @@ Each supported release target needs an actual build and installation smoke test;
 
 ## Traceability and closeout
 
-Use G IDs for goals, F IDs for feature dispositions, P IDs for tasks, and D IDs for decisions. Link phase evidence from PROJECT.md with date, task, tested versions, route/model, observed outcome, interventions, direct-tool comparison and limitations. A feature is complete only when its acceptance evidence is linked, docs reflect implemented behavior, and required PR review is complete.
+Use G IDs for goals, F IDs for feature dispositions, AC IDs for milestone acceptance, P IDs for tasks, and D IDs for decisions. Validate the Mermaid diagrams and cross-document references when architecture changes; diagram validation is documentation tooling, not a Node.js runtime requirement for ah. Link phase evidence from PROJECT.md with date, task, tested versions, route/model, observed outcome, interventions, direct-tool comparison and limitations. A feature is complete only when its acceptance evidence is linked, docs reflect implemented behavior, and required PR review is complete.
