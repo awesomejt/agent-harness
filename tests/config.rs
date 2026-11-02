@@ -1,5 +1,5 @@
 use awesomejt_agent_harness::config::{
-    Config, Exit, Invocation, MAX_INPUT_BYTES, Mode, Permissions, Source,
+    Config, Exit, Invalid, Invocation, MAX_INPUT_BYTES, Mode, Permissions, Source,
 };
 use std::ffi::OsString;
 use std::io::{Cursor, Read};
@@ -68,30 +68,71 @@ fn missing_key_rejects_before_stdin_read() {
 
 #[test]
 fn strict_schema_rejects_unknown_duplicate_secret_and_unsupported_fields() {
-    for input in [
-        VALID.replace("\"version\":1", "\"version\":2"),
-        VALID.replace("\"version\":1", "\"version\":1,\"version\":1"),
-        VALID.replace(
-            "\"version\":1",
-            "\"version\":1,\"api_key\":\"SENTINEL_SECRET\"",
+    let schema = "invalid config: expected strict version-1 JSON schema";
+    for (input, expected) in [
+        (
+            VALID.replace("\"version\":1", "\"version\":2"),
+            "unsupported config version",
         ),
-        VALID.replace("\"api_key_env\":", "\"api_key\":"),
-        VALID.replace("\"mode\":\"local-only\"", "\"mode\":\"local-first\""),
-        VALID.replace("\"version\":1", "\"version\":1,\"permissions\":\"prompt\""),
-        VALID.replace("\"version\":1", "\"version\":1,\"timeout_secs\":0"),
-        VALID.replace("\"version\":1", "\"version\":1,\"timeout_secs\":86401"),
-        VALID.replace("\"version\":1", "\"version\":1,\"timeout_secs\":1.5"),
-        VALID.replace(
-            "\"version\":1",
-            "\"version\":1,\"permissions\":{\"shell\":\"project\"}",
+        (
+            VALID.replace("\"version\":1", "\"version\":1,\"version\":1"),
+            schema,
         ),
-        VALID.replace("test-alias", "provider/model"),
-        VALID.replace("TEST_KEY", "not a key name"),
+        (
+            VALID.replace(
+                "\"version\":1",
+                "\"version\":1,\"api_key\":\"SENTINEL_SECRET\"",
+            ),
+            schema,
+        ),
+        (
+            VALID.replace(
+                "\"api_key_env\":\"TEST_KEY\"",
+                "\"api_key_env\":\"TEST_KEY\",\"api_key\":\"SENTINEL_SECRET\"",
+            ),
+            schema,
+        ),
+        (
+            VALID.replace("local-only", "local-first"),
+            "only local-only is supported in the first slice",
+        ),
+        (
+            VALID.replace("\"version\":1", "\"version\":1,\"permissions\":\"prompt\""),
+            schema,
+        ),
+        (
+            VALID.replace("\"version\":1", "\"version\":1,\"timeout_secs\":0"),
+            "timeout must be 1–86400 seconds",
+        ),
+        (
+            VALID.replace("\"version\":1", "\"version\":1,\"timeout_secs\":86401"),
+            "timeout must be 1–86400 seconds",
+        ),
+        (
+            VALID.replace("\"version\":1", "\"version\":1,\"timeout_secs\":1.5"),
+            schema,
+        ),
+        (
+            VALID.replace(
+                "\"version\":1",
+                "\"version\":1,\"permissions\":{\"shell\":\"project\"}",
+            ),
+            schema,
+        ),
+        (
+            VALID.replace("test-alias", "provider/model"),
+            "model must be a 1–128 byte LiteLLM alias using letters, digits, dot, underscore or hyphen",
+        ),
+        (
+            VALID.replace("TEST_KEY", "not a key name"),
+            "api_key_env must be an environment variable name",
+        ),
     ] {
-        match Config::read(input.as_bytes()) {
-            Ok(_) => panic!("invalid config accepted"),
-            Err(error) => assert!(!format!("{error:?}").contains("SENTINEL_SECRET")),
-        }
+        let error = Config::read(input.as_bytes())
+            .err()
+            .expect("invalid config accepted");
+        assert_eq!(error, Invalid(expected));
+        assert!(!format!("{error:?}").contains("SENTINEL_SECRET"));
     }
 }
 
@@ -106,6 +147,11 @@ fn endpoint_rejects_embedded_credentials_and_non_api_urls() {
         "https://host/other",
         "https://host/v1/",
         " https://host/v1",
+        "http://host/x/../v1",
+        "http://host/./v1",
+        "http://@host/v1",
+        "HTTP://HOST/v1",
+        "http://host:80/v1",
     ] {
         assert!(
             Config::read(VALID.replace("http://litellm:4000/v1", endpoint).as_bytes()).is_err()
@@ -123,30 +169,64 @@ fn endpoint_rejects_embedded_credentials_and_non_api_urls() {
 
 #[test]
 fn invalid_invocations_reject_without_io() {
-    for args in [
-        vec!["single"],
-        vec!["single", ""], // empty inline is checked during resolve below
-        vec!["single", "a", "b"],
-        vec!["single", "a", "--prompt-file", "-"],
-        vec!["single", "--prompt-file", "-", "a"],
-        vec!["single", "a", "--mode", "cloud-only"],
-        vec!["single", "a", "--permissions", "project-shell"],
-        vec!["single", "a", "--permissions", "prompt"],
-        vec!["single", "a", "--no-sync", "--no-sync"],
-        vec!["single", "a", "--model", "--preview"],
-        vec!["single", "a", "--model", "bad/model"],
-        vec!["single", "a", "--timeout-secs", "0"],
-        vec!["single", "a", "--agent", "coder"],
+    for (args, expected) in [
+        (
+            vec!["single"],
+            "provide inline prompt or --prompt-file PATH|-",
+        ),
+        (vec!["single", "a", "b"], "conflicting prompt sources"),
+        (
+            vec!["single", "a", "--prompt-file", "-"],
+            "conflicting prompt sources",
+        ),
+        (
+            vec!["single", "--prompt-file", "-", "a"],
+            "conflicting prompt sources",
+        ),
+        (
+            vec!["single", "a", "--mode", "cloud-only"],
+            "only local-only is supported in the first slice",
+        ),
+        (
+            vec!["single", "a", "--permissions", "project-shell"],
+            "unsupported permission policy",
+        ),
+        (
+            vec!["single", "a", "--permissions", "prompt"],
+            "unsupported permission policy",
+        ),
+        (
+            vec!["single", "a", "--no-sync", "--no-sync"],
+            "duplicate option",
+        ),
+        (
+            vec!["single", "a", "--model", "--preview"],
+            "missing option value",
+        ),
+        (
+            vec!["single", "a", "--model", "bad/model"],
+            "model must be a 1–128 byte LiteLLM alias using letters, digits, dot, underscore or hyphen",
+        ),
+        (
+            vec!["single", "a", "--timeout-secs", "0"],
+            "timeout must be 1–86400 seconds",
+        ),
+        (
+            vec!["single", "a", "--agent", "coder"],
+            "unsupported option",
+        ),
     ] {
-        let parsed = Invocation::parse(args.iter().map(OsString::from), Path::new("."));
-        if let Ok(request) = parsed {
-            assert!(
-                request
-                    .resolve(config(), |_| Some("key".into()), NeverRead)
-                    .is_err()
-            );
-        }
+        assert_eq!(
+            Invocation::parse(args.iter().map(OsString::from), Path::new(".")).err(),
+            Some(Invalid(expected))
+        );
     }
+    assert_eq!(
+        invocation(&["single", ""])
+            .resolve(config(), |_| Some("key".into()), NeverRead)
+            .err(),
+        Some(Invalid("prompt must not be empty"))
+    );
 }
 
 #[test]
@@ -283,4 +363,43 @@ fn fifo_prompt_rejects_without_waiting_for_a_writer() {
     );
     std::fs::remove_file(path).unwrap();
     assert!(result.is_err());
+}
+
+#[test]
+fn config_file_open_is_regular_and_bounded() {
+    let directory = std::env::temp_dir().join(format!("ah-p2-1-config-{}", std::process::id()));
+    std::fs::create_dir(&directory).unwrap();
+    let path = directory.join("ah.json");
+    std::fs::write(&path, VALID).unwrap();
+    assert!(Config::open(&path).is_ok());
+    assert_eq!(
+        Config::open(&directory).err(),
+        Some(Invalid("input path must be a regular file"))
+    );
+    std::fs::write(&path, vec![b' '; MAX_INPUT_BYTES as usize + 1]).unwrap();
+    assert_eq!(
+        Config::open(&path).err(),
+        Some(Invalid("input exceeds 1 MiB"))
+    );
+    std::fs::remove_file(&path).unwrap();
+    assert_eq!(
+        Config::open(&path).err(),
+        Some(Invalid("cannot open input file"))
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let cpath = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(cpath.as_ptr(), 0o600) }, 0);
+        assert_eq!(
+            Config::open(&path).err(),
+            Some(Invalid("input path must be a regular file"))
+        );
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(
+            Config::open(Path::new("/dev/null")).err(),
+            Some(Invalid("input path must be a regular file"))
+        );
+    }
+    std::fs::remove_dir(&directory).unwrap();
 }

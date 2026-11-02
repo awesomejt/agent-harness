@@ -117,7 +117,35 @@ fn bounded(mut reader: impl Read) -> Result<String> {
     String::from_utf8(bytes).map_err(|_| Invalid("input must be UTF-8"))
 }
 
+fn open_regular_file(path: &Path) -> Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NONBLOCK | libc::O_NOCTTY);
+    }
+    let file = options
+        .open(path)
+        .map_err(|_| Invalid("cannot open input file"))?;
+    if !file
+        .metadata()
+        .map_err(|_| Invalid("cannot inspect input file"))?
+        .is_file()
+    {
+        return Err(Invalid("input path must be a regular file"));
+    }
+    Ok(file)
+}
+
 impl Config {
+    /// Application file entry point: reject streams/devices before reading.
+    pub fn open(path: &Path) -> Result<Self> {
+        Self::read(open_regular_file(path)?)
+    }
+
+    /// Validate a caller-owned reader (e.g. fixture bytes). Application config
+    /// loading must use `open` to enforce regular-file/nonblocking semantics.
     pub fn read(reader: impl Read) -> Result<Self> {
         // Direct struct deserialization also rejects duplicate fields. Never
         // surface serde's error: it can contain arbitrary secret-bearing input.
@@ -151,11 +179,12 @@ impl Config {
             || endpoint.query().is_some()
             || endpoint.fragment().is_some()
             || endpoint.path() != "/v1"
+            || endpoint.as_str() != self.litellm.api_base
             || self.litellm.api_base.trim() != self.litellm.api_base
             || self.litellm.api_base.chars().any(char::is_control)
         {
             return Err(Invalid(
-                "API base requires http(s), a host, /v1 and no credentials/query/fragment",
+                "API base requires canonical http(s), a host, /v1 and no credentials/query/fragment",
             ));
         }
         let name = self.litellm.api_key_env.as_bytes();
@@ -326,28 +355,7 @@ impl Invocation {
         }
         let prompt = match self.prompt {
             PromptSource::Inline(text) => bounded(text.as_bytes())?,
-            PromptSource::File(path) => {
-                let mut options = std::fs::OpenOptions::new();
-                options.read(true);
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::OpenOptionsExt;
-                    options.custom_flags(libc::O_NONBLOCK | libc::O_NOCTTY);
-                }
-                let file = options
-                    .open(path)
-                    .map_err(|_| Invalid("cannot open prompt file"))?;
-                // Inspect the opened handle so a path swap cannot turn a regular
-                // file into an accepted stream. Unix nonblocking open avoids FIFO waits.
-                if !file
-                    .metadata()
-                    .map_err(|_| Invalid("cannot inspect prompt file"))?
-                    .is_file()
-                {
-                    return Err(Invalid("prompt path must be a regular file"));
-                }
-                bounded(file)?
-            }
+            PromptSource::File(path) => bounded(open_regular_file(&path)?)?,
             PromptSource::Stdin => bounded(stdin)?,
         };
         if prompt.trim().is_empty() {
