@@ -19,9 +19,9 @@ It enforces operational modes (`local-only`, `cloud-only`, `local-first`) so clo
 
 All agents must follow the multi-agent Git workflow documented in [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md):
 
-- No direct commits to `main`. Use a feature branch per task.
-- Open a PR to `main` when the task is complete (this triggers an automatic Grok review).
-- Address critical/high findings and request re-review with `/grok review` if needed.
+- No direct commits to `main`. Use `feature/<phase>/<task>-description` for normal tasks, `review/<phase>-description` for holistic phase reviews, and `patch/<task>` for standalone fixes outside the feature/task process.
+- Open a PR to `main` when the task is complete. Feature/patch PRs trigger normal Grok review; `review/` branches bypass that process while retaining the holistic phase-review gate.
+- On feature/patch PRs, address critical/high Grok findings and request re-review with `/grok review` if needed. Resolve and verify all holistic phase-review findings before phase acceptance.
 - Minor/nitpick findings do not require re-review.
 - Maximum 3 Grok reviews per PR; after that, hand off to a human.
 - On clean approval: merge, delete remote branch, then locally `git checkout main && git pull --prune && git branch -d <branch>`.
