@@ -23,7 +23,7 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 <a id="p2-2"></a>
 ## P2.2 — Local-only single coding run
 
-- **Depends on:** [P2.3](02-first-slice.md#p2-3)
+- **Depends on:** [P2.1](02-first-slice.md#p2-1), [P2.3](02-first-slice.md#p2-3)
 - **Deliverable and boundary:** Wire prompt input, project/model selection, policy, project preparation and selected OpenCode adapter into ah single. Support inline/file/stdin; reject unimplemented modes. Runtime owns tool turns. Before any real coding prompt, implement and verify the P2.1 permission contract and minimum bounded cancellation/cleanup with failure/uncertainty handling; P2.4 completes progress, outcome and adversarial hardening. Never temporarily launch with unenforced permissions or the probe supervisor treated as production-ready.
 - **Acceptance evidence:** CLI/integration checks show a validated LiteLLM-only route and a real project task path rather than a text-only completion; prompt-source errors cannot start work. Include controlled permission-denial and cleanup checks before exercising authorized edit/test tools.
 - **Decision/readiness gate:** AC01, AC02, AC05; no cloud fallback in this slice.
