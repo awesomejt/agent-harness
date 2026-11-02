@@ -4,7 +4,7 @@
 
 - Task: P0.13. Reviewer: primary coding agent. Review date: 2026-11-01. This is an author-led integrated assessment, with independent Grok PR review of the gate/report; it is not represented as an independent manual audit of every document.
 - Accepted planning baseline: main through [PR #4](https://github.com/awesomejt/agent-harness/pull/4), commit e23bb2c18be1842c873e0446480961112c6d6070. Included prior work: PRs #1–#4 covering goals, feature comparison, Rust architecture and execution planning.
-- Initial reviewed material head: b5e5b9f7ad8baebea07ec85e9c1457e486155f8a on [PR #5](https://github.com/awesomejt/agent-harness/pull/5). The corrective material head will be stamped explicitly before acceptance; report/status finalization is separate from that reviewed material.
+- Initial reviewed material head: b5e5b9f7ad8baebea07ec85e9c1457e486155f8a on [PR #5](https://github.com/awesomejt/agent-harness/pull/5). Corrective reviewed material head: b1f4f000f4818ab0a0cc40dd4055239f17b33e7a; material range e23bb2c18be1842c873e0446480961112c6d6070..b1f4f000f4818ab0a0cc40dd4055239f17b33e7a. Subsequent report/status-only finalization commits are separate from that material and do not change phase scope.
 - Scope: all planning deliverables P0.1–P0.12 and their integrated G/F/AC/P/D contracts, plus the new progression gates. No executable implementation, supported runtime/platform, billing measurement or live compatibility is claimed.
 
 ## Per-area integrated assessment
@@ -51,7 +51,7 @@ Severity uses Critical/High/Medium/Low from [the phase-review procedure](../PHAS
 | R00-04 | Medium / Grok Concern | Review severity and critical/high escalation were undefined. | Procedure now defines four impact levels and maps incoming Blocker/Concern/Nit labels; template references that scale. No demonstrated security/data-loss or runtime impact makes this High/Critical. | Corrected; re-review pending. |
 | R00-05 | Medium / Grok Concern | Reopened review status and revision naming were ambiguous. | Uncheck same task in PROJECT.md, retain accepted report links, write phase-NN-r2.md/-r3.md and recheck only on accepted merge; P9.5 card and template agree. | Corrected; re-review pending. |
 | R00-06 | Medium / Grok Concern | Initial Phase 0 report did not substantiate each template area or G/F/AC coverage. | Added per-area assessment, specific evidence links, limitations and complete G/F/AC coverage above. Author-led versus independent PR cross-check is stated honestly. | Corrected; re-review pending. |
-| R00-07 | Low / Grok Nit | Reviewed material head was deferred entirely to PR metadata. | Record initial material SHA explicitly; stamp corrective material SHA before report/status finalization. Finalization-only commit is distinguished to avoid self-referential SHA requirements. | Correction in progress; stamp before pass. |
+| R00-07 | Low / Grok Nit | Reviewed material head was deferred entirely to PR metadata. | Record initial material SHA explicitly; stamp corrective material SHA before report/status finalization. Finalization-only commit is distinguished to avoid self-referential SHA requirements. | Corrective material SHA stamped; re-review pending. |
 | R00-08 | Low / Grok Nit | P8.4 wording still implied it closed Phase 8. | [Pi card](../../tasks/08-pi.md) now prepares evidence for P8.5; tracker and final review card agree. | Corrected; re-review pending. |
 | R00-09 | Low / Grok Nit | Historical PR #1 review label could be confused with P0.13. | PROJECT.md now says Phase 0 PR #1 review, distinct from the holistic gate. | Corrected; re-review pending. |
 
@@ -59,10 +59,10 @@ No additional feature recommendation was promoted by this review. Any new recomm
 
 ## Verification and integrated recheck
 
-Documentation checks passed before the first PR review: 34 Markdown documents; resolvable links/anchors/fences/references; 60 unique active/future cards; ten review gates; dependency acyclicity, mandatory phase coverage and no cross-phase review bypass; all seven Mermaid diagrams parsed. After corrective changes, rerun the same checks plus explicit assertions for the severity/reopen rules and per-area report coverage before acceptance.
+Documentation checks passed before the first PR review: 34 Markdown documents; resolvable links/anchors/fences/references; 60 unique active/future cards; ten review gates; dependency acyclicity, mandatory phase coverage and no cross-phase review bypass; all seven Mermaid diagrams parsed. Corrective recheck passed the same link/reference/dependency/diagram checks, plus explicit assertions for all four severity levels, same-task reopening/history rules, all eight assessment areas and nine recorded findings.
 
 Rust builds, runtime live tests, binary installation and provider/cost behavior are not applicable to this planning-only phase. They remain scheduled evidence obligations. The independent first-pass Grok review of PR #5 reported 0 Blocker, 3 Concern and 3 Nit; impact classifications and corrections are recorded above. A second Grok review is requested to verify the completed gate/report rather than treating prior per-PR approvals as holistic evidence.
 
 ## Gate outcome
 
-Changes addressed pending corrective-head stamp, final checks and second PR review. P0.13 remains open; P1.1 must not start until the report/fixes are accepted and merged with no unresolved findings. A later report/status-only commit may propose pass for that reviewed material head; it becomes effective only on merge.
+Corrective material head and passing checks are recorded; second PR review remains pending. P0.13 remains open; P1.1 must not start until the report/fixes are accepted and merged with no unresolved findings. A later report/status-only commit may propose pass for that reviewed material head; it becomes effective only on merge.
