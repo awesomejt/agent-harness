@@ -37,7 +37,8 @@ The harness owns its LiteLLM routing configuration and managed project-level Ope
 
 ```bash
 # Proposed interface; not implemented yet. Run from the target project.
-ah single "Fix the parser and run its tests" --mode local-only --model "configured-alias"
+# Replace <configured-alias> with an alias already configured in LiteLLM.
+ah single "Fix the parser and run its tests" --mode local-only --model "<configured-alias>"
 ```
 
 The run should show the selected route/model, stream agent activity, preserve project changes, and provide a meaningful exit status. Cancellation and missing/unreachable dependencies must be understandable. Setup instructions must distinguish installing `ah` from installing OpenCode and configuring LiteLLM.

@@ -45,3 +45,5 @@ A proposed module name or diagram participant is not a frozen Rust trait, wire s
 ## Validation
 
 Check local Markdown links, balanced fences, unique G/F/AC/P/D references, task/phase coverage and actual Mermaid parser acceptance for all six diagrams. Preserve a clean PR with the required Grok review before merge. Diagram/parser tooling used to validate documentation does not become a harness runtime dependency. No cargo tests are claimed before Cargo files exist.
+
+Validation result: all six diagrams passed an actual Mermaid parser; local links, balanced fences and all G/F/AC/P/D references passed across 18 Markdown documents (9 goals, 26 feature entries, 11 acceptance rows, 58 tasks and 16 decisions). Grok review on PR #3 reported 0 blockers, 2 concerns and 3 nits; all five were addressed, including lifecycle alignment and explicit fallback-rejection/preview paths. No critical/high finding required a re-review.

@@ -59,6 +59,8 @@ sequenceDiagram
     AH->>Policy: Resolve and validate permitted route
     Policy-->>AH: LiteLLM plan or rejection
     alt Preview only
+        AH->>Config: Read project settings and compute proposed managed changes
+        Config-->>AH: Read-only change plan or conflict
         AH-->>User: Redacted plan and proposed changes without execution
     else Executing validated plan
         AH->>Config: Validate and atomically sync, or validate no-sync
@@ -87,7 +89,8 @@ Every rejection/conflict stops before launch; diagram success messages do not im
 ```mermaid
 flowchart TD
     Start[Resolved request] --> Validate[Validate mode, capabilities and route configuration]
-    Validate --> Mode{Mode}
+    Validate -->|invalid| Reject[Reject before launch]
+    Validate -->|valid| Mode{Mode}
     Mode -->|local-only| LocalOnly[Attempt LiteLLM route]
     LocalOnly --> LocalOutcome[Return outcome; no native fallback]
     Mode -->|cloud-only| NativeOnly[Attempt configured native route; no LiteLLM discovery]
@@ -97,8 +100,10 @@ flowchart TD
     Result -->|success| Finish[Return success after cleanup]
     Result -->|uncertain or ineligible failure| Stop[Return failure or uncertainty; no blind replay]
     Result -->|eligible deterministic failure| Fallback[Record failure and resolve configured native target]
-    Fallback --> Revalidate[Revalidate route, constraints and retry bounds]
-    Revalidate --> NativeAttempt[Launch a new native attempt]
+    Fallback -->|target missing| Stop
+    Fallback -->|target configured| Revalidate[Revalidate route, constraints and retry bounds]
+    Revalidate -->|not permitted or bounds exhausted| Stop
+    Revalidate -->|permitted and within bounds| NativeAttempt[Launch a new native attempt]
     NativeAttempt --> Final[Return final attempt outcome and history]
 ```
 

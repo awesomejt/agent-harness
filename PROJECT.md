@@ -8,7 +8,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - Phase 0 review: PR #1 received 0 blockers, 2 concerns, and 2 nits; all four addressed. No critical/high findings; no re-review required under docs/GIT_WORKFLOW.md.
 - Implementation: none yet.
 - Direction: Rust CLI with prebuilt binaries; OpenCode first, LiteLLM route plus native route.
-- Next implementation task: P1.1, a narrow OpenCode integration experiment, after the Rust architecture/alignment documentation PR closes. Feature/contract review is complete (PR #2).
+- Next implementation task: P1.1, a narrow OpenCode integration experiment. Feature/contract review (PR #2) and Rust architecture/alignment review (PR #3) are complete; no implementation started.
 - Feature coverage: docs/FEATURE_REVIEW.md records eight upstream projects and F01–F26 dispositions; docs/README.md indexes technical contracts. No implementation has started.
 - First usable milestone: end of Phase 2. Core MVP: end of Phase 4.
 - Task IDs are stable references, not execution order; phase validation/closeout depends on every other task in that phase.
@@ -25,7 +25,7 @@ Last updated: 2026-11-01. Status is maintained here; phase contracts are in [doc
 - [x] P0.7 Draft execution/configuration/workflow/testing/operations contracts and documentation index with phase-owned finalization.
 - [x] P0.8 Validate feature/task/doc traceability and complete PR review for the feature/contract pass (PR #2; 0 blockers, 2 concerns and 1 nit addressed; no critical/high findings).
 - [x] P0.9 Align full scope and AC01–AC11 acceptance with the Rust software blueprint, architecture diagrams and detailed contracts.
-- [ ] P0.10 Validate diagrams/document consistency and complete PR review of the Rust architecture pass.
+- [x] P0.10 Validate diagrams/document consistency and complete PR review of the Rust architecture pass (PR #3; 0 blockers, 2 concerns and 3 nits addressed; no critical/high findings).
 
 ## Phase 1 — Integration experiment
 
