@@ -1,6 +1,6 @@
 # Configuration and agent contract
 
-Status: P2.1 fixes the first-slice input contract below and implements library validation. P2.2 exposes `ah single` on tested macOS; P3.7 moves the runtime pin to OpenCode 2.2.5 (D035). P2.3 owns managed OpenCode configuration and effective-route validation; P2.7 exposes read-only `ah single ... --preview` diagnostics. P3.2 adds isolated native OpenCode cloud-only execution (D032); P3.3 adds LiteLLM model-group references and the read-only proxy handoff (D033) and the configured local-first fallback (D034); P3.7 moves both routes to OpenCode 2.2.5. Phase 3 passed P3.6. P4.1 fixes the canonical schema below; P4.2/P4.3 own emission, selection and enforced execution.
+Status: P2.1 fixes the first-slice input contract below and implements library validation. P2.2 exposes `ah single` on tested macOS; P3.7 moves the runtime pin to OpenCode 2.2.5 (D035). P2.3 owns managed OpenCode configuration and effective-route validation; P2.7 exposes read-only `ah single ... --preview` diagnostics. P3.2 adds isolated native OpenCode cloud-only execution (D032); P3.3 adds LiteLLM model-group references and the read-only proxy handoff (D033) and the configured local-first fallback (D034); P3.7 moves both routes to OpenCode 2.2.5. Phase 3 passed P3.6. P4.1 fixes the canonical schema below; P4.2 adds `--agent` selection, model precedence, read-only preview and conflict-aware project emission (D037); P4.3 owns enforced named execution, which refuses until then.
 
 ## Version 1 first-slice configuration (D024)
 
@@ -171,7 +171,7 @@ When versioning managed configuration, commit `opencode.json` and `.ah-opencode-
 
 ## Canonical agents
 
-D036 fixes version 1. `agents/NAME.md` is the canonical project source. P4.1 supplies a library parser and examples; `ah single` does not discover or execute these files yet. P4.2 adds name-based emission/selection; P4.3 adds capability checks and enforced constraints.
+D036 fixes version 1. `agents/NAME.md` is the canonical project source. P4.1 supplies the parser and examples. P4.2 adds `--agent NAME` selection, preview and project emission ([below](#p42-selection-and-emission-d037)); named execution refuses until P4.3 adds capability checks and enforced constraints.
 
 ```yaml
 ---
@@ -189,7 +189,7 @@ Required fields are `version`, `name`, `description`, `capacity`, `permissions` 
 
 `description` is 1–512 UTF-8 bytes, single-line and trimmed, without controls or Unicode line/paragraph separators (U+2028/U+2029). `capacity` is `primary`, `specialized` or `both`; specialized means a separate harness-invoked role, not permission to create backend subagents. `tools` is an explicit, duplicate-free list from `read`, `search`, `edit`, `execute`; an empty list is valid. These are harness capabilities, not arbitrary backend tool names. `permissions` is a ceiling: `deny` requires no tools, `read-only` permits only read/search, and `trusted` permits any of the four. The future runtime mapping must intersect this ceiling and list with invocation authorization; project metadata cannot grant host trust. Shell/execute cannot satisfy read-only, even for a command described as a test. No path globs, auto-allow or prompt-only restrictions are accepted.
 
-Optional `models` has only `local` and/or `native`, at least one present. For example `models: {local: 'group:code', native: gpt-5.4}`. Each is a string scalar: local uses the existing LiteLLM alias or `group:NAME` grammar; native uses the existing unprefixed model identifier grammar. No endpoints, keys, provider prefixes or native group references. An omitted route inherits its resolved invocation/config model. Group existence and active-route compatibility are checked when resolving selection in P4.2/P4.3, not by this standalone parser. Fallback must resolve its own native model under the same agent restrictions and may never broaden them. Precedence relative to an explicit `--model` is finalized with selection in P4.2.
+Optional `models` has only `local` and/or `native`, at least one present. For example `models: {local: 'group:code', native: gpt-5.4}`. Each is a string scalar: local uses the existing LiteLLM alias or `group:NAME` grammar; native uses the existing unprefixed model identifier grammar. No endpoints, keys, provider prefixes or native group references. An omitted route inherits its resolved invocation/config model. Group existence and active-route compatibility are checked when resolving selection in P4.2/P4.3, not by this standalone parser. Fallback must resolve its own native model under the same agent restrictions and may never broaden them. P4.2 fixes precedence: explicit `--model`, then the agent's route model, then config (D037).
 
 Optional `effort` is `default` (also the omission default), `low`, `medium`, `high` or `max`. Non-default values are required capabilities, not a tested mapping or approximation. P4.3 must refuse unsupported runtime/model combinations before model work. The parser does not claim that OpenCode can enforce every syntactically valid definition.
 
@@ -197,7 +197,34 @@ Files are UTF-8, at most 1 MiB, with an exact opening `---` line and closing `--
 
 **OpenCode destinations (tested 2.2.5).** Project emission is `.opencode/agents/NAME.md`, with native frontmatter and the Markdown body as `system`. Canonical frontmatter must be translated, never copied unchanged: OpenCode does not understand harness version, capacity, tools or permission ceilings. Map capacity `primary`/`specialized`/`both` to native `mode: primary`/`subagent`/`all`. Native `description`, structured `model: {providerID, model}` and ordered `permissions` use their 2.x fields. Isolated harness execution uses a generated `agents.NAME` entry in `OPENCODE_CONFIG_CONTENT`, with body as `system`, rather than enabling project-config discovery or loading the emitted file. Existing source/agent checks must extend to the selected definition before execution in P4.3; this task does not change the current `build` check. No global agent destination, other provider format, backend delegation or non-default effort mapping is guaranteed. The [destination probe](../scripts/tests/agents_runtime.py) verifies both destinations and three modes with no model prompt; [P4.1 evidence](evidence/p4-1-agent-schema.md) records limits.
 
-P4.1 implements the validation rules above. P4.2 must add conflict-aware project emission, user-owned name-collision refusal, deterministic mapping fixtures and read-only destination/constraint preview. P4.3 must add runtime capability checks and enforced constraints before named execution.
+P4.1 implements the validation rules above. P4.3 must add runtime capability checks and enforced constraints before named execution.
+
+### P4.2 selection and emission (D037)
+
+`ah single ... --agent NAME` validates the name, then loads only `PROJECT/agents/NAME.md`. `agents` must be a real directory whose listing contains exactly `NAME.md`; a case-variant filename refuses and other definitions are never parsed. Global/user agent locations are not consulted.
+
+| Route | Model precedence |
+| --- | --- |
+| LiteLLM (local-only, local-first primary) | `--model` → agent `models.local` → config `model` |
+| Native (cloud-only) | `--model` → agent `models.native` → `native.model` |
+| Local-first fallback | agent `models.native` → `native.model` (`--model` never applies) |
+
+An agent `group:NAME` resolves through `litellm.groups` only on the active LiteLLM route and is ignored on the native route. Preview shows the model source as `agent`, plus an `agent:` line with name, capacity, ceiling, tools, effort and emission status; description/body are omitted.
+
+A named non-preview request exits 2 before any runtime, network check or project write: the ceiling is not yet enforced at runtime (P4.3), and running unenforced would silently widen or ignore the definition.
+
+On the managed local route (not `--no-sync`; never native, D032), the project transaction emits only the selected agent to `.opencode/agents/NAME.md` for direct OpenCode use:
+
+```text
+---
+{"description":"…","mode":"subagent","model":{"providerID":"ah-litellm","model":"proxy"},"permissions":[{"action":"*","resource":"*","effect":"deny"},{"action":"read","resource":"*","effect":"ask"},…]}
+---
+<canonical body, byte-for-byte>
+```
+
+The frontmatter is one JSON flow mapping (valid YAML). `model` is the resolved route model. Permissions come only from the canonical ceiling and tools: deny all, then `ask` for each listed tool (`read`→`read`, `search`→`glob`+`grep`, `edit`→`edit`, `execute`→`shell`), and `external_directory` is `ask` only under a trusted ceiling, otherwise `deny`. No rule allows. The isolated runtime never loads this file, and it is not the enforced runtime entry. [Golden fixtures](../tests/fixtures/opencode-agents/) pin the bytes.
+
+`.ah-opencode-agents.json` records the exact content last emitted for each owned name. Only an unchanged owned file is replaced. A manually edited owned file, or an existing file absent from the receipt (even if identical), refuses. A missing file is (re)created; other owned files are untouched and never deleted. The planner refuses, case-insensitively, any other OpenCode 2.2.5 project source of the same name: another spelling in `.opencode/agents/`, legacy `.opencode/agent/`, or `agent`/`agents` keys in `opencode.json` or `.opencode/opencode.json`. `.opencode/opencode.jsonc`, symlinked `.opencode`/`.opencode/agents`/destination and an invalid receipt also refuse. Nested IDs such as `.opencode/agents/sub/NAME.md` (`sub/NAME`) are distinct. Writes use the existing lock, re-checked snapshots and collisions, atomic replacement and directory fsync. A crash between the agent file and receipt is a visible ownership conflict. Preview lists the planned file and receipt by path and writes nothing.
 
 No backend is assumed to have the same subagent semantics or tools. Include a capability/mapping report and refuse unsupported required restrictions. Skills/instruction loading and MCP registration remain backend-owned; mapping an agent into a skill does not prove equivalent permissions.
 
