@@ -167,6 +167,16 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
             )
         }
     };
+    let prompt = match crate::opencode::prompt_supported(&r.prompt) {
+        Ok(()) => String::new(),
+        Err(error) => format!("; execution refused: {}", error.0),
+    };
+    // D040: path omitted; the runtime, not the harness, reads the file.
+    let instructions = if r.instructions.is_some() {
+        "project AGENTS.md (runtime-loaded)"
+    } else {
+        "none (no project AGENTS.md)"
+    };
     let health = if local {
         "LiteLLM reachability, alias availability"
     } else {
@@ -180,12 +190,13 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
          execution platform: {}\n\
          model: {} ({}); helper: same model\n\
          agent: {agent}\n\
+         project instructions: {instructions}; skills/MCP/plugins/project config not inherited\n\
          proxy handoff: {handoff}\n\
          credentials: environment reference present (config); value and endpoint omitted\n\
          permissions: {scope} ({}); external tools/subagents/network tools disabled\n\
          timeout: {} seconds ({})\n\
          sync: {} ({}); planned changes: {changes}\n\
-         prompt: validated; contents omitted\n\
+         prompt: validated; contents omitted{prompt}\n\
          health checks: none; {health}, runtime version and effective capabilities unverified\n\
          before execution: {before}; execution preflight verifies runtime routing/permissions\n",
         env!("CARGO_PKG_VERSION"),

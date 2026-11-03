@@ -56,6 +56,12 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
         progress.reject(error.0);
         return Exit::Invalid;
     }
+    if !request.preview
+        && let Err(error) = crate::opencode::prompt_supported(&request.prompt)
+    {
+        progress.reject(error.0);
+        return Exit::Invalid;
+    }
     if request.preview {
         return match prepare_plan(&request) {
             Ok(plan) => {
@@ -188,6 +194,7 @@ async fn coordinate(
             && native.agent.as_ref().map(crate::agents::Agent::name)
                 == request.agent.as_ref().map(crate::agents::Agent::name)
             && crate::opencode::effective(native) == crate::opencode::effective(request)
+            && native.instructions == request.instructions
             && native.timeout_secs == request.timeout_secs
             && native.prompt == request.prompt,
         prior_fallbacks: 0,

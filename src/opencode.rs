@@ -117,6 +117,21 @@ pub(crate) fn supports(agent: &Agent) -> Result<(), Invalid> {
     }
 }
 
+/// 2.2.5 runs a prompt whose first word is `/NAME` as a runtime command
+/// (ACP advertises built-ins `init`, `review`, `goal` and `compact`; project
+/// commands are not loaded). Such a turn can report `end_turn` with an empty
+/// response and no model request, so command prompts are unsupported (D040).
+/// A leading path such as `/src/main.rs` (with a second `/`) remains text.
+pub(crate) fn prompt_supported(prompt: &str) -> Result<(), Invalid> {
+    let word = prompt.split_whitespace().next().unwrap_or_default();
+    match word.strip_prefix('/') {
+        Some(name) if !name.is_empty() && !name.contains('/') => Err(Invalid(
+            "prompt starts with a runtime slash command, which is unsupported; rephrase it",
+        )),
+        _ => Ok(()),
+    }
+}
+
 /// Project `.opencode/agents/NAME.md` for direct OpenCode use on the local
 /// route (D037): native frontmatter as one JSON flow mapping, which is valid
 /// YAML, then the canonical Markdown body unchanged as `system`.
@@ -137,6 +152,9 @@ pub(crate) fn agent_markdown(agent: &Agent, request: &Resolved) -> String {
 
 /// Complete runtime configuration passed via OPENCODE_CONFIG_CONTENT. Only the
 /// selected provider may be used; the title helper is pinned to the same model.
+/// Project instructions are the one absolute `AGENTS.md` path, or none: 2.2.5
+/// loads no project instructions with project configuration disabled (D040).
+/// Skills, MCP servers and plugins stay empty or denied by the rules.
 /// Global rules are the effective rules, so built-in helpers and subagents
 /// never exceed a selected agent. The harness invokes that agent directly as
 /// the default agent, so its entry is always `primary`: 2.2.5 silently falls
@@ -173,6 +191,7 @@ pub(crate) fn config(request: &Resolved) -> Value {
             {"action": "provider.use", "resource": provider, "effect": "allow"},
         ],
         "agents": agents,
+        "instructions": request.instructions.iter().collect::<Vec<_>>(),
         "mcp": {},
         "plugins": [],
         "providers": providers,
@@ -533,6 +552,21 @@ mod tests {
         bad.push(json!([role.clone(), agent("general", wide, Value::Null)]));
         for bad in bad {
             assert!(validate_agents(&r, &bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn instructions_name_only_the_resolved_path_and_command_prompts_refuse() {
+        let mut r = request(Mode::CloudOnly, Permissions::Deny);
+        r.instructions = None;
+        assert_eq!(config(&r)["instructions"], json!([]));
+        r.instructions = Some("/p/AGENTS.md".into());
+        assert_eq!(config(&r)["instructions"], json!(["/p/AGENTS.md"]));
+        for prompt in ["/review", "  /init now", "\n/goal\tship", "/compact", "/x."] {
+            assert!(prompt_supported(prompt).is_err(), "{prompt:?}");
+        }
+        for prompt in ["fix /init", "/src/main.rs fails", "/", "review", "a/b"] {
+            assert!(prompt_supported(prompt).is_ok(), "{prompt:?}");
         }
     }
 

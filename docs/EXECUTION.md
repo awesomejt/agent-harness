@@ -32,7 +32,7 @@ Record tested runtime version, launch interface, model/effort mapping, project/r
 
 Resolve restrictions before model work. If a runtime cannot enforce the requested constraint or route, refuse execution. In particular, inherited models, helper/subagent models, skills, MCP tools, and runtime fallback must not bypass routing/permissions. This is configuration and integration policy, not a claim of OS/network sandboxing for arbitrary commands.
 
-Runtime-managed skills, MCP, context selection, compaction and caching remain runtime responsibilities. The harness reports relevant limitations and preserves restrictions; it does not implement those subsystems for MVP.
+Runtime-managed skills, MCP, context selection, compaction and caching remain runtime responsibilities. The harness reports relevant limitations and preserves restrictions; it does not implement those subsystems for MVP. [P4.8](#p48-inherited-capabilities-d040) records the tested/unsupported/unverified matrix for OpenCode 2.2.5.
 
 ## Permissions and headless operation
 
@@ -155,3 +155,12 @@ A dedicated writer thread owns stdout behind a 256-record queue. Records are num
 Records never contain prompts, partial assistant text, reasoning, tool arguments, raw stderr, provider errors, paths, endpoints, environment names or key values. Compatibility within v1: new record types, new fields and new `route`/`backend_stop` values may appear; consumers ignore unknown types/fields and treat unknown values as unknown. Removing, renaming or retyping a field, changing a meaning or adding an `outcome` value requires `v` 2.
 
 R03-REC1 is declined (D039). A post-submission failure without a trustworthy terminal response stays exit 4, even with zero grants and zero completed tool calls; the result exposes `prompt_submitted`, `backend_stop: null`, `grants` and `tool_events` instead. Headless behavior is unchanged: stdin is read only for `--prompt-file -`, permission requests use the noninteractive policy, and there is no TTY prompt. See [Operations](OPERATIONS.md#headless-and-ci-use-p47) for CI usage.
+
+## P4.8 inherited capabilities (D040)
+
+The [P4.8 capability matrix](evidence/p4-8-inherited-capabilities.md) is versioned against OpenCode 2.2.5 and records each capability as tested, unsupported or unverified.
+
+- **Project instructions:** the isolated runtime receives exactly one project instruction source, the canonical project-root `AGENTS.md`, named by absolute path in the generated document's `instructions`. 2.2.5 loads none when project configuration is disabled. Resolution exits 2 if the path does not resolve to a regular file inside the project. The runtime reads the file; the harness does not read, bound or snapshot it. Parent-directory, `CLAUDE.md` and project-config `instructions` sources are not loaded. A nested `AGENTS.md` may be attached by the runtime after a granted read in that directory.
+- **Runtime commands:** a prompt whose first word is `/NAME` is refused with exit 2 before launch. ACP would run it as a runtime command, which can end the turn with `end_turn` and no model work.
+- **Not loaded or denied:** skills, MCP servers (the document's `mcp` and the ACP `mcpServers` are empty), plugins, custom tools, project commands, subagent delegation and web tools. Each is not loaded, not offered or denied by the effective rules, on both routes and for every role.
+- **Runtime-owned and unverified:** context selection, compaction and caching.

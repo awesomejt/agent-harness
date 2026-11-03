@@ -11,7 +11,7 @@ These documents are implementation contracts and planning records. Phase 2 imple
 | [Rust design](DESIGN.md) / [Architecture](ARCHITECTURE.md) | Proposed module/domain model and six system/component/behavior/deployment diagrams | Proposed vocabulary becomes concrete Rust APIs after Phase 1 validation |
 | [Consistency review](CONSISTENCY_REVIEW.md) | Scope, MVP acceptance, Rust direction and document agreement | Refresh after design-changing phases |
 | [Frameworks](FRAMEWORKS.md) | Library and example shortlist | Version/license/platform validation on adoption |
-| [Execution contract](EXECUTION.md) | Requests, lifecycle, events, outcomes, capabilities, fallback, headless execution | Transport/permissions 1; exits 2; machine records v1 (D039, P4.7) |
+| [Execution contract](EXECUTION.md) | Requests, lifecycle, events, outcomes, capabilities, fallback, headless execution | Transport/permissions 1; exits 2; machine records v1 (D039, P4.7); inherited capabilities (D040, P4.8) |
 | [Configuration contract](CONFIGURATION.md) | Resolution, preview, sync, secrets, canonical-agent mapping | Format/precedence 2; model groups 3; agent schema 4 |
 | [Workflow state](WORKFLOWS.md) | Sequence/Ralph recovery, context and verification contracts | Durable schema/resume 5; completion/limits 6 |
 | [Validation plan](TESTING.md) | Policy, adapter, lifecycle, sync, release and live acceptance evidence | Executable tests and commands as implementation appears |

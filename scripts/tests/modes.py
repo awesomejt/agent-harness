@@ -143,7 +143,7 @@ def run(case, cfg, *, extra=(), env_drop=(), timeout='15'):
 
 
 ROUTING_KEYS = {'model', 'default_agent', 'update', 'share', 'permissions', 'policies', 'agents',
-                'mcp', 'plugins', 'providers'}
+                'instructions', 'mcp', 'plugins', 'providers'}
 
 
 def assert_records(records, route, endpoint, key, trusted=False):
@@ -176,6 +176,8 @@ def assert_records(records, route, endpoint, key, trusted=False):
             assert list(cfg['providers']) == ['ah-litellm'], cfg
             assert cfg['providers']['ah-litellm']['settings'] == dict(apiKey='{env:AH_RUNTIME_API_KEY}', baseURL=endpoint), cfg
         assert cfg['plugins'] == [] and cfg['mcp'] == {} and cfg['default_agent'] == 'build', cfg
+        # Matrix projects have no AGENTS.md, so no instructions are named (D040).
+        assert cfg['instructions'] == [], cfg
         assert cfg['update'] == 'disable' and cfg['share'] == 'disabled', cfg
 
 
