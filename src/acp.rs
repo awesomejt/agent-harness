@@ -10,7 +10,7 @@ use crate::{
 };
 use agent_client_protocol::schema::{ProtocolVersion, v1::*};
 use agent_client_protocol::{ByteStreams, Client};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::io;
 use std::sync::{
@@ -77,6 +77,13 @@ struct Observed {
     kinds: HashMap<String, String>,
     granted: usize,
 }
+impl Observed {
+    /// Cumulative counters, so a dropped activity record loses nothing.
+    fn counters(&self) -> Value {
+        json!({"assistant_chunks": self.chunks, "tool_events": self.tools,
+               "permission_requests": self.permissions, "grants": self.granted})
+    }
+}
 
 pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
     if runtime.cancelled.is_cancelled() || tokio::time::Instant::now() >= runtime.deadline {
@@ -102,6 +109,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
             return Exit::Failed;
         }
     };
+    runtime.progress.note(json!({"launched": true}));
     let input = owned.child.stdin.take().unwrap();
     let output = owned.child.stdout.take().unwrap();
     let violation = Arc::new(Violation::default());
@@ -155,6 +163,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                         state.chunks += 1;
                         if state.chunks == 1 || state.chunks % 128 == 0 {
                             notification_progress.event(format!("assistant activity; chunks={}", state.chunks));
+                            notification_progress.emit("attempt.activity", state.counters());
                         }
                         if let Some(text) = value["update"]["content"]["text"].as_str() {
                             if state.text.len() + text.len() > 1_000_000 {
@@ -167,6 +176,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                         state.tools += 1;
                         if state.tools <= 16 || state.tools % 128 == 0 {
                             notification_progress.event(format!("tool activity; events={}", state.tools));
+                            notification_progress.emit("attempt.activity", state.counters());
                         }
                         let update = &value["update"];
                         let mut completed_kind = None;
@@ -294,6 +304,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                 state.permissions += 1;
                 if state.permissions <= 16 || state.permissions % 128 == 0 {
                     permission_progress.event(format!("headless permission response; requests={}; grants={}", state.permissions, state.granted));
+                    permission_progress.emit("attempt.activity", state.counters());
                 }
                 responder
                     .respond(RequestPermissionResponse::new(outcome))
@@ -404,12 +415,17 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
             // Session IDs are opaque backend data: JSON escaping and a length
             // bound plus non-ASCII escaping prevent terminal injection and
             // unbounded diagnostics (including C1 controls and bidi overrides).
-            foreground_progress.event(format!("session={}", serde_json::to_string(&session.session_id.to_string().chars().take(128).map(|c| if c.is_ascii() { c.to_string() } else { c.escape_unicode().to_string() }).collect::<String>()).unwrap()));
+            let escaped = session.session_id.to_string().chars().take(128).map(|c| if c.is_ascii() { c.to_string() } else { c.escape_unicode().to_string() }).collect::<String>();
+            foreground_progress.event(format!("session={}", serde_json::to_string(&escaped).unwrap()));
+            foreground_progress.note(json!({"session": escaped}));
+            foreground_progress.emit("attempt.session", json!({"session": escaped}));
             if runtime.cancelled.is_cancelled() || tokio::time::Instant::now() >= runtime.deadline {
                 return Err(agent_client_protocol::Error::internal_error());
             }
             sent.store(true, Ordering::SeqCst);
             foreground_progress.event("prompt submitted");
+            foreground_progress.note(json!({"prompt_submitted": true}));
+            foreground_progress.emit("attempt.prompt_submitted", json!({}));
             let response = cx
                 .send_request(PromptRequest::new(
                     session.session_id.clone(),
@@ -438,6 +454,13 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                 Some("cancelled") => "backend terminal=cancelled; project effects may remain",
                 _ => "backend terminal=failure (turn limit or refusal)",
             });
+            let backend_stop = match stop["stopReason"].as_str() {
+                Some("end_turn") => "end_turn",
+                Some("cancelled") => "cancelled",
+                _ => "other",
+            };
+            foreground_progress.note(json!({"backend_stop": backend_stop}));
+            foreground_progress.emit("attempt.backend_stop", json!({"backend_stop": backend_stop}));
             finished.store(match stop["stopReason"].as_str() {
                 Some("end_turn") => 1,
                 Some("cancelled") => 3,
@@ -462,6 +485,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
             _ = heartbeat.tick() => {
                 let state = observed.lock().unwrap();
                 runtime.progress.event(format!("active; chunks={}; tools={}; permissions={}", state.chunks, state.tools, state.permissions));
+                runtime.progress.emit("attempt.activity", state.counters());
             }
         }
     };
@@ -481,6 +505,15 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
             terminal.load(Ordering::SeqCst), violation.failed.load(Ordering::SeqCst),
             state.permissions, state.granted, state.tools, owned.stderr_bytes()
         ));
+        let summary = json!({
+            "cleanup_confirmed": cleanup,
+            "permission_requests": state.permissions,
+            "grants": state.granted,
+            "tool_events": state.tools,
+            "protocol_violation": violation.failed.load(Ordering::SeqCst),
+        });
+        runtime.progress.note(summary.clone());
+        runtime.progress.emit("attempt.cleanup", summary);
     }
     if !cleanup
         || (active.load(Ordering::SeqCst)
@@ -510,7 +543,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
         .progress
         .event("backend end_turn; cleanup confirmed; delivering response (2s output budget)");
     let text = std::mem::take(&mut observed.lock().unwrap().text);
-    if !crate::progress::response(text).await {
+    if !runtime.progress.deliver(text).await {
         runtime.progress.event(
             "final response delivery failed or blocked; backend completed, output may be partial",
         );

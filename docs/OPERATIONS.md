@@ -171,12 +171,31 @@ Errors explain what failed, which attempt/route was affected, whether tools may 
 | Binary not found | Show required runtime and install guidance; do not fetch executables automatically. |
 | LiteLLM unavailable/model missing | Show permitted endpoint/model and sanitized error; fix proxy/model config or explicitly choose another permitted mode. |
 | Native API key or model access rejected (cloud-only or local-first fallback) | Check the value exported under `native.api_key_env` and the account's access to `native.model`. The harness consumes no login store, so `/connect` or CLI login does not help; never inspect token stores. A rejection after prompt submission exits 4 even with 0 grants (P3.5). |
-| Provider failure after prompt submission (exit 4, 0 grants) | Seen for a bad key or a missing LiteLLM alias. The outcome is conservatively uncertain; confirm no project change, fix the key or alias, then start a new run. local-first never falls back after the reachability check passes. |
+| Provider failure after prompt submission (exit 4, 0 grants) | Seen for a bad key or a missing LiteLLM alias. The outcome is conservatively uncertain (R03-REC1 declined, D039); with `--output jsonl` the result shows `prompt_submitted: true`, `backend_stop: null`, `grants: 0`. Confirm no project change, fix the key or alias, then start a new run. local-first never falls back after the reachability check passes. |
 | local-first ran the native fallback unexpectedly | Progress shows `attempt=2`; the LiteLLM host could not be resolved or reached. A mistyped `api_base` host falls back too (D034); correct it or use `--mode local-only`. |
 | Permission request cannot be answered | Apply documented noninteractive policy and exit/report denial; do not open a hidden TUI. |
 | Managed config conflicts | Show a redacted preview and affected ownership; preserve user content. |
 | Stream disconnect/timeout after work | Report uncertain outcome and project inspection/recovery guidance; do not replay automatically. |
 | Workflow resume mismatch | Explain changed inputs/config/state and require an explicit phase-defined recovery choice. |
+
+### Headless and CI use (P4.7)
+
+Coding runs never prompt. Pass the prompt inline or with `--prompt-file PATH`; stdin is read only for `--prompt-file -`, so redirect it from `/dev/null` otherwise. Permission requests get the noninteractive `deny`/`trusted` policy, never a TTY prompt. Always set `--timeout-secs` and use `--output jsonl` for automation. stdout then carries only [version-1 records](EXECUTION.md#p47-machine-output-d039); keep stderr as a human log.
+
+```bash
+ah single --prompt-file task.txt --project . --timeout-secs 900 --output jsonl \
+  </dev/null >ah-records.jsonl 2>ah-diagnostics.log
+status=$?
+# The exit code is authoritative; the last record is the result when present.
+tail -n 1 ah-records.jsonl | jq -e 'select(.v == 1 and .type == "result") | .outcome'
+case $status in
+  0) echo "backend turn succeeded; run your own verification (tests are not implied)" ;;
+  4) echo "uncertain: inspect project changes before any manual rerun"; exit 1 ;;
+  *) exit "$status" ;;
+esac
+```
+
+Do not retry automatically on exit 1, 3 or 4: the harness never replays a submitted prompt, and a manual rerun is a new run that may repeat effects. Refuse records whose `v` is not 1. A missing result line (abrupt termination or blocked stdout) leaves only the exit code. `trusted` grants host file/shell access; reserve it for disposable CI checkouts.
 
 ## Project and data handling
 
@@ -188,7 +207,7 @@ Retain enough sanitized attempt and verification information to explain routing/
 
 ## Release and maintenance
 
-Follow the repository PR/Grok review workflow. Release documentation must list supported harness/runtime versions, platform constraints, schema/output changes and migration needs. Version machine output in Phase 4 and durable state in Phase 5, before persistence ships; do not silently reinterpret unknown future versions.
+Follow the repository PR/Grok review workflow. Release documentation must list supported harness/runtime versions, platform constraints, schema/output changes and migration needs. Machine output is versioned by D039 (`v` 1); version durable state in Phase 5, before persistence ships; do not silently reinterpret unknown future versions.
 
 Upgrades must preserve user-owned config and workflow evidence. Document recovery/downgrade limitations for incompatible state rather than imply every version is reversible. New adapters require their own tests/live evidence and capability documentation before being advertised as supported.
 

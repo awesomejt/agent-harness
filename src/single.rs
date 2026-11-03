@@ -6,7 +6,11 @@ use crate::{
 use std::ffi::OsString;
 
 pub fn run(args: Vec<OsString>) -> Exit {
-    let progress = crate::progress::Progress::new();
+    let progress = crate::progress::Progress::new(crate::config::machine_output(&args));
+    progress.emit(
+        "run.started",
+        serde_json::json!({"harness_version": env!("CARGO_PKG_VERSION")}),
+    );
     let exit = execute(args, &progress);
     progress.finish(exit)
 }
@@ -14,7 +18,10 @@ pub fn run(args: Vec<OsString>) -> Exit {
 fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
     let cwd = match std::env::current_dir() {
         Ok(cwd) => cwd,
-        Err(_) => return Exit::Invalid,
+        Err(_) => {
+            progress.reject("current directory is unavailable");
+            return Exit::Invalid;
+        }
     };
     let resolved: Result<_, crate::config::Invalid> = (|| {
         let invocation = Invocation::parse(args, &cwd)?;
@@ -31,6 +38,7 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
         Ok(request) => request,
         Err(error) => {
             progress.event(format!("{}; use --help", error.0));
+            progress.reason(error.0);
             if error.0 == crate::config::MISSING_KEY {
                 progress.event(
                     "set the environment variable named by the selected route api_key_env before retrying",
@@ -45,7 +53,7 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
         && !request.preview
         && let Err(error) = crate::opencode::supports(agent)
     {
-        progress.event(error.0);
+        progress.reject(error.0);
         return Exit::Invalid;
     }
     if request.preview {
@@ -64,7 +72,7 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
                 }
             }
             Err(error) => {
-                progress.event(error.0);
+                progress.reject(error.0);
                 Exit::Invalid
             }
         };
@@ -72,7 +80,7 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
     #[cfg(not(target_os = "macos"))]
     {
         let _ = request;
-        progress.event("coding runs currently support tested macOS only");
+        progress.reject("coding runs currently support tested macOS only");
         Exit::Invalid
     }
     #[cfg(target_os = "macos")]
@@ -82,7 +90,7 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
         let plan = match prepare_plan(&request) {
             Ok(plan) => plan,
             Err(error) => {
-                progress.event(error.0);
+                progress.reject(error.0);
                 return Exit::Invalid;
             }
         };
@@ -127,10 +135,12 @@ async fn coordinate(
     use crate::probe::Reachability;
     use crate::recovery::{Decision, Evidence, Failure, Submission};
     let first = progress.attempt(1);
+    first.start(describe(request, "local-first"));
     first.event(
         "local-first LiteLLM reachability check (TCP connect only; no request or credential sent)",
     );
     let Some(api_base) = request.api_base.as_deref() else {
+        progress.reject("local-first requires a LiteLLM endpoint");
         return Exit::Invalid;
     };
     let failure = match crate::probe::litellm(api_base, deadline, &cancelled).await {
@@ -199,6 +209,7 @@ async fn coordinate(
         "LiteLLM endpoint unreachable before submission; no runtime launched; no project changes",
     );
     progress.recovery("fallback=attempt 2 (native) after pre-submission LiteLLM transport failure; no further retry");
+    progress.fallback();
     progress
         .attempt(2)
         .event("fallback from attempt=1; fresh runtime state and grants; shared deadline");
@@ -225,6 +236,7 @@ async fn attempt(
     progress: &crate::progress::Progress,
 ) -> Exit {
     let progress = &progress.attempt(number);
+    progress.start(describe(request, label));
     let mut adapter =
         match crate::runtime::Runtime::new(request, deadline, cancelled, progress.clone()) {
             Ok(adapter) => adapter,
@@ -252,7 +264,7 @@ async fn attempt(
         if let Some(plan) = plan
             && let Err(error) = plan.apply()
         {
-            progress.event(error.0);
+            progress.reject(error.0);
             return Exit::Invalid;
         }
         tokio::task::yield_now().await;
@@ -288,7 +300,9 @@ async fn attempt(
         crate::acp::run(&adapter, request).await
     }
     .await;
-    if !adapter.cleanup_private_home().await {
+    let removed = adapter.cleanup_private_home().await;
+    progress.note(serde_json::json!({"runtime_state_removed": removed}));
+    if !removed {
         progress.event(
             "uncertain private runtime cleanup; inspect ah-runtime-* under the system temporary directory before manual removal",
         );
@@ -296,6 +310,31 @@ async fn attempt(
     } else {
         exit
     }
+}
+
+/// Public attempt description (D039); fixed harness names, never paths,
+/// endpoints, prompts or credential references.
+#[cfg(target_os = "macos")]
+fn describe(request: &crate::config::Resolved, label: &str) -> serde_json::Value {
+    serde_json::json!({
+        "route": label,
+        "runtime": "opencode",
+        "runtime_version": crate::opencode::VERSION,
+        "model": request.runtime_model(),
+        "group": request.group,
+        "permissions": match request.permissions {
+            crate::config::Permissions::Deny => "deny",
+            crate::config::Permissions::Trusted => "trusted",
+        },
+        "agent": request.agent.as_ref().map(|a| serde_json::json!({
+            "name": a.name(),
+            "capacity": match a.capacity() {
+                crate::agents::Capacity::Primary => "primary",
+                crate::agents::Capacity::Specialized => "specialized",
+                crate::agents::Capacity::Both => "both",
+            },
+        })),
+    })
 }
 
 fn prepare_plan(request: &crate::config::Resolved) -> Result<Option<Plan>, crate::config::Invalid> {

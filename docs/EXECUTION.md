@@ -1,6 +1,6 @@
 # Execution contract
 
-Status: design contract, not a published Rust API or wire schema. See [architecture](ARCHITECTURE.md), [configuration](CONFIGURATION.md), and [workflow state](WORKFLOWS.md). Phase 1 chooses transport/permission handling, Phase 2 fixes initial request/exit behavior, and Phase 4 versions machine-readable output.
+Status: design contract, not a published Rust API or wire schema. See [architecture](ARCHITECTURE.md), [configuration](CONFIGURATION.md), and [workflow state](WORKFLOWS.md). Phase 1 chooses transport/permission handling, Phase 2 fixes initial request/exit behavior, and Phase 4 versions machine-readable output ([D039](#p47-machine-output-d039)).
 
 ## Request resolution
 
@@ -22,7 +22,7 @@ Every invocation has a run identity; every launched attempt has its own identity
 
 Outcomes distinguish validation rejection, launch failure, runtime/provider failure, success, cancellation/deadline, and uncertain completion after an interrupted attempt. Include retry eligibility and possible side effects where known. Do not infer that absent tool events prove no tool executed after a transport failure.
 
-Human diagnostics go to stderr when stdout carries a final response or structured records. The Phase 4 machine contract must specify envelope version, IDs, timestamps/order, event types, optional provider fields, redaction, and a terminal record. Do not expose chain-of-thought as a required normalized field. Bound output buffering and document truncation rather than silently dropping completion or permission events.
+Human diagnostics go to stderr when stdout carries a final response or structured records. The Phase 4 machine contract must specify envelope version, IDs, timestamps/order, event types, optional provider fields, redaction, and a terminal record. Do not expose chain-of-thought as a required normalized field. Bound output buffering and document truncation rather than silently dropping completion or permission events. [D039](#p47-machine-output-d039) meets this with counted best-effort records whose cumulative permission/tool counters and backend stop are repeated in the always-last result record.
 
 D024 fixes numeric exits: 0 = successful backend turn plus confirmed cleanup; 1 = launch/runtime/provider/output failure with known outcome; 2 = rejected input/configuration/unsupported capability; 3 = cancellation/deadline with known terminal outcome and confirmed cleanup; 4 = uncertain completion or cleanup. Uncertainty overrides other outcomes, even after a backend success marker. Cancellation is known only with affirmative evidence of termination/effects; missing tool events do not prove it. A successful agent turn does not mean tests passed. These values are represented in the validation library; P2.2/P2.4 implement runtime classification. Uncertainty takes precedence when cancellation or timeout may have left side effects; report that uncertainty explicitly on stderr in Phase 2 rather than waiting for Phase 4 machine records. Later structured-output additions must preserve documented shell behavior.
 
@@ -116,3 +116,42 @@ Human diagnostics use a dedicated OS thread and nonblocking 64-entry queue, with
 D030 adds an explicit private HOME/XDG removal check after every prepared runtime path, including preflight failure and cancellation, before the invocation's final outcome. A separate OS worker performs recursive removal and verifies absence; the supervisor waits at most two seconds. If worker creation fails, removal is unattempted; there is no synchronous fallback because recursive filesystem I/O cannot be given the supervisor's wait bound. Worker failure, filesystem error, unconfirmed absence or timeout overrides the exit with 4 and a redacted warning that temporary state may remain. Process-group cleanup remains a separate check. A timed-out worker can continue until CLI process exit; no detached-writer containment or cleanup after abrupt termination is promised. Constructor failures retain best-effort removal before any coding work.
 
 The final assistant response may already have been delivered after backend success and confirmed process cleanup; later private-state removal failure still returns 4. Honor the final exit rather than inferring success from stdout. Inspect retained `ah-runtime-*` directories in the system temporary directory deliberately; never apply automatic cleanup to the selected project. The immutable published `v0.1.0-alpha.1` artifact retains its earlier best-effort private-state removal behavior; this correction is in source for the next packaged version.
+
+## P4.7 machine output (D039)
+
+`--output jsonl` selects version-1 machine records; `--output human` (the default) leaves every byte of human stdout/stderr unchanged. The exact adjacent pair `--output jsonl` selects machine mode before full validation, so rejected machine invocations still end in a result record. Other values reject with exit 2 in human mode. Preview is human-only: `--output jsonl --preview` rejects. Human stderr diagnostics are not a schema in either mode.
+
+stdout then carries only UTF-8 JSON Lines, one object per `\n`-terminated line, and never raw assistant text. Every record has this envelope:
+
+| Field | Meaning |
+|---|---|
+| `v` | Contract major version, `1`. Refuse any other value. |
+| `seq` | 0-based, strictly increasing in stdout order. A gap means dropped non-terminal records (see `records_dropped`). |
+| `run` | Opaque run identity, equal to stderr `run=`. |
+| `type` | Record type below. |
+| `ts_ms` | Wall-clock Unix milliseconds; can step. |
+| `elapsed_ms` | Monotonic milliseconds since invocation start. |
+| `attempt` | Attempt number, only on attempt-scoped records (`attempt.*`). |
+
+| `type` | Additional fields |
+|---|---|
+| `run.started` | `harness_version`. Always first (`seq` 0). |
+| `attempt.started` | `route` (`local-only`, `cloud-only`, `local-first`, `local-first fallback`), `runtime` (`opencode`), `runtime_version`, `model` (runtime model, such as `ah-litellm/ALIAS`), `group` (harness group or `null`), `permissions` (`deny`/`trusted`), `agent` (`{name, capacity}` or `null`). |
+| `attempt.session` | `session`: bounded escaped backend session ID. |
+| `attempt.prompt_submitted` | None; the submission boundary was crossed. |
+| `attempt.usage` | The usage object below. |
+| `attempt.activity` | Cumulative `assistant_chunks`, `tool_events`, `permission_requests`, `grants`. Sampled like human activity; also sent with the five-second heartbeat. |
+| `attempt.backend_stop` | `backend_stop`: `end_turn`, `cancelled` or `other` (other known terminal reasons). |
+| `attempt.cleanup` | `cleanup_confirmed`, `permission_requests`, `grants`, `tool_events`, `protocol_violation`. |
+| `fallback` | `from_attempt` 1, `to_attempt` 2, `reason` `litellm_unreachable_before_submission`. |
+| `result` | Terminal record below. Always last; exactly one. |
+
+The `result` record contains `outcome`, `exit`, `reason`, `response`, `attempts`, `fallback`, `recovery`, `diagnostics_omitted` and `records_dropped`. `outcome` is a closed v1 mapping of the D024 exits: 0 `succeeded`, 1 `failed`, 2 `rejected`, 3 `cancelled`, 4 `uncertain`. `reason` is the first static harness rejection text, or `null`; it is for people, not a stable code. `response` is the final assistant text only after backend `end_turn` and confirmed process cleanup. It can accompany `uncertain` if later private-state removal fails. Otherwise it is `null`. It is untrusted backend data. `attempts` is empty when the request never reached an attempt. Each entry has `attempt`, the `attempt.started` fields, `launched` (coding ACP child spawned), `session`, `prompt_submitted`, `backend_stop`, `cleanup_confirmed`, `permission_requests`, `grants`, `tool_events`, `protocol_violation`, `runtime_state_removed` and `usage`. Fields not yet observed are `null`. Counters are harness observations of protocol events, not proof that no tool ran.
+
+The usage object is `source` (`opencode-acp-usage-update` or `null`), `context_used_tokens`, `context_capacity_tokens`, `turn_tokens` and `session_cost` (`{amount, currency}` with an ISO-style uppercase three-letter code, or `null`). Every unreported or invalid metric is `null`, never zero. With OpenCode 2.2.5, `turn_tokens` is always `null`; context and cost are backend reports, not measured billing.
+
+A dedicated writer thread owns stdout behind a 256-record queue. Records are numbered under the queue lock. A full queue drops non-terminal records and counts them in `records_dropped`; activity counters are cumulative and repeated in the attempt summaries, so totals survive. The result is appended after every queued record within a **two-second** budget after the final outcome. If it is not fully written, success (exit 0) becomes 1 with a human diagnostic, and other exits are unchanged. After any failed write, nothing more is written, so a partial line can only be the last line. Consumers must check the exit code first. A missing, unterminated or unparsable result means the outcome is the exit code and effects are unknown. Abrupt process termination produces no result.
+
+Records never contain prompts, partial assistant text, reasoning, tool arguments, raw stderr, provider errors, paths, endpoints, environment names or key values. Compatibility within v1: new record types, new fields and new `route`/`backend_stop` values may appear; consumers ignore unknown types/fields and treat unknown values as unknown. Removing, renaming or retyping a field, changing a meaning or adding an `outcome` value requires `v` 2.
+
+R03-REC1 is declined (D039). A post-submission failure without a trustworthy terminal response stays exit 4, even with zero grants and zero completed tool calls; the result exposes `prompt_submitted`, `backend_stop: null`, `grants` and `tool_events` instead. Headless behavior is unchanged: stdin is read only for `--prompt-file -`, permission requests use the noninteractive policy, and there is no TTY prompt. See [Operations](OPERATIONS.md#headless-and-ci-use-p47) for CI usage.

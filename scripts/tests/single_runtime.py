@@ -111,6 +111,7 @@ def main():
     parser.add_argument('--binary',type=Path,default=ROOT/'target/debug/ah',help='Path to the ah binary to test')
     parser.add_argument('--timeout-secs',type=int,default=300)
     parser.add_argument('--group',help='select the proxy model group through this harness litellm.groups name (P3.3)')
+    parser.add_argument('--jsonl',action='store_true',help='use --output jsonl and check the version-1 result record (P4.7)')
     args=parser.parse_args()
     args.binary=args.binary.expanduser().resolve()
     if not args.binary.is_file() or not os.access(args.binary,os.X_OK):
@@ -130,7 +131,7 @@ def main():
         (cwd/'calc.py').write_text('def add(a, b):\n    return a - b\n')
         (cwd/'test_calc.py').write_text('from calc import add\nassert add(2, 3) == 5\nprint("PASS arithmetic")\n')
         prompt='Fix add in calc.py so it adds correctly. Read calc.py, edit it with the edit tool, then use the shell tool to run python3 test_calc.py and touch verified only if it passes. Do not change test_calc.py. Do not use subagents. Reply briefly.'
-        p=subprocess.Popen([str(args.binary),'single',prompt,'--project',str(cwd),'--permissions','trusted','--timeout-secs',str(args.timeout_secs)],
+        p=subprocess.Popen([str(args.binary),'single',prompt,'--project',str(cwd),'--permissions','trusted','--timeout-secs',str(args.timeout_secs)]+(['--output','jsonl'] if args.jsonl else []),
             env={**os.environ,'TEST_KEY':s.key},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
         if args.cancel:
             assert s.waiting.wait(60),'runtime did not reach post-edit/test cancellation point'
@@ -138,6 +139,17 @@ def main():
         stdout,stderr=p.communicate(timeout=args.timeout_secs+20)
         print('CLI exit:',p.returncode,'; stderr:',stderr.strip(),flush=True)
         print('Wire:',json.dumps(s.records),flush=True)
+        if args.jsonl:
+            records=[json.loads(line) for line in stdout.splitlines()]
+            result=records[-1]
+            assert all(r['v']==1 for r in records) and [r['seq'] for r in records]==list(range(len(records)))
+            assert result['type']=='result' and result['exit']==p.returncode, result
+            (attempt,)=result['attempts']
+            assert attempt['prompt_submitted'] and attempt['cleanup_confirmed'] and attempt['runtime_state_removed'], attempt
+            print('Machine records:',[r['type'] for r in records],'; result:',json.dumps({k:result[k] for k in ['outcome','exit','fallback']}),
+                  '; attempt:',json.dumps({k:attempt[k] for k in ['backend_stop','permission_requests','grants','tool_events','usage']}),flush=True)
+            if not args.refuse and not args.cancel:
+                assert result['outcome']=='succeeded' and isinstance(result['response'],str) and attempt['grants']>=3, result
         print('Observed project effects:',json.dumps(dict(edited='return a + b' in (cwd/'calc.py').read_text(), verified=(cwd/'verified').exists())),flush=True)
         if args.refuse:
             # 2.2.5 ends the turn with stopReason=cancelled after a rejected permission.

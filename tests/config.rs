@@ -893,3 +893,33 @@ fn local_first_requires_both_routes_and_both_keys_before_stdin() {
             .is_err()
     );
 }
+
+#[test]
+fn output_format_parses_and_machine_mode_is_detected_before_validation() {
+    use awesomejt_agent_harness::config::machine_output;
+    let parse = |args: &[&str]| {
+        Invocation::parse(args.iter().map(OsString::from), Path::new("."))
+            .err()
+            .map(|e| e.0)
+    };
+    assert_eq!(parse(&["single", "x", "--output", "human"]), None);
+    assert_eq!(parse(&["single", "x", "--output", "jsonl"]), None);
+    assert_eq!(
+        parse(&["single", "x", "--output", "json"]),
+        Some("unsupported output format")
+    );
+    assert_eq!(
+        parse(&["single", "x", "--output", "jsonl", "--preview"]),
+        Some("--output jsonl does not support --preview; preview is human-readable only")
+    );
+    assert_eq!(
+        parse(&["single", "x", "--output", "human", "--preview"]),
+        None
+    );
+    let scan = |args: &[&str]| machine_output(&args.iter().map(OsString::from).collect::<Vec<_>>());
+    assert!(scan(&["single", "--output", "jsonl"]));
+    assert!(scan(&["single", "x", "--bogus", "--output", "jsonl"]));
+    assert!(!scan(&["single", "x", "--output", "human"]));
+    assert!(!scan(&["single", "x", "--output"]));
+    assert!(!scan(&["single", "x", "jsonl", "--output"]));
+}

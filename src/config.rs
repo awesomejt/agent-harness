@@ -107,7 +107,15 @@ pub struct Invocation {
     timeout_secs: Option<u64>,
     no_sync: bool,
     preview: bool,
+    machine: bool,
     prompt: PromptSource,
+}
+
+/// Whether `--output jsonl` was requested, decided before full validation so
+/// that even a rejected invocation ends with a machine result record (D039).
+pub fn machine_output(args: &[OsString]) -> bool {
+    args.windows(2)
+        .any(|pair| pair[0] == "--output" && pair[1] == "jsonl")
 }
 
 enum PromptSource {
@@ -384,6 +392,7 @@ impl Invocation {
             timeout_secs: None,
             no_sync: false,
             preview: false,
+            machine: false,
             prompt: PromptSource::Stdin,
         };
         let mut prompt = None;
@@ -412,6 +421,7 @@ impl Invocation {
                         | "--permissions"
                         | "--timeout-secs"
                         | "--prompt-file"
+                        | "--output"
                 ) {
                     return Err(Invalid("unsupported option"));
                 }
@@ -447,6 +457,13 @@ impl Invocation {
                         validate_timeout(seconds)?;
                         request.timeout_secs = Some(seconds);
                     }
+                    "--output" => {
+                        request.machine = match value {
+                            "human" => false,
+                            "jsonl" => true,
+                            _ => return Err(Invalid("unsupported output format")),
+                        }
+                    }
                     "--prompt-file" => {
                         if prompt.is_some() {
                             return Err(Invalid("conflicting prompt sources"));
@@ -472,6 +489,11 @@ impl Invocation {
             }
         }
         request.prompt = prompt.ok_or(Invalid("provide inline prompt or --prompt-file PATH|-"))?;
+        if request.machine && request.preview {
+            return Err(Invalid(
+                "--output jsonl does not support --preview; preview is human-readable only",
+            ));
+        }
         Ok(request)
     }
 
