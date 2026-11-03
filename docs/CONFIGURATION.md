@@ -111,13 +111,16 @@ ah single "Review the change" --model group:review --preview
 ah single --prompt-file task.txt --project ./repo --config ./repo/ah.json
 cat task.txt | ah single --prompt-file -
 ah single "Review this project" --preview --no-sync
+ah single --prompt-file task.txt --output jsonl </dev/null   # P4.7 machine records
 ```
+
+`--output human|jsonl` (default `human`) selects the [machine record contract](EXECUTION.md#p47-machine-output-d039) for coding runs; it changes stdout only.
 
 Exactly one inline positional prompt or `--prompt-file PATH|-` is mandatory. Stdin is read only for explicit `--prompt-file -`; never choose stdin or an interactive session implicitly. Unknown options, repeated options, multiple sources and missing values reject. Options may appear before/after the positional prompt. No short aliases, equals syntax or `--` terminator in the initial parser; use a prompt file for leading-dash text. All arguments must be UTF-8. Preserve prompt whitespace but reject whitespace-only/empty content, invalid UTF-8 or more than 1 MiB. Prompt files must be regular files; stream input uses explicit stdin. Check config/project/key prerequisites before reading stdin. No model work or project writes may precede input validation. File/stdin I/O must stay cancellation-aware in the eventual application; the library reader enforces a byte bound, not a wall-clock deadline.
 
 `--timeout-secs N` is an integer from 1 through 86400, covering preflight and the active attempt after prompt acquisition. An expired bound enters cleanup; cleanup has separate finite budgets fixed/tested in P2.4. Input acquisition can be interrupted without launching work. No hidden retry or timeout extension. `--no-sync` skips managed writes, never effective-routing or permission validation.
 
-`--preview` resolves the same input and managed-change planner, prints a human-readable redacted plan, and exits before writes or child launch. It performs no network checks, remote registry updates, runtime discovery subprocesses or model requests. Show config path, choice sources, route/runtime/model, environment reference presence, permission scope, timeout and required managed changes; omit key values and prompt contents. Availability and capabilities that require runtime/service inspection must be marked unverified. Read-only local binary/version-file discovery is permitted. Preview success means a valid local plan, not readiness to execute. No machine schema is promised until Phase 4.
+`--preview` resolves the same input and managed-change planner, prints a human-readable redacted plan, and exits before writes or child launch. It performs no network checks, remote registry updates, runtime discovery subprocesses or model requests. Show config path, choice sources, route/runtime/model, environment reference presence, permission scope, timeout and required managed changes; omit key values and prompt contents. Availability and capabilities that require runtime/service inspection must be marked unverified. Read-only local binary/version-file discovery is permitted. Preview success means a valid local plan, not readiness to execute. Preview stays human-only; `--output jsonl --preview` rejects ([D039](../DECISIONS.md#2026-11-03--d039-opt-in-version-1-machine-records-with-unchanged-exits)).
 
 ### Headless permission profiles
 

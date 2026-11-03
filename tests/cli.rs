@@ -142,3 +142,82 @@ fn named_agent_preview_reports_mapping_and_unsupported_effort_refuses_without_wr
     assert_eq!(listing(), before);
     std::fs::remove_dir_all(project).unwrap();
 }
+
+/// D039: a machine consumer sees only version-1 records on stdout, ending in
+/// exactly one result record, even when the invocation is rejected.
+#[test]
+fn machine_output_rejections_end_in_one_result_record() {
+    let project = std::env::temp_dir().join(format!("ah-cli-machine-{}", std::process::id()));
+    std::fs::create_dir_all(&project).unwrap();
+    let project_arg = project.to_str().unwrap();
+    for (args, reason) in [
+        (
+            vec![
+                "single",
+                "Task",
+                "--project",
+                project_arg,
+                "--output",
+                "jsonl",
+            ],
+            "cannot open input file",
+        ),
+        (
+            vec!["single", "Task", "--output", "jsonl", "--preview"],
+            "--output jsonl does not support --preview; preview is human-readable only",
+        ),
+        (
+            vec!["single", "Task", "--output", "jsonl", "--output", "jsonl"],
+            "duplicate option",
+        ),
+        (
+            vec!["single", "--output", "jsonl"],
+            "provide inline prompt or --prompt-file PATH|-",
+        ),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_ah"))
+            .args(&args)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let records: Vec<serde_json::Value> = stdout
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert!(stdout.ends_with('\n'));
+        assert_eq!(records.len(), 2, "{stdout}");
+        assert_eq!(records[0]["type"], "run.started");
+        assert_eq!(records[0]["seq"], 0);
+        assert_eq!(records[0]["harness_version"], env!("CARGO_PKG_VERSION"));
+        let result = &records[1];
+        assert_eq!(result["v"], 1);
+        assert_eq!(result["seq"], 1);
+        assert_eq!(result["run"], records[0]["run"]);
+        assert_eq!(result["type"], "result");
+        assert_eq!(result["outcome"], "rejected");
+        assert_eq!(result["exit"], 2);
+        assert_eq!(result["reason"], reason, "{args:?}");
+        assert_eq!(result["response"], serde_json::Value::Null);
+        assert_eq!(result["attempts"], serde_json::json!([]));
+        assert_eq!(result["fallback"], false);
+        assert!(result.get("attempt").is_none());
+        // Diagnostics stay on stderr in the human format.
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.lines().all(|line| line.starts_with("ah: run=")));
+        assert!(stderr.contains(reason));
+    }
+    // An unsupported or absent value is not machine mode: human rejection only.
+    for args in [
+        vec!["single", "Task", "--output", "xml"],
+        vec!["single", "Task", "--output"],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_ah"))
+            .args(&args)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2));
+        assert!(output.stdout.is_empty(), "{args:?}");
+    }
+    std::fs::remove_dir_all(project).unwrap();
+}
