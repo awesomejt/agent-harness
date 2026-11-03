@@ -256,6 +256,11 @@ async fn attempt(
                 "preflight failed (requires OpenCode {} and exact isolated routing/permissions)",
                 crate::opencode::VERSION
             ));
+            if exit == Exit::Invalid {
+                progress.reason(
+                    "preflight failed: OpenCode version, isolated routing, permissions or agent did not match",
+                );
+            }
             return exit;
         }
         if tokio::time::Instant::now() >= adapter.deadline {

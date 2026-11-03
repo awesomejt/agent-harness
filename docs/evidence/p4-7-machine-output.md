@@ -82,7 +82,9 @@ attempt has the full key set and a null `turn_tokens`, stderr lines are all
 | Local-first, closed endpoint | 0 | Two attempts, `fallback` record, attempt 1 not launched, later records attempt 2 |
 | Human mode (default and explicit), `--output xml` | 0/2 | stdout exactly `OK`; invalid value human-only |
 
-Result: `PASS machine output fixtures` (15 runs).
+| Missing key reference | 2 | `reason` names the missing key reference |
+
+Result: `PASS machine output fixtures` (16 runs).
 
 Existing fake-runtime suites rerun unchanged against this build: `single.py`,
 `preview.py`, `modes.py` (165 cases), `native.py` (40 cases), `local_first.py`,
@@ -104,6 +106,16 @@ records:
 
 No live provider inference was needed: the contract covers harness output, and
 the installed runtime and real tool calls are exercised through the stub.
+
+## Review closeout
+
+Grok PR #37: 0 blockers, 1 concern, 1 nit. The concern was that runtime-phase
+exit 2 paths (missing runtime/key, preflight mismatch) left `reason` null. Fixed:
+each now sets a static reason, and fixtures assert it for preflight and a missing
+key. The nit was that `launched`/`prompt_submitted` default to `false` while the
+contract said unobserved fields are `null`. The contract now states that these
+harness-owned boundaries are `false` until crossed; the code is unchanged.
+Neither finding is critical/high, so no re-review is required.
 
 ## Boundaries
 

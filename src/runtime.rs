@@ -29,11 +29,15 @@ impl Runtime {
                 "OpenCode missing: install {} on an absolute PATH entry",
                 crate::opencode::VERSION
             ));
+            progress.reason("OpenCode missing on an absolute PATH entry");
             Exit::Invalid
         })?;
         let key = std::env::var_os(&request.api_key_env)
             .filter(|s| !s.is_empty())
-            .ok_or(Exit::Invalid)?;
+            .ok_or_else(|| {
+                progress.reject(crate::config::MISSING_KEY);
+                Exit::Invalid
+            })?;
         let home = PrivateHome::new().map_err(|_| Exit::Failed)?;
         let config = crate::opencode::config(request);
         let mut env: Vec<(OsString, OsString)> = vec![

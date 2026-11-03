@@ -151,6 +151,7 @@ records, result = run('text', 2, extra=['--output', 'jsonl'])
 assert result['reason'] == 'duplicate option' and result['attempts'] == [], result
 _, result = run('version', 2)
 assert result['attempts'][0]['launched'] is False and result['attempts'][0]['prompt_submitted'] is False, result
+assert result['reason'].startswith('preflight failed'), result
 
 # A blocked consumer cannot stall cleanup; undelivered success becomes exit 1.
 run('blocked-stdout', 1, read_stdout=False)
@@ -184,4 +185,8 @@ with tempfile.TemporaryDirectory(prefix='ah-machine-test-') as d:
     p = subprocess.run([str(BINARY), 'single', 'Task', '--project', str(base), '--output', 'xml'],
                        env=env, capture_output=True, text=True, timeout=30)
     assert p.returncode == 2 and p.stdout == '' and 'unsupported output format' in p.stderr, p
+# A runtime-phase rejection (missing key) also names its reason.
+records, result = run('text', 2, extra=[], cfg=dict(version=1, mode='local-only', model='fixture',
+    litellm=dict(api_base='http://127.0.0.1:9/v1', api_key_env='ABSENT_KEY')))
+assert result['reason'] == 'API key environment reference is missing or empty', result
 print('PASS machine output fixtures')

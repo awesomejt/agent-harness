@@ -203,6 +203,8 @@ impl Progress {
                 ] {
                     entry.insert(key.into(), Value::Null);
                 }
+                // The harness owns both boundaries, so they are known false
+                // until crossed, unlike backend observations.
                 entry.insert("launched".into(), json!(false));
                 entry.insert("prompt_submitted".into(), json!(false));
                 entry.insert("usage".into(), unknown_usage());
