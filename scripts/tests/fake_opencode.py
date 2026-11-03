@@ -12,6 +12,8 @@ cwd = Path.cwd()
 case = (cwd / 'case').read_text().strip()
 sid = 'test\u009b\u202e\n\x1b' if case=='session-controls' else 'test'
 config = json.loads(os.environ['OPENCODE_CONFIG_CONTENT'])
+if (cwd / 'track-runtime-home').exists():
+    (cwd / 'runtime-home').write_text(os.environ['HOME'])
 assert 'ANTHROPIC_API_KEY' not in os.environ
 assert os.environ['OPENCODE_DISABLE_PROJECT_CONFIG'] == 'true'
 assert os.environ['HOME'] != str(cwd)
@@ -42,6 +44,9 @@ if 'debug' in sys.argv:
         print(json.dumps(dict(name='build', permission=rules)))
     sys.exit()
 (cwd / 'launched').touch()
+if case == 'home-cleanup-failure':
+    (Path(os.environ['HOME']) / 'retained-state').write_text('runtime state')
+    os.chmod(os.environ['HOME'], 0)
 child = subprocess.Popen([sys.executable, '-c',
     'import signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); time.sleep(120)'],
     stdin=subprocess.DEVNULL, stdout=None if case=='held-pipes' else subprocess.DEVNULL, stderr=None if case=='held-pipes' else subprocess.DEVNULL)
@@ -72,7 +77,7 @@ for line in sys.stdin:
     elif method == 'session/prompt':
         prompt_id = m['id']
         (cwd / 'prompted').touch()
-        if case in ['deadline', 'interrupt','cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission']:
+        if case in ['deadline', 'interrupt','cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission','cancel-term']:
             continue
         if case == 'deny-progress':
             for status in ['in_progress','failed']:
@@ -134,7 +139,7 @@ for line in sys.stdin:
             reply(prompt_id, dict(stopReason='cancelled' if case == 'backend-cancelled' else 'end_turn'))
     elif method == 'session/cancel':
         (cwd / 'cancelled').touch()
-        if case in ['cancel-ack','cancel-deadline','cancel-success']:
+        if case in ['cancel-ack','cancel-deadline','cancel-success','cancel-term']:
             reply(prompt_id,dict(stopReason='end_turn' if case=='cancel-success' else 'cancelled'))
         elif case == 'cancel-permission':
             send(dict(jsonrpc='2.0',method='session/update',params=dict(sessionId=sid,update=dict(sessionUpdate='tool_call',toolCallId='tool-1',title='Tool',kind='read',rawInput=dict(filePath='/tmp/example'),status='pending'))))

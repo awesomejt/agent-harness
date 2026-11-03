@@ -88,18 +88,28 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
             Err(_) => return Exit::Failed,
         };
         runtime.block_on(async {
-            let adapter = match crate::runtime::Runtime::new(&request, &plan, deadline, progress.clone()) { Ok(adapter) => adapter, Err(exit) => return exit };
-            if let Err(exit) = crate::worktree::report(&request.project, deadline, progress).await { return exit; }
-            if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= deadline { return Exit::Cancelled; }
-            // Preflight consumes an isolated routing snapshot; no project code or
-            // plugins execute. Only then persist the already validated plan.
-            if let Err(exit) = adapter.preflight(&request, &plan).await { progress.event("preflight failed (requires OpenCode 1.18.30 and exact isolated routing/permissions)"); return exit; }
-            if tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
-            if let Err(error) = plan.apply() { progress.event(error.0); return Exit::Invalid; }
-            tokio::task::yield_now().await;
-            if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
-            progress.event(format!("attempt=1 local-only via OpenCode 1.18.30; model ah-litellm/{}; permissions {:?}", request.model, request.permissions));
-            crate::acp::run(&adapter, &request).await
+            let mut adapter = match crate::runtime::Runtime::new(&request, &plan, deadline, progress.clone()) { Ok(adapter) => adapter, Err(exit) => return exit };
+            let exit = async {
+                if let Err(exit) = crate::worktree::report(&request.project, deadline, progress).await { return exit; }
+                if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= deadline { return Exit::Cancelled; }
+                // Preflight consumes an isolated routing snapshot; no project code or
+                // plugins execute. Only then persist the already validated plan.
+                if let Err(exit) = adapter.preflight(&request, &plan).await { progress.event("preflight failed (requires OpenCode 1.18.30 and exact isolated routing/permissions)"); return exit; }
+                if tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
+                if let Err(error) = plan.apply() { progress.event(error.0); return Exit::Invalid; }
+                tokio::task::yield_now().await;
+                if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
+                progress.event(format!("attempt=1 local-only via OpenCode 1.18.30; model ah-litellm/{}; permissions {:?}", request.model, request.permissions));
+                crate::acp::run(&adapter, &request).await
+            }.await;
+            if !adapter.cleanup_private_home().await {
+                progress.event(
+                    "uncertain private runtime cleanup; inspect ah-runtime-* under the system temporary directory before manual removal",
+                );
+                Exit::Uncertain
+            } else {
+                exit
+            }
         })
     }
 }
