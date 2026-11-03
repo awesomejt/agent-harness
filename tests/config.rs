@@ -850,4 +850,38 @@ fn local_first_requires_both_routes_and_both_keys_before_stdin() {
             "local-first requires litellm and native configuration"
         ))
     );
+    // C03-01: `--model` can supply the local model only when the config's own
+    // mode is cloud-only; the own-mode local-first case above still rejects.
+    let switched = NATIVE.replace(
+        "\"version\":1",
+        "\"version\":1,\"litellm\":{\"api_base\":\"http://litellm:4000/v1\",\"api_key_env\":\"TEST_KEY\"}",
+    );
+    let r = invocation(&[
+        "single",
+        "task",
+        "--mode",
+        "local-first",
+        "--model",
+        "fixture",
+    ])
+    .resolve(
+        Config::read(switched.as_bytes()).unwrap(),
+        |_| Some("secret".into()),
+        NeverRead,
+    )
+    .unwrap();
+    assert_eq!(r.runtime_model(), "ah-litellm/fixture");
+    assert_eq!(
+        r.fallback.as_deref().unwrap().runtime_model(),
+        "opencode/gpt-5.4"
+    );
+    assert!(
+        invocation(&["single", "task", "--mode", "local-first"])
+            .resolve(
+                Config::read(switched.as_bytes()).unwrap(),
+                |_| Some("secret".into()),
+                NeverRead,
+            )
+            .is_err()
+    );
 }
