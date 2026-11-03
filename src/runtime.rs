@@ -255,6 +255,9 @@ impl Runtime {
                 let _ = send.send(result);
             });
         if worker.is_err() {
+            // No removal was attempted. Do not fall back to recursive I/O on
+            // the supervisor: it has no wall-clock bound. The caller reports
+            // uncertainty and directs the user to inspect retained state.
             return false;
         }
         matches!(
