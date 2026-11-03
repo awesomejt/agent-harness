@@ -105,6 +105,7 @@ def main():
     parser.add_argument('--key-env',default='LITELLM_API_KEY')
     parser.add_argument('--binary',type=Path,default=ROOT/'target/debug/ah',help='Path to the ah binary to test')
     parser.add_argument('--timeout-secs',type=int,default=300)
+    parser.add_argument('--group',help='select the proxy model group through this harness litellm.groups name (P3.3)')
     args=parser.parse_args()
     args.binary=args.binary.expanduser().resolve()
     if not args.binary.is_file() or not os.access(args.binary,os.X_OK):
@@ -114,8 +115,12 @@ def main():
         cwd=Path(d).resolve();s.cwd=cwd;s.outside=Path(outside).resolve()
         (s.outside/'outside.txt').write_text('OUTSIDE_READ_OK')
         subprocess.run(['git','init','-q',str(cwd)],check=True)
-        (cwd/'ah.json').write_text(json.dumps(dict(version=1,mode='local-only',model=s.alias,
-            litellm=dict(api_base=endpoint,api_key_env='TEST_KEY'))))
+        litellm=dict(api_base=endpoint,api_key_env='TEST_KEY')
+        if args.group:
+            # The wire model must stay the proxy group; the harness name never leaves ah.
+            litellm['groups']={args.group:s.alias,'unselected-group':'unselected-proxy-group'}
+        (cwd/'ah.json').write_text(json.dumps(dict(version=1,mode='local-only',
+            model='group:'+args.group if args.group else s.alias,litellm=litellm)))
         (cwd/'calc.py').write_text('def add(a, b):\n    return a - b\n')
         (cwd/'test_calc.py').write_text('from calc import add\nassert add(2, 3) == 5\nprint("PASS arithmetic")\n')
         prompt='Fix add in calc.py so it adds correctly. Read calc.py, edit it with the edit tool, then use bash to run python3 test_calc.py and touch verified only if it passes. Do not change test_calc.py. Do not use subagents. Reply briefly.'
@@ -129,11 +134,13 @@ def main():
         print('Wire:',json.dumps(s.records),flush=True)
         print('Observed project effects:',json.dumps(dict(edited='return a + b' in (cwd/'calc.py').read_text(), verified=(cwd/'verified').exists())),flush=True)
         assert p.returncode == (3 if args.cancel else 0) and not s.failed
+        assert not args.group or f'ah-litellm/{s.alias} (group {args.group})' in stderr
+        assert s.records and all(r['model'] == s.alias for r in s.records)
         assert 'return a + b' in (cwd/'calc.py').read_text()
         assert (cwd/'verified').exists()
         verify=subprocess.run(['python3','test_calc.py'],cwd=cwd,capture_output=True,text=True)
         assert verify.returncode == 0
-        print(('PASS confirmed cancellation after ' if args.cancel else 'PASS ')+ 'actual project edit and independent arithmetic test; '+('live LiteLLM' if args.live else 'local deterministic model stub'),flush=True)
+        print(('PASS confirmed cancellation after ' if args.cancel else 'PASS ')+ 'actual project edit and independent arithmetic test; '+('live LiteLLM' if args.live else 'local deterministic model stub')+(f'; harness group {args.group}' if args.group else ''),flush=True)
 
 
 if __name__=='__main__':

@@ -78,6 +78,7 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), Trap) as trap:
                     assert 'route: native OpenCode' in p.stdout
                     assert 'managed project config untouched' in p.stdout
                     assert 'planned changes: none' in p.stdout
+                    assert 'proxy handoff: not applicable (native route)' in p.stdout
                 if case == 'read':
                     result=json.loads((base/'permission-result.json').read_text())
                     assert result['result']['outcome']['optionId'] == 'once', result

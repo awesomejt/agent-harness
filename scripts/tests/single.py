@@ -15,7 +15,7 @@ BINARY = ROOT / 'target/debug/ah'
 FAKE = ROOT / 'scripts/tests/fake_opencode.py'
 
 
-def check(case, expected, trusted=False, source='inline'):
+def check(case, expected, trusted=False, source='inline', grouped=False):
     with tempfile.TemporaryDirectory(prefix='ah-single-test-') as d:
         base = Path(d).resolve()
         (base / 'opencode').symlink_to(FAKE)
@@ -24,8 +24,12 @@ def check(case, expected, trusted=False, source='inline'):
         for name in ['claude','codex','grok','gemini','pi']:
             (base/name).write_text('#!/bin/sh\ntouch cloud-native-launched\nexit 99\n')
             (base/name).chmod(0o755)
-        (base / 'ah.json').write_text(json.dumps(dict(version=1, mode='local-only',model='fixture',
-            litellm=dict(api_base='http://127.0.0.1:9/v1',api_key_env='TEST_KEY'))))
+        litellm=dict(api_base='http://127.0.0.1:9/v1',api_key_env='TEST_KEY')
+        if grouped:
+            # P3.3: the harness group resolves to the existing proxy group 'fixture'.
+            litellm['groups']=dict(coder='fixture',review='unused-review')
+        (base / 'ah.json').write_text(json.dumps(dict(version=1, mode='local-only',
+            model='group:coder' if grouped else 'fixture',litellm=litellm)))
         args = [str(BINARY),'single','--project',str(base),'--timeout-secs','4' if case in ['deadline','cancel-deadline'] else ('1' if case=='preflight-deadline' else '15')]
         if trusted:
             args += ['--permissions','trusted']
@@ -128,6 +132,7 @@ def check(case, expected, trusted=False, source='inline'):
             assert snapshots=={name:((base/name).read_bytes(),(base/name).stat().st_mtime_ns) for name in snapshots}
         if (base/'prompted').exists() and case != 'blocked-stderr':
             assert 'attempt=1' in err and 'usage=' in err and 'outcome=' in err, (case,err)
+            assert ('ah-litellm/fixture (group coder)' in err) == grouped, (case,err)
         if case in ['cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission','cancel-term']:
             assert (base/'cancelled').exists(),case
         if case == 'session-controls':
@@ -156,6 +161,8 @@ for source in ['inline','file','stdin']:
 for case in ['read','edit','execute','search','external','other','no-once','kind-mismatch','unbound','argument-mismatch','empty-metadata','omitted-metadata']:
     check(case,0,trusted=True)
 check('deny',0)
+check('success',0,grouped=True)
+check('read',0,trusted=True,grouped=True)
 check('deny-progress',4)
 for case in ['duplicate','empty-id','wrong-session','eof','oversized','deadline','interrupt','unexpected-write']:
     check(case,4,trusted=True)

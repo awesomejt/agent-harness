@@ -558,3 +558,195 @@ fn explicit_local_model_completes_a_native_config_mode_switch() {
     // flags do not repair malformed default configuration.
     assert!(Config::read(both.replace("cloud-only", "local-only").as_bytes()).is_err());
 }
+
+const GROUPED: &str = r#"{"version":1,"mode":"local-only","model":"group:coder","litellm":{"api_base":"http://litellm:4000/v1","api_key_env":"TEST_KEY","groups":{"coder":"proxy-coder","review":"proxy-review","spare":"proxy-coder"}}}"#;
+
+fn local_key(name: &str) -> Option<OsString> {
+    assert_eq!(name, "TEST_KEY");
+    Some("secret".into())
+}
+
+#[test]
+fn group_references_resolve_to_one_existing_proxy_group() {
+    let r = invocation(&["single", "task"])
+        .resolve(
+            Config::read(GROUPED.as_bytes()).unwrap(),
+            local_key,
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!(r.group.as_deref(), Some("coder"));
+    assert_eq!(r.model, "proxy-coder");
+    assert_eq!(r.runtime_model(), "ah-litellm/proxy-coder");
+    assert_eq!(r.sources.model, Source::Config);
+    // Handoff lists each distinct proxy group once, independent of selection.
+    assert_eq!(r.proxy_groups, ["proxy-coder", "proxy-review"]);
+
+    let r = invocation(&["single", "task", "--model", "group:review"])
+        .resolve(
+            Config::read(GROUPED.as_bytes()).unwrap(),
+            local_key,
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!(
+        (r.group.as_deref(), r.model.as_str()),
+        (Some("review"), "proxy-review")
+    );
+    assert_eq!(r.sources.model, Source::Invocation);
+
+    // A bare name is always a direct proxy model group, never a harness group.
+    let r = invocation(&["single", "task", "--model", "coder"])
+        .resolve(
+            Config::read(GROUPED.as_bytes()).unwrap(),
+            local_key,
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!((r.group.as_deref(), r.model.as_str()), (None, "coder"));
+
+    let r = invocation(&["single", "task"])
+        .resolve(config(), local_key, NeverRead)
+        .unwrap();
+    assert!(r.group.is_none() && r.proxy_groups.is_empty());
+}
+
+#[test]
+fn undefined_or_native_group_references_reject_before_key_lookup() {
+    for (args, input, expected) in [
+        (
+            vec!["single", "--prompt-file", "-", "--model", "group:missing"],
+            GROUPED.to_owned(),
+            "model group reference is not defined in litellm.groups",
+        ),
+        (
+            vec!["single", "--prompt-file", "-", "--model", "group:coder"],
+            VALID.to_owned(),
+            "model group reference is not defined in litellm.groups",
+        ),
+        (
+            vec!["single", "--prompt-file", "-", "--mode", "cloud-only", "--model", "group:coder"],
+            GROUPED.replace(
+                "\"version\":1",
+                "\"version\":1,\"native\":{\"target\":\"opencode\",\"model\":\"gpt-5.4\",\"api_key_env\":\"NATIVE_KEY\"}",
+            ),
+            "model groups apply only to the LiteLLM route",
+        ),
+    ] {
+        assert_eq!(
+            invocation(&args)
+                .resolve(
+                    Config::read(input.as_bytes()).unwrap(),
+                    |_| panic!("group validation precedes key lookup"),
+                    NeverRead,
+                )
+                .err(),
+            Some(Invalid(expected))
+        );
+    }
+    for value in [
+        "group:",
+        "group:a/b",
+        "Group:coder",
+        "group:group:coder",
+        "litellm:coder",
+    ] {
+        assert!(
+            Invocation::parse(
+                ["single", "task", "--model", value].map(OsString::from),
+                Path::new("/")
+            )
+            .is_err(),
+            "{value}"
+        );
+    }
+}
+
+#[test]
+fn native_route_ignores_local_group_default() {
+    let both = GROUPED.replace("local-only", "cloud-only").replace(
+        "\"version\":1",
+        "\"version\":1,\"native\":{\"target\":\"opencode\",\"model\":\"gpt-5.4\",\"api_key_env\":\"NATIVE_KEY\"}",
+    );
+    let r = invocation(&["single", "task"])
+        .resolve(
+            Config::read(both.as_bytes()).unwrap(),
+            |name| {
+                assert_eq!(name, "NATIVE_KEY");
+                Some("secret".into())
+            },
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!(r.runtime_model(), "opencode/gpt-5.4");
+    assert!(r.group.is_none() && r.proxy_groups.is_empty());
+    // A mode override back to LiteLLM uses the configured group default.
+    let local = invocation(&["single", "task", "--mode", "local-only"])
+        .resolve(Config::read(both.as_bytes()).unwrap(), local_key, NeverRead)
+        .unwrap();
+    assert_eq!(local.runtime_model(), "ah-litellm/proxy-coder");
+}
+
+#[test]
+fn group_schema_rejects_duplicates_bounds_and_unresolved_defaults() {
+    let groups =
+        r#""groups":{"coder":"proxy-coder","review":"proxy-review","spare":"proxy-coder"}"#;
+    let many = (0..65)
+        .map(|i| format!("\"g{i}\":\"proxy\""))
+        .collect::<Vec<_>>()
+        .join(",");
+    for (input, expected) in [
+        (
+            GROUPED.replace(r#""review":"proxy-review""#, r#""coder":"proxy-review""#),
+            Some("invalid config: expected strict version-1 JSON schema"),
+        ),
+        (
+            GROUPED.replace(groups, r#""groups":{}"#),
+            Some("litellm.groups requires 1–64 entries"),
+        ),
+        (
+            GROUPED.replace(groups, &format!("\"groups\":{{{many}}}")),
+            Some("litellm.groups requires 1–64 entries"),
+        ),
+        (GROUPED.replace(groups, r#""groups":null"#), None),
+        (GROUPED.replace(groups, r#""groups":["proxy-coder"]"#), None),
+        (
+            GROUPED.replace("\"proxy-review\"", "{\"model\":\"proxy-review\"}"),
+            None,
+        ),
+        (
+            GROUPED.replace("\"proxy-review\"", "\"provider/model\""),
+            None,
+        ),
+        (GROUPED.replace("\"proxy-review\"", "\"group:coder\""), None),
+        (GROUPED.replace("\"review\"", "\"bad name\""), None),
+        (GROUPED.replace("\"review\"", "\"\""), None),
+        (
+            GROUPED.replace("group:coder", "group:missing"),
+            Some("model group reference is not defined in litellm.groups"),
+        ),
+        (
+            GROUPED.replace(groups, "\"x\":1").replace(",\"x\":1", ""),
+            Some("model group reference is not defined in litellm.groups"),
+        ),
+        (
+            NATIVE.replace("\"version\":1", "\"version\":1,\"model\":\"group:coder\""),
+            Some("model group reference is not defined in litellm.groups"),
+        ),
+    ] {
+        let result = Config::read(input.as_bytes());
+        assert!(result.is_err(), "{input}");
+        if let Some(expected) = expected {
+            assert_eq!(result.err(), Some(Invalid(expected)), "{input}");
+        }
+    }
+    // A native config may hold an inactive valid group default for --mode local-only.
+    assert!(
+        Config::read(
+            NATIVE
+                .replace("\"version\":1", "\"version\":1,\"model\":\"group:coder\",\"litellm\":{\"api_base\":\"http://litellm:4000/v1\",\"api_key_env\":\"TEST_KEY\",\"groups\":{\"coder\":\"proxy-coder\"}}")
+                .as_bytes()
+        )
+        .is_ok()
+    );
+}

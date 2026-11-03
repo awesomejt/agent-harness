@@ -99,7 +99,7 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
                 if let Some(plan) = plan && let Err(error) = plan.apply() { progress.event(error.0); return Exit::Invalid; }
                 tokio::task::yield_now().await;
                 if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
-                progress.event(format!("attempt=1 {} via OpenCode 1.18.30; model {}; permissions {:?}", if request.mode == Mode::LocalOnly { "local-only" } else { "cloud-only" }, request.runtime_model(), request.permissions));
+                progress.event(format!("attempt=1 {} via OpenCode 1.18.30; model {}{}; permissions {:?}", if request.mode == Mode::LocalOnly { "local-only" } else { "cloud-only" }, request.runtime_model(), request.group.as_ref().map(|g| format!(" (group {g})")).unwrap_or_default(), request.permissions));
                 crate::acp::run(&adapter, &request).await
             }.await;
             if !adapter.cleanup_private_home().await {

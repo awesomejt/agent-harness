@@ -19,7 +19,7 @@ flowchart LR
 
 The LiteLLM and native arrows represent alternative model routes selected by policy, not permission for simultaneous unrestricted traffic. The same runtime executable may serve either route. `ah` controls supported runtime configuration and permissions; it is not an OS/network sandbox for arbitrary project commands. Native credentials stay in official tools. LiteLLM environment references are passed through supported configuration without serializing literal keys.
 
-The harness owns endpoint/group selection and desired routing policy; the existing proxy executes its internal routing. The first slice references an already configured alias. Proxy-service installation, restarts and automatic live reconfiguration are not implied. Phase 3 specifies model-group representation, validation and any config handoff before claiming synchronization with proxy internals.
+The harness owns endpoint/group selection and desired routing policy; the existing proxy executes its internal routing. The first slice references an already configured alias. Proxy-service installation, restarts and automatic live reconfiguration are not implied. P3.3 ([D033](../DECISIONS.md#2026-11-02--d033-harness-model-groups-as-explicit-single-proxy-group-references)) adds harness group names that each resolve to one existing proxy model group, with a read-only preview handoff of required proxy groups; the harness does not synchronize or reconfigure proxy internals.
 
 ## Software components
 
