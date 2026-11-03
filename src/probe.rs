@@ -38,6 +38,9 @@ pub(crate) async fn litellm(
     let worker = std::thread::Builder::new()
         .name("ah-litellm-probe".into())
         .spawn(move || {
+            // The system resolver has no timeout. A hung lookup is reported as
+            // Unreachable at the budget; this detached thread may then linger in
+            // getaddrinfo during the fallback attempt until the process exits.
             let addresses: Vec<SocketAddr> = match &host {
                 url::Host::Domain(name) => match (name.as_str(), port).to_socket_addrs() {
                     Ok(found) => found.collect(),
@@ -67,8 +70,7 @@ pub(crate) async fn litellm(
 }
 
 fn connect(addresses: &[SocketAddr], limit: std::time::Instant) -> Reachability {
-    use std::io::ErrorKind::*;
-    let mut result = Reachability::Unreachable;
+    let mut errors = Vec::new();
     for address in addresses {
         let Some(left) = limit
             .checked_duration_since(std::time::Instant::now())
@@ -79,20 +81,35 @@ fn connect(addresses: &[SocketAddr], limit: std::time::Instant) -> Reachability 
         match TcpStream::connect_timeout(address, left) {
             // Dropped immediately: no request bytes are written.
             Ok(_) => return Reachability::Reachable,
-            Err(e)
-                if matches!(
-                    e.kind(),
-                    ConnectionRefused | HostUnreachable | NetworkUnreachable | TimedOut
-                ) => {}
-            Err(_) => result = Reachability::Unknown,
+            Err(e) => errors.push(e.kind()),
         }
     }
-    result
+    verdict(&errors)
+}
+
+/// No address connected. Any confirmed transport failure is eligible evidence;
+/// an odd error elsewhere does not show the endpoint is reachable. Only when no
+/// attempted address produced a transport verdict is the outcome unknown.
+/// No addresses (resolution failure) or no attempt within budget is unreachable.
+fn verdict(errors: &[std::io::ErrorKind]) -> Reachability {
+    use std::io::ErrorKind::*;
+    if errors.is_empty()
+        || errors.iter().any(|kind| {
+            matches!(
+                kind,
+                ConnectionRefused | HostUnreachable | NetworkUnreachable | TimedOut
+            )
+        })
+    {
+        Reachability::Unreachable
+    } else {
+        Reachability::Unknown
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Reachability, litellm};
+    use super::{Reachability, litellm, verdict};
     use std::time::Duration;
     use tokio::time::Instant;
 
@@ -132,6 +149,24 @@ mod tests {
         assert_eq!(
             check("http://ah-unresolvable.invalid:4000/v1").await,
             Reachability::Unreachable
+        );
+    }
+
+    #[test]
+    fn any_confirmed_transport_failure_outweighs_other_address_errors() {
+        use std::io::ErrorKind::*;
+        assert_eq!(verdict(&[]), Reachability::Unreachable);
+        assert_eq!(
+            verdict(&[AddrNotAvailable, ConnectionRefused]),
+            Reachability::Unreachable
+        );
+        assert_eq!(
+            verdict(&[TimedOut, PermissionDenied]),
+            Reachability::Unreachable
+        );
+        assert_eq!(
+            verdict(&[PermissionDenied, AddrNotAvailable]),
+            Reachability::Unknown
         );
     }
 

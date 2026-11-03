@@ -145,6 +145,14 @@ async fn coordinate(
         Reachability::Stopped if cancelled.is_cancelled() => Failure::Cancelled,
         Reachability::Stopped => Failure::Deadline,
     };
+    // Cancellation or deadline arriving after classification still takes
+    // precedence (D031), for both the decision and the exit code.
+    let stopped = cancelled.is_cancelled() || tokio::time::Instant::now() >= deadline;
+    let failure = match failure {
+        _ if cancelled.is_cancelled() => Failure::Cancelled,
+        _ if stopped => Failure::Deadline,
+        failure => failure,
+    };
     let decision = crate::recovery::decide(&Evidence {
         mode: crate::recovery::Mode::LocalFirst,
         failure,
@@ -152,7 +160,7 @@ async fn coordinate(
         // resource awaits cleanup; no project write has occurred.
         submission: Submission::NotAttempted,
         cleanup_confirmed: true,
-        cancelled_or_expired: cancelled.is_cancelled() || tokio::time::Instant::now() >= deadline,
+        cancelled_or_expired: stopped,
         // Static target validation and key presence precede launch; attempt 2
         // still runs the full native preflight before any prompt.
         configured_target_validated: native.mode == Mode::CloudOnly && native.fallback.is_none(),
