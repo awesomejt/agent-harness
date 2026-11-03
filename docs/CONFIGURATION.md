@@ -1,6 +1,6 @@
 # Configuration and agent contract
 
-Status: P2.1 fixes the first-slice input contract below and implements library validation. P2.2 exposes `ah single` on tested macOS; P3.7 moves the runtime pin to OpenCode 2.2.5 (D035). P2.3 owns managed OpenCode configuration and effective-route validation; P2.7 exposes read-only `ah single ... --preview` diagnostics. P3.2 adds isolated native OpenCode cloud-only execution (D032); P3.3 adds LiteLLM model-group references and the read-only proxy handoff (D033) and the configured local-first fallback (D034); P3.7 moves both routes to OpenCode 2.2.5. Phase 3 acceptance is the P3.6 review; Phase 4 fixes canonical agents.
+Status: P2.1 fixes the first-slice input contract below and implements library validation. P2.2 exposes `ah single` on tested macOS; P3.7 moves the runtime pin to OpenCode 2.2.5 (D035). P2.3 owns managed OpenCode configuration and effective-route validation; P2.7 exposes read-only `ah single ... --preview` diagnostics. P3.2 adds isolated native OpenCode cloud-only execution (D032); P3.3 adds LiteLLM model-group references and the read-only proxy handoff (D033) and the configured local-first fallback (D034); P3.7 moves both routes to OpenCode 2.2.5. Phase 3 passed P3.6. P4.1 fixes the canonical schema below; P4.2/P4.3 own emission, selection and enforced execution.
 
 ## Version 1 first-slice configuration (D024)
 
@@ -171,9 +171,33 @@ When versioning managed configuration, commit `opencode.json` and `.ah-opencode-
 
 ## Canonical agents
 
-Markdown body plus YAML frontmatter is canonical. Names map deterministically to backend definitions. The full schema must cover description, primary/specialized applicability, model alias, supported effort, tools and permissions before Phase 4. Exact field names, validation library and output destinations remain deferred.
+D036 fixes version 1. `agents/NAME.md` is the canonical project source. P4.1 supplies a library parser and examples; `ah single` does not discover or execute these files yet. P4.2 adds name-based emission/selection; P4.3 adds capability checks and enforced constraints.
 
-Name validation must prevent path traversal and ambiguous output names. Validate YAML structures, duplicate names/keys, collisions with user-owned definitions and unsupported restrictions. Preview output and mapping diagnostics before applying. Fixtures compare emitted content and permissions against tested backend versions.
+```yaml
+---
+version: 1
+name: reviewer
+description: Review a change for correctness and regressions.
+capacity: specialized
+permissions: read-only
+tools: [read, search]
+---
+Inspect the change and report concrete defects. Do not edit or run commands.
+```
+
+Required fields are `version`, `name`, `description`, `capacity`, `permissions` and `tools`. Unknown/duplicate fields, invalid types and unknown enum values reject. Explicit null rejects, including optional fields. Names use 1–64 ASCII lowercase letters/digits with single internal hyphens, begin with a letter and match the filename exactly. No dot, slash, backslash, underscore, case folding, traversal or hidden name. OpenCode built-ins `build`, `plan`, `general`, `explore`, `compaction`, `title` and `summary` are reserved; backend conflicts beyond this set remain a P4.2 check. A catalog has at most 64 unique names, sorted by name; duplicate definitions never override.
+
+`description` is 1–512 UTF-8 bytes, single-line and trimmed, without controls or Unicode line/paragraph separators (U+2028/U+2029). `capacity` is `primary`, `specialized` or `both`; specialized means a separate harness-invoked role, not permission to create backend subagents. `tools` is an explicit, duplicate-free list from `read`, `search`, `edit`, `execute`; an empty list is valid. These are harness capabilities, not arbitrary backend tool names. `permissions` is a ceiling: `deny` requires no tools, `read-only` permits only read/search, and `trusted` permits any of the four. The future runtime mapping must intersect this ceiling and list with invocation authorization; project metadata cannot grant host trust. Shell/execute cannot satisfy read-only, even for a command described as a test. No path globs, auto-allow or prompt-only restrictions are accepted.
+
+Optional `models` has only `local` and/or `native`, at least one present. For example `models: {local: 'group:code', native: gpt-5.4}`. Each is a string scalar: local uses the existing LiteLLM alias or `group:NAME` grammar; native uses the existing unprefixed model identifier grammar. No endpoints, keys, provider prefixes or native group references. An omitted route inherits its resolved invocation/config model. Group existence and active-route compatibility are checked when resolving selection in P4.2/P4.3, not by this standalone parser. Fallback must resolve its own native model under the same agent restrictions and may never broaden them. Precedence relative to an explicit `--model` is finalized with selection in P4.2.
+
+Optional `effort` is `default` (also the omission default), `low`, `medium`, `high` or `max`. Non-default values are required capabilities, not a tested mapping or approximation. P4.3 must refuse unsupported runtime/model combinations before model work. The parser does not claim that OpenCode can enforce every syntactically valid definition.
+
+Files are UTF-8, at most 1 MiB, with an exact opening `---` line and closing `---` line. LF and CRLF delimiters are accepted; BOM, missing delimiters, whitespace-only bodies and body controls other than tab/CR/LF reject. Frontmatter is at most 16 KiB, parsed as one YAML mapping by pinned `serde_yaml_ng` 0.10.0. A bounded value pass rejects custom tags, then direct strict-struct decoding retains duplicate-field rejection. String fields must be YAML strings, with no null/number/boolean coercion; quote numeric-only model names. YAML merge keys and custom tags are unsupported. Ordinary string anchors/aliases may resolve within the mapping; unresolved/recursive/type-incompatible aliases reject. Body text is preserved exactly, including trailing newline. File loading requires a regular file, rejects parent traversal and a final symlink, and uses nonblocking/no-follow Unix opening. Parent-directory containment and transaction races belong to the P4.2 project planner; the parser is not a filesystem sandbox. Errors contain only static messages, with no file content, raw YAML diagnostics or private paths.
+
+**OpenCode destinations (tested 2.2.5).** Project emission is `.opencode/agents/NAME.md`, with native frontmatter and the Markdown body as `system`. Canonical frontmatter must be translated, never copied unchanged: OpenCode does not understand harness version, capacity, tools or permission ceilings. Map capacity `primary`/`specialized`/`both` to native `mode: primary`/`subagent`/`all`. Native `description`, structured `model: {providerID, model}` and ordered `permissions` use their 2.x fields. Isolated harness execution uses a generated `agents.NAME` entry in `OPENCODE_CONFIG_CONTENT`, with body as `system`, rather than enabling project-config discovery or loading the emitted file. Existing source/agent checks must extend to the selected definition before execution in P4.3; this task does not change the current `build` check. No global agent destination, other provider format, backend delegation or non-default effort mapping is guaranteed. The [destination probe](../scripts/tests/agents_runtime.py) verifies both destinations and three modes with no model prompt; [P4.1 evidence](evidence/p4-1-agent-schema.md) records limits.
+
+P4.1 implements the validation rules above. P4.2 must add conflict-aware project emission, user-owned name-collision refusal, deterministic mapping fixtures and read-only destination/constraint preview. P4.3 must add runtime capability checks and enforced constraints before named execution.
 
 No backend is assumed to have the same subagent semantics or tools. Include a capability/mapping report and refuse unsupported required restrictions. Skills/instruction loading and MCP registration remain backend-owned; mapping an agent into a skill does not prove equivalent permissions.
 

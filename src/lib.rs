@@ -4,6 +4,7 @@ use std::ffi::OsString;
 
 #[cfg(target_os = "macos")]
 mod acp;
+pub mod agents;
 pub mod config;
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod opencode;
