@@ -152,6 +152,13 @@ fn route_models_are_explicit_and_never_provider_urls() {
 
 #[test]
 fn bounded_input_and_redacted_errors() {
+    for separator in ["\\u2028", "\\u2029"] {
+        reject(&REVIEWER.replace(
+            "description: Review a change for correctness and regressions.",
+            &format!("description: \"line{separator}break\""),
+        ));
+    }
+
     assert!(Agent::read(Cursor::new(vec![b'a'; MAX_INPUT_BYTES as usize + 1])).is_err());
     assert!(Agent::read(&b"\xff"[..]).is_err());
     reject(&format!("---\n#{}\n{}", "a".repeat(16_384), &REVIEWER[4..]));

@@ -254,7 +254,9 @@ fn validate_header(h: &Header) -> Result<()> {
     if h.description.is_empty()
         || h.description.len() > 512
         || h.description.trim() != h.description
-        || h.description.chars().any(char::is_control)
+        || h.description
+            .chars()
+            .any(|c| c.is_control() || matches!(c, '\u{2028}' | '\u{2029}'))
     {
         return Err(Invalid(
             "agent description must be 1–512 bytes of single-line text",

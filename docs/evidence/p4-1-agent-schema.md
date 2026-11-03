@@ -87,3 +87,14 @@ unchanged; this task adds no live provider call or wider platform claim.
 Next: P4.2 — name-based native emission, ownership/collision handling,
 read-only preview, model precedence and `--agent` selection. P4.3/P4.4 retain
 effective role enforcement and live prohibited-operation acceptance.
+
+## PR review closeout
+
+[Grok PR #34 review](https://github.com/awesomejt/agent-harness/pull/34#pullrequestreview-5749150719):
+0 blockers, 1 documentation concern and 1 nit. Both addressed: the old generic
+agent backlog paragraph now explicitly assigns emission/preview/collisions to
+P4.2 and capability enforcement to P4.3; descriptions also reject Unicode
+U+2028/U+2029, with escaped-YAML regression fixtures. Format, locked Clippy,
+all 65 root tests and locked release build pass after the fixes. No critical/high
+finding or mandatory re-review. One automated first-pass review posted; an
+explicit request was made while it was pending, with no additional requests.
