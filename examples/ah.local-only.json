@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "mode": "local-only",
+  "model": "your-existing-alias",
+  "litellm": {
+    "api_base": "http://your-proxy:4000/v1",
+    "api_key_env": "LITELLM_API_KEY"
+  },
+  "permissions": "deny",
+  "timeout_secs": 1800
+}

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "mode": "cloud-only",
+  "native": {
+    "target": "opencode",
+    "model": "your-catalog-model",
+    "api_key_env": "OPENCODE_API_KEY"
+  },
+  "permissions": "deny",
+  "timeout_secs": 1800
+}

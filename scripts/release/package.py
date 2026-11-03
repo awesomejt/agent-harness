@@ -106,6 +106,18 @@ def build_package(output_directory, version, commit, build_directory):
         for source, target in [('LICENSE', 'LICENSE'), ('docs/OPERATIONS.md', 'INSTALL.md'),
                                ('scripts/release/NOTICES.md', 'THIRD_PARTY_NOTICES.md')]:
             shutil.copy2(ROOT / source, bundle / target)
+        # Sample configs and canonical agents, validated by tests and the archive smoke.
+        examples = bundle / 'examples'
+        (examples / 'agents').mkdir(parents=True)
+        configs = {f'ah.{mode}.json' for mode in ('local-only', 'cloud-only', 'local-first')}
+        agents = {'coder.md', 'reviewer.md'}
+        if ({p.name for p in (ROOT / 'examples').iterdir()} != configs
+                or {p.name for p in (ROOT / 'agents').iterdir()} != agents):
+            raise RuntimeError('examples/ or agents/ differs from the reviewed sample set')
+        for name_ in sorted(configs):
+            shutil.copy2(ROOT / 'examples' / name_, examples / name_)
+        for name_ in sorted(agents):
+            shutil.copy2(ROOT / 'agents' / name_, examples / 'agents' / name_)
         install = bundle / 'INSTALL.md'
         def repository_link(match):
             target = match.group(2)
