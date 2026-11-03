@@ -11,6 +11,7 @@ mod preview;
 mod process;
 mod progress;
 pub mod project_config;
+pub mod recovery;
 #[cfg(target_os = "macos")]
 mod runtime;
 pub mod single;
