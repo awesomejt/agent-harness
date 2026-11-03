@@ -986,11 +986,30 @@ fn project_instructions_are_only_a_regular_root_agents_file_inside_the_project()
 #[test]
 fn packaged_example_configs_validate() {
     let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples");
-    for file in [
-        "ah.local-only.json",
-        "ah.cloud-only.json",
-        "ah.local-first.json",
+    let mut files: Vec<_> = std::fs::read_dir(&examples)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    files.sort();
+    assert_eq!(
+        files,
+        [
+            "ah.cloud-only.json",
+            "ah.local-first.json",
+            "ah.local-only.json"
+        ]
+    );
+    for (file, mode, litellm, native) in [
+        ("ah.local-only.json", "local-only", true, false),
+        ("ah.cloud-only.json", "cloud-only", false, true),
+        ("ah.local-first.json", "local-first", true, true),
     ] {
-        assert!(Config::open(&examples.join(file)).is_ok(), "{file}");
+        let path = examples.join(file);
+        assert!(Config::open(&path).is_ok(), "{file}");
+        let value: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(value["mode"], mode, "{file}");
+        assert_eq!(value.get("litellm").is_some(), litellm, "{file}");
+        assert_eq!(value.get("native").is_some(), native, "{file}");
     }
 }
