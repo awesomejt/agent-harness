@@ -19,6 +19,10 @@ if (cwd / 'track-runtime-home').exists():
 assert 'ANTHROPIC_API_KEY' not in os.environ
 assert os.environ['OPENCODE_DISABLE_PROJECT_CONFIG'] == 'true'
 assert os.environ['HOME'] != str(cwd)
+if (cwd / 'track-config').exists():
+    # P3.4 matrix: record each invocation's effective inputs for route assertions.
+    with open(cwd / 'runtime-config.jsonl', 'a') as record:
+        record.write(json.dumps(dict(args=sys.argv[1:], env=sorted(os.environ), config=config)) + '\n')
 native = config['enabled_providers'] == ['opencode']
 if native:
     assert config['provider'] == {}
@@ -49,6 +53,16 @@ if 'debug' in sys.argv:
             config['enabled_providers'].append('ah-litellm')
         if case == 'native-agent':
             config['agent']['rogue'] = dict(model='ah-litellm/fixture')
+        # Inherited helper/subagent/provider choices, identical for both routes.
+        if case == 'inherit-agent':
+            config['agent']['helper'] = dict(model='other/fixture')
+        if case == 'inherit-subagent':
+            config['agent']['explore'] = dict(mode='subagent', model=config['model'])
+        if case == 'inherit-mode':
+            config['mode']['plan'] = dict(model='other/fixture')
+        if case == 'inherit-provider':
+            config['provider']['other'] = dict(options=dict(baseURL='http://127.0.0.1:9/v1'))
+            config['enabled_providers'].append('other')
         if case == 'widened':
             config['permission']['task'] = 'allow'
         print(json.dumps(config))
