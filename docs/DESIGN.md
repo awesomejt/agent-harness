@@ -59,7 +59,7 @@ A transport-level success acknowledgement may precede model work. Normalize even
 
 Resolution produces source-attributed values, then policy/capability validation, then a read-only change plan. Preview applies nothing and launches no model work. Execution rechecks conflicts/effective routing before applying managed project settings. `--no-sync` skips mutation, not validation.
 
-Managed writes are scoped, conflict-aware and atomic per file; D025 fixes advisory locking, stale-snapshot refusal and interrupted-receipt conflicts in Phase 2. Preserve unrelated/global content and environment key references. Native plans cannot inherit harness-managed LiteLLM model selection. The first slice uses an existing proxy alias; Phase 3 defines desired model-group configuration/handoff without assuming service-management privileges.
+Managed writes are scoped, conflict-aware and atomic per file; D025 fixes advisory locking, stale-snapshot refusal and interrupted-receipt conflicts in Phase 2. Preserve unrelated/global content and environment key references. Native plans cannot inherit harness-managed LiteLLM model selection. The first slice uses an existing proxy alias; D033 adds `litellm.groups` references resolved by `config` to one proxy model group before planning, plus a read-only preview handoff, without service-management privileges.
 
 Project baselines support dirty-worktree diagnostics and later evidence, not perfect edit attribution or transactional rollback. Runtime edits are subject to the selected permissions. Never reset/stash/commit user work as automatic setup or error recovery.
 

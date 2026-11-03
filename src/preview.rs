@@ -65,6 +65,33 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
     } else {
         "ensure the native API key and built-in model are available; login stores are not consumed"
     };
+    // Identifier grammar excludes quotes/controls, so group names print safely.
+    let quoted = |names: &[String]| {
+        names
+            .iter()
+            .map(|n| format!("\"{n}\""))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let selection = match &r.group {
+        Some(group) => format!(
+            "harness group \"{group}\" -> proxy model group \"{}\"",
+            r.model
+        ),
+        None => format!("direct proxy model group \"{}\"", r.model),
+    };
+    let handoff = if !local {
+        "not applicable (native route)".to_owned()
+    } else if r.proxy_groups.is_empty() {
+        format!(
+            "{selection}; no litellm.groups configured; proxy configuration operator-owned and unchanged; existence unverified"
+        )
+    } else {
+        format!(
+            "{selection}; litellm.groups require proxy model groups {}; proxy configuration operator-owned and unchanged; existence unverified",
+            quoted(&r.proxy_groups)
+        )
+    };
     let health = if local {
         "LiteLLM reachability, alias availability"
     } else {
@@ -77,6 +104,7 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
          runtime: OpenCode ACP; {runtime}\n\
          execution platform: {}\n\
          model: {} ({}); helper: same model\n\
+         proxy handoff: {handoff}\n\
          credentials: environment reference present (config); value and endpoint omitted\n\
          permissions: {scope} ({}); external tools/subagents/network tools disabled\n\
          timeout: {} seconds ({})\n\

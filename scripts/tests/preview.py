@@ -84,8 +84,26 @@ with tempfile.TemporaryDirectory(prefix='ah-preview-') as directory:
     desired['model'] = 'ah-litellm/other'
     (project / 'opencode.json').write_text(json.dumps(desired))
     run(['--no-sync'], expected=2)
+    # P3.3 handoff: group selection and required proxy groups, nothing written to the proxy.
+    (project / 'opencode.json').write_text('{"custom":"UNMANAGED_SECRET"}')
+    grouped = dict(config, model='group:coder')
+    grouped['litellm'] = dict(config['litellm'], groups={'coder': 'proxy-coder', 'review': 'proxy-review'})
+    config_path.write_text(json.dumps(grouped))
+    out, _ = run()
+    assert 'model: ah-litellm/proxy-coder (config)' in out, out
+    assert ('proxy handoff: harness group "coder" -> proxy model group "proxy-coder"; '
+            'litellm.groups require proxy model groups "proxy-coder", "proxy-review"; '
+            'proxy configuration operator-owned and unchanged; existence unverified') in out, out
+    out, _ = run(['--model', 'group:review'])
+    assert 'harness group "review" -> proxy model group "proxy-review"' in out
+    out, _ = run(['--model', 'direct'])
+    assert 'direct proxy model group "direct"' in out
+    run(['--model', 'group:missing'], expected=2)
+    config_path.write_text(json.dumps(config))
+    out, _ = run()
+    assert 'direct proxy model group "fixture"; no litellm.groups configured' in out
     config['model'] = 'bad/model'
     config_path.write_text(json.dumps(config))
     run(expected=2)
 
-print('preview fixtures passed: no launch/writes, redaction, sources, missing prerequisites, no-sync')
+print('preview fixtures passed: no launch/writes, redaction, sources, missing prerequisites, no-sync, group handoff')

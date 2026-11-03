@@ -244,3 +244,50 @@ fn legacy_mode_models_cannot_override_selected_route() {
         assert!(plan.validate_effective(&effective).is_err());
     }
 }
+
+#[test]
+fn group_reference_manages_only_the_resolved_proxy_group() {
+    let p = Project::new();
+    let config = Config::read(br#"{"version":1,"mode":"local-only","model":"group:coder","litellm":{"api_base":"http://litellm:4000/v1","api_key_env":"TEST_KEY","groups":{"coder":"proxy-coder","review":"proxy-review"}}}"#.as_slice()).unwrap();
+    let r = Invocation::parse(
+        [
+            OsString::from("single"),
+            OsString::from("task"),
+            OsString::from("--project"),
+            p.0.clone().into_os_string(),
+        ],
+        &p.0,
+    )
+    .unwrap()
+    .resolve(
+        config,
+        |_| Some("SENTINEL_SECRET_DO_NOT_WRITE".into()),
+        &b""[..],
+    )
+    .unwrap();
+    let plan = Plan::prepare(&r).unwrap();
+    let routing = plan.runtime_routing();
+    assert_eq!(routing["model"], "ah-litellm/proxy-coder");
+    assert_eq!(routing["small_model"], "ah-litellm/proxy-coder");
+    let models = routing["provider"]["ah-litellm"]["models"]
+        .as_object()
+        .unwrap();
+    assert_eq!(models.keys().collect::<Vec<_>>(), ["proxy-coder"]);
+    plan.apply().unwrap();
+    for name in ["opencode.json", ".ah-opencode-owner.json"] {
+        let text = p.read(name);
+        // Harness group names and unselected groups are not runtime routing.
+        assert!(!text.contains("\"coder\"") && !text.contains("/coder\""));
+        assert!(!text.contains("review") && !text.contains("group:"));
+        assert!(!text.contains("SENTINEL_SECRET_DO_NOT_WRITE"));
+    }
+    // Effective validation rejects a runtime that selected a different group.
+    let mut effective = routing.clone();
+    effective["model"] = "ah-litellm/proxy-review".into();
+    assert!(
+        Plan::prepare(&r)
+            .unwrap()
+            .validate_effective(&effective)
+            .is_err()
+    );
+}

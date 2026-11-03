@@ -9,6 +9,9 @@ pub(crate) const MISSING_KEY: &str = "API key environment reference is missing o
 pub const CONFIG_NAME: &str = "ah.json";
 pub const MAX_INPUT_BYTES: u64 = 1_048_576;
 pub const DEFAULT_TIMEOUT_SECS: u64 = 1800;
+/// Explicit harness model-group reference syntax for `model`/`--model`.
+pub const GROUP_PREFIX: &str = "group:";
+pub const MAX_GROUPS: usize = 64;
 
 /// Errors deliberately exclude untrusted input, paths, prompt text and credentials.
 #[derive(Debug, PartialEq, Eq)]
@@ -46,6 +49,36 @@ pub struct Config {
 struct LiteLlm {
     api_base: String,
     api_key_env: String,
+    #[serde(default, deserialize_with = "present")]
+    groups: Option<Groups>,
+}
+
+/// Harness group name -> existing proxy model group. Map deserialization would
+/// otherwise keep the last duplicate key silently.
+struct Groups(std::collections::BTreeMap<String, String>);
+impl<'de> Deserialize<'de> for Groups {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = Groups;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a group object")
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut a: A,
+            ) -> std::result::Result<Groups, A::Error> {
+                let mut groups = std::collections::BTreeMap::new();
+                while let Some((name, target)) = a.next_entry::<String, String>()? {
+                    if groups.insert(name, target).is_some() {
+                        return Err(serde::de::Error::custom("duplicate group"));
+                    }
+                }
+                Ok(Groups(groups))
+            }
+        }
+        d.deserialize_map(V)
+    }
 }
 
 // Optional blocks may be absent but explicit null is not a valid route config.
@@ -105,7 +138,13 @@ pub struct Resolved {
     pub mode: Mode,
     pub sources: Sources,
     pub project: PathBuf,
+    /// Proxy model group (local) or built-in model (native) sent to the runtime.
     pub model: String,
+    /// Harness group name when `model` was selected through `group:NAME`.
+    pub group: Option<String>,
+    /// Distinct proxy model groups named by `litellm.groups`, for the read-only
+    /// operator handoff. Empty for native requests.
+    pub proxy_groups: Vec<String>,
     pub api_base: Option<String>,
     pub api_key_env: String,
     pub permissions: Permissions,
@@ -191,11 +230,14 @@ impl Config {
         }
         validate_mode(&self.mode)?;
         if let Some(model) = &self.model {
-            validate_model(model)?;
+            validate_reference(model)?;
         }
         validate_timeout(self.timeout_secs.unwrap_or(DEFAULT_TIMEOUT_SECS))?;
         if let Some(local) = &self.litellm {
             validate_local(local)?;
+        }
+        if let Some(group) = self.model.as_deref().and_then(group_name) {
+            self.group(group)?;
         }
         if let Some(native) = &self.native {
             if native.target != "opencode" {
@@ -232,7 +274,22 @@ fn validate_local(local: &LiteLlm) -> Result<()> {
             "API base requires canonical http(s), a host, /v1 and no credentials/query/fragment",
         ));
     }
+    if let Some(groups) = &local.groups {
+        if groups.0.is_empty() || groups.0.len() > MAX_GROUPS {
+            return Err(Invalid("litellm.groups requires 1–64 entries"));
+        }
+        for (name, target) in &groups.0 {
+            validate_model(name)?;
+            validate_model(target)?;
+        }
+    }
     validate_key_name(&local.api_key_env)
+}
+fn group_name(reference: &str) -> Option<&str> {
+    reference.strip_prefix(GROUP_PREFIX)
+}
+fn validate_reference(reference: &str) -> Result<()> {
+    validate_model(group_name(reference).unwrap_or(reference))
 }
 fn validate_key_name(value: &str) -> Result<()> {
     let name = value.as_bytes();
@@ -245,6 +302,16 @@ fn validate_key_name(value: &str) -> Result<()> {
     Ok(())
 }
 impl Config {
+    fn group(&self, name: &str) -> Result<&str> {
+        self.litellm
+            .as_ref()
+            .and_then(|local| local.groups.as_ref())
+            .and_then(|groups| groups.0.get(name))
+            .map(String::as_str)
+            .ok_or(Invalid(
+                "model group reference is not defined in litellm.groups",
+            ))
+    }
     fn key_name(&self, mode: &str) -> Result<&str> {
         match mode {
             "local-only" => self
@@ -351,7 +418,7 @@ impl Invocation {
                         request.mode = Some(value.to_owned());
                     }
                     "--model" => {
-                        validate_model(value)?;
+                        validate_reference(value)?;
                         request.model = Some(value.to_owned());
                     }
                     "--permissions" => {
@@ -432,6 +499,14 @@ impl Invocation {
             .ok_or(Invalid(
                 "selected route requires a model default or explicit --model",
             ))?;
+        // Groups are LiteLLM routing choices; a native route never reinterprets one.
+        let (group, model) = match group_name(&model) {
+            Some(_) if mode == "cloud-only" => {
+                return Err(Invalid("model groups apply only to the LiteLLM route"));
+            }
+            Some(name) => (Some(name.to_owned()), config.group(name)?.to_owned()),
+            None => (None, model),
+        };
         let mode = if mode == "cloud-only" {
             Mode::CloudOnly
         } else {
@@ -478,6 +553,20 @@ impl Invocation {
             sources,
             project,
             model,
+            group,
+            proxy_groups: match (
+                mode,
+                config.litellm.as_ref().and_then(|l| l.groups.as_ref()),
+            ) {
+                (Mode::LocalOnly, Some(groups)) => groups
+                    .0
+                    .values()
+                    .cloned()
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .into_iter()
+                    .collect(),
+                _ => Vec::new(),
+            },
             api_base: if mode == Mode::LocalOnly {
                 config.litellm.map(|v| v.api_base)
             } else {

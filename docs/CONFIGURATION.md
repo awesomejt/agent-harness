@@ -1,6 +1,6 @@
 # Configuration and agent contract
 
-Status: P2.1 fixes the first-slice input contract below and implements library validation. P2.2 exposes `ah single` on tested macOS/OpenCode 1.18.30. P2.3 owns managed OpenCode configuration and effective-route validation; P2.7 exposes read-only `ah single ... --preview` diagnostics. P3.2 adds isolated native OpenCode cloud-only execution (D032); model groups/fallback remain P3.3; Phase 4 fixes canonical agents.
+Status: P2.1 fixes the first-slice input contract below and implements library validation. P2.2 exposes `ah single` on tested macOS/OpenCode 1.18.30. P2.3 owns managed OpenCode configuration and effective-route validation; P2.7 exposes read-only `ah single ... --preview` diagnostics. P3.2 adds isolated native OpenCode cloud-only execution (D032); P3.3 adds LiteLLM model-group references and the read-only proxy handoff (D033), with configured fallback still pending; Phase 4 fixes canonical agents.
 
 ## Version 1 first-slice configuration (D024)
 
@@ -22,7 +22,7 @@ The selected project directory contains `ah.json`. Read exactly that file, or th
 
 Strict JSON, no comments. Version and mode are required. Local-only requires top-level `model` and both `litellm` fields. Cloud-only requires the `native` block below. Present route blocks must validate even when inactive; absent blocks are allowed for the other route, but explicit null blocks reject. Unknown and duplicate fields reject, including literal `api_key`, arbitrary tool policies, agents and fallback configuration. `permissions` defaults to `deny` (absence or JSON null), and project config accepts only `deny`; host-level `trusted` requires an explicit invocation flag. `timeout_secs` defaults to 1800 (absence or JSON null). All other null values reject. Config is UTF-8, at most 1 MiB. Application file loading uses `Config::open`, sharing the prompt-file nonblocking Unix open and opened-handle regular-file check; FIFOs/devices/directories reject before reads. The raw-reader API is for caller-owned readers such as fixtures. Errors never echo raw parse errors, input values, prompt contents or secret-bearing paths.
 
-The model is an existing LiteLLM alias, 1–128 ASCII letters/digits/dot/underscore/hyphen; provider-prefixed models, groups and inline proxy routing are outside this slice. `api_base` is an absolute HTTP(S) URL with host and exactly `/v1`, without trailing slash, credentials, query, fragment, surrounding whitespace or controls. Require canonical URL spelling equal to the structured parser output: reject dot segments, empty userinfo, uppercase scheme/host and explicit default ports instead of retaining an unvalidated raw spelling. URL validation does not establish proxy availability or provider policy. HTTP permits the existing private-network deployment; credential transport security is the operator's responsibility. `api_key_env` is an ASCII environment name (`[A-Za-z_][A-Za-z0-9_]*`). Its value must exist and be nonempty in the launch environment; no interpolation or key lookup fallback. Keep the resolved value out of config, request records, diagnostics and logs. The environment lookup value is checked for nonempty content and immediately dropped; only its name is retained in the resolved request.
+The model is an existing LiteLLM alias (proxy model group), 1–128 ASCII letters/digits/dot/underscore/hyphen, or an explicit `group:NAME` reference to a harness model group (below). Provider-prefixed models and inline proxy routing are unsupported. `api_base` is an absolute HTTP(S) URL with host and exactly `/v1`, without trailing slash, credentials, query, fragment, surrounding whitespace or controls. Require canonical URL spelling equal to the structured parser output: reject dot segments, empty userinfo, uppercase scheme/host and explicit default ports instead of retaining an unvalidated raw spelling. URL validation does not establish proxy availability or provider policy. HTTP permits the existing private-network deployment; credential transport security is the operator's responsibility. `api_key_env` is an ASCII environment name (`[A-Za-z_][A-Za-z0-9_]*`). Its value must exist and be nonempty in the launch environment; no interpolation or key lookup fallback. Keep the resolved value out of config, request records, diagnostics and logs. The environment lookup value is checked for nonempty content and immediately dropped; only its name is retained in the resolved request.
 
 Validate the whole config even if invocation flags override fields; malformed/unsupported config cannot be repaired by an override. Then explicit `--mode`, `--model`, `--permissions` and `--timeout-secs` override their corresponding config values. Only explicit `--permissions trusted` may authorize host access; a config requesting it rejects even if a flag overrides it. Built-ins apply only to absent optional fields. No other harness environment settings, prompt metadata, user defaults or inherited runtime defaults participate in harness resolution. `local-only` and `cloud-only` are accepted after P3.2; `local-first` and automatic fallback remain unavailable. A mode override requires its explicitly configured route and never inherits the other route's model or credentials. A cloud-only config may include `litellm` without a top-level local model; switching it to local-only then requires explicit `--model`. A config whose own mode is local-only still requires its local model default before any overrides.
 
@@ -50,11 +50,38 @@ Cloud-only bypasses the project transaction planner entirely, including with `--
 
 Native preview uses the same input resolver, reports native selection and no managed changes, and performs no child launch, catalog read or network check. `--no-sync` has no additional effect on this route: effective runtime checks are always mandatory. No harness retry or fallback is added; unknown post-submission outcomes remain uncertain.
 
+### LiteLLM model groups (P3.3 / D033)
+
+```json
+{
+  "version": 1,
+  "mode": "local-only",
+  "model": "group:coder",
+  "litellm": {
+    "api_base": "http://litellm:4000/v1",
+    "api_key_env": "LITELLM_API_KEY",
+    "groups": {
+      "coder": "macmini-qwen3-coder-30b",
+      "review": "macmini-qwen3-coder-30b"
+    }
+  }
+}
+```
+
+`litellm.groups` is optional. When present it is an object of 1–64 entries; explicit null, empty objects, duplicate keys and non-string targets reject. Each key is a harness group name and each value names exactly one existing LiteLLM proxy model group (the `model_name` clients request). Both use the model identifier grammar, so a value cannot itself be a reference or provider-prefixed model. Several harness groups may name the same proxy group.
+
+Top-level `model` and `--model` accept either a bare proxy model group (unchanged) or `group:NAME`. Only the explicit prefix consults `litellm.groups`; a bare name equal to a harness group name is still sent directly, so harness names cannot shadow proxy names. An undefined reference rejects during config validation (config default) or resolution (`--model`), before credential lookup or stdin. Groups belong to the LiteLLM route: `--mode cloud-only --model group:NAME` rejects, and `native.model` cannot be a reference. A cloud-only config may still hold a valid local group default for an explicit `--mode local-only` switch.
+
+A harness group is a stable name for one proxy group, not a pool. The harness does not list deployments, rank or order alternatives; LiteLLM keeps load balancing, retries and fallbacks within its group. Resolution replaces the reference with its proxy group before planning: managed `opencode.json`, the ownership receipt, effective-route checks, runtime/session model and wire requests use only `ah-litellm/PROXY_GROUP`. Harness group names and unselected groups never reach the runtime or project files. Switching between a direct alias and a group that resolves to the same proxy name changes no managed values; changing a group's target updates owned routing like any model change, and `--no-sync` requires the resolved values on disk.
+
+**Proxy handoff.** LiteLLM configuration is operator-owned; the harness never writes it, calls admin/model-management APIs, or installs/restarts/reloads the proxy. `--preview` prints a `proxy handoff:` line: the selected harness group (or direct selection), its proxy model group, and every distinct proxy model group that `litellm.groups` requires, marked existence unverified. Operators ensure those `model_name` entries (or LiteLLM aliases) exist at the configured endpoint. The command remains network-free. Before execution, validation is static (schema, references, route) plus the existing exact effective-routing preflight; proxy group existence is established only by actual use. A missing proxy group surfaces as a runtime failure that stops without retry or fallback. The `attempt=1` progress line names the harness group when one was used.
+
 ### Selected invocation and preview syntax
 
 ```bash
 # Runnable with the P2.2 development binary:
 ah single "Fix the parser and run tests" --mode local-only --permissions trusted
+ah single "Review the change" --model group:review --preview
 ah single --prompt-file task.txt --project ./repo --config ./repo/ah.json
 cat task.txt | ah single --prompt-file -
 ah single "Review this project" --preview --no-sync
@@ -78,7 +105,7 @@ P2.2 must prove actual read/edit/shell enforcement, denied-action behavior and e
 
 Deserialize into input structures, then validate into route-specific domain values as outlined in [DESIGN.md](DESIGN.md). Canonical YAML frontmatter is separate from the strict JSON harness config selected by D024. Runtime state is not inherited from ai-queue's SQLite schema.
 
-The first slice references an existing LiteLLM alias. The harness owns desired endpoint/group selection and policy; the proxy executes internal routing. Phase 3 defines group representation, validation and any configuration handoff. This does not imply automatic proxy-service installation/restart/reconfiguration privileges.
+The first slice references an existing LiteLLM alias. The harness owns desired endpoint/group selection and policy; the proxy executes internal routing. P3.3 defines group representation, validation and the read-only handoff below (D033). This does not imply automatic proxy-service installation/restart/reconfiguration privileges.
 
 ## Resolution and validation
 
