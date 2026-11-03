@@ -13,12 +13,14 @@ Date: 2026-11-03. Entry: `ea9a5f4` (merged P3.7 / PR #30). Task branch: `feature
 
 ## Live results
 
-| Run | Mode / endpoint | Route taken | Exit | Time | Grants | Edit + `verified` | Independent test | Context used |
-|---|---|---|---|---|---|---|---|---|
-| Local | `local-only` | LiteLLM `ah-litellm/flash` | 0 | 17 s | 5/5 | Yes | Pass | 3166 tokens |
-| Native | `cloud-only` | native `opencode/deepseek-v4.1-flash-free` | 0 | 10 s | 3/3 | Yes | Pass | 3080 tokens |
-| Local-first, reachable | `local-first`, `litellm:4000` | attempt 1 LiteLLM only | 0 | 13 s | 4/4 | Yes | Pass | 3093 tokens |
-| Local-first, fallback | `local-first`, closed `127.0.0.1` port | attempt 1 check → attempt 2 native | 0 | 9 s | 4/4 | Yes | Pass | 2918 tokens |
+| Run | Mode / endpoint | Route taken | Exit | Time | Grants | Edit + `verified` | Independent test | Context used | Reported cost |
+|---|---|---|---|---|---|---|---|---|---|
+| Local | `local-only` | LiteLLM `ah-litellm/flash` | 0 | 17 s | 5/5 | Yes | Pass | 3166 tokens | 0 USD |
+| Native | `cloud-only` | native `opencode/deepseek-v4.1-flash-free` | 0 | 10 s | 3/3 | Yes | Pass | 3080 tokens | 0 USD |
+| Local-first, reachable | `local-first`, `litellm:4000` | attempt 1 LiteLLM only | 0 | 13 s | 4/4 | Yes | Pass | 3093 tokens | 0 USD |
+| Local-first, fallback | `local-first`, closed `127.0.0.1` port | attempt 1 check → attempt 2 native | 0 | 9 s | 4/4 | Yes | Pass | 2918 tokens | 0 USD |
+
+Context and cost come from OpenCode's ACP `usage_update` (`source=OpenCode ACP session/update`). They are OpenCode's own report, not a provider or proxy bill: the local alias carries no OpenCode price, and the native model is a free catalog entry. Grant counts differ because each model chose its own tool sequence for the same prompt, for example separate reads or a glob before the edit. Every request in every run received a bound one-shot grant, and none was refused.
 
 **Route explanations.** `--preview` output for each mode is read-only and network-free:
 
