@@ -55,9 +55,21 @@ Treat project instructions, prompt files and backend output as data/instructions
 
 ## Failure and fallback
 
-Phase 3 defines classification and bounded retries. Distinguish configuration/authentication errors, unavailable endpoint/model, rate limits, transient transport errors, runtime failures, and ambiguous completion. Invalid input or unsupported restrictions are not reasons to send the prompt to a less constrained route.
+P3.1 selects the following policy for the future coordinator. A classification requires reliable structured, adapter-specific evidence; raw error text, HTTP-like substrings, absence of tool events, and missing acknowledgements are insufficient. If evidence is unavailable or contradictory, classify as unknown and stop. The current ACP adapter does not reliably distinguish provider authentication, rate limits or transport errors, and must not infer them from generic failures.
 
-Fallback is only permitted in local-first and only to the configured native target. Validate the same project/agent restrictions on the new target. A deterministic pre-execution failure can be eligible. An active-attempt timeout or broken connection may leave changes; stop with uncertainty unless an explicit recovery policy authorizes continuation. Never silently send the full backend transcript to another provider.
+| Failure, established before prompt submission | Automatic native fallback |
+|---|---|
+| Invalid input/configuration, missing credentials, or unsupported constraint | Stop; correct the request or configuration. |
+| Authentication/authorization failure | Stop; correct credentials or access. |
+| Confirmed service/model unavailable, rate limit, or transport failure | Eligible only if all guards below hold. |
+| Runtime/protocol/permission failure, unknown cause | Stop; inspect diagnostics. |
+| User cancellation or deadline | Stop, even if another failure also occurred. |
+
+Eligibility requires `local-first`, a configured native target independently validated to enforce the same required project, mode and permission constraints, confirmed process **and private-state** cleanup, an unexpired overall deadline, and no cancellation. The supervisor must affirm that submission was never attempted; set the submission boundary before handing the prompt to transport, because failed sends can still deliver. If no coding attempt was launched, cleanup is confirmed only when all resources actually created have been verified cleaned. Project configuration writes may already have occurred and are not rolled back. Only the original prompt and explicitly required request context may be sent; no backend transcript, session, permission grants or implicit context cross routes. Fallback creates a distinct linked attempt with fresh grants. No automatic same-route retry is permitted; at most one native fallback attempt is permitted per invocation, with no further fallback. Both attempts share the original active deadline; do not reset it. Each cleanup uses its existing finite cleanup budgets. Preflight requests may have occurred even when the coding prompt was never submitted.
+
+Once prompt submission was attempted, no automatic replay or fallback is permitted, including after a known failure, cancellation, rate limit or terminal response. A missing trustworthy terminal response or unconfirmed cleanup remains uncertain (exit 4); even a known terminal failure or cancellation can have effects. Inspect project changes and external effects before deciding manually whether to issue a new invocation. A manual invocation is a new run and does not imply rollback or safe replay. Output-delivery failure after a successful turn also cannot authorize replay. Existing exit precedence remains unchanged.
+
+The decision function and fixtures in `src/recovery.rs` and `tests/recovery.rs` exercise these guards; they are not yet connected to execution. P3.2/P3.3 must establish trustworthy classification, target validation, lifecycle and enforcement before enabling fallback. The current CLI remains local-only and never automatically retries or falls back.
 
 ## Process and project integrity
 
