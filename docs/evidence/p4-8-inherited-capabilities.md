@@ -137,3 +137,14 @@ matrix projects): 165 matrix + 14 invalid cases pass. Unchanged in result:
   MVP scope.
 
 Next: P4.4 primary and reviewer acceptance.
+
+## PR review closeout
+
+[Grok PR #38 review](https://github.com/awesomejt/agent-harness/pull/38): 0 blockers, 1 concern
+and 1 nit, both addressed. Concern: the local-first recovery guard did not compare
+`instructions`, so a future clone regression would have run the fallback silently without
+`AGENTS.md`. `constraints_preserved` now also requires identical instructions, and D040
+says so. Nit: the `direct()` docstring in `capabilities_runtime.py` described a return
+value it did not have; it is corrected. Format, locked Clippy, 81 root tests,
+`local_first.py`, `modes.py` and `capabilities_runtime.py` pass. No critical/high
+finding, so no re-review is required.

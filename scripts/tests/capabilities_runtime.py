@@ -118,7 +118,8 @@ def ah(project, prompt, *extra, env=None):
 
 def direct(runtime, base, name, instructions, prompt_port):
     """ACP initialize/session/new (and a prompt when a stub port is given) with
-    the harness isolation flags; returns (advertised commands, records)."""
+    the harness isolation flags; returns the advertised command names. Model
+    requests are recorded by the stub server."""
     project = base / ('direct-' + name)
     home = base / ('home-' + name)
     project.mkdir()

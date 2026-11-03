@@ -194,6 +194,7 @@ async fn coordinate(
             && native.agent.as_ref().map(crate::agents::Agent::name)
                 == request.agent.as_ref().map(crate::agents::Agent::name)
             && crate::opencode::effective(native) == crate::opencode::effective(request)
+            && native.instructions == request.instructions
             && native.timeout_secs == request.timeout_secs
             && native.prompt == request.prompt,
         prior_fallbacks: 0,
