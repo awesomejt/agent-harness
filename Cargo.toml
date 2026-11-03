@@ -19,6 +19,7 @@ tokio-util = { version = "=0.7.16", features = ["compat", "rt"] }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "=1.0.145", features = ["raw_value"] }
 url = "=2.5.8"
+serde_yaml_ng = "=0.10.0"
 
 [target.'cfg(unix)'.dependencies]
 libc = "=0.2.177"

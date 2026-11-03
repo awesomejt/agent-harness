@@ -170,7 +170,7 @@ pub enum Exit {
     Uncertain = 4,
 }
 
-fn bounded(mut reader: impl Read) -> Result<String> {
+pub(crate) fn bounded(mut reader: impl Read) -> Result<String> {
     let mut bytes = Vec::new();
     reader
         .by_ref()
@@ -295,7 +295,7 @@ fn validate_local(local: &LiteLlm) -> Result<()> {
 fn group_name(reference: &str) -> Option<&str> {
     reference.strip_prefix(GROUP_PREFIX)
 }
-fn validate_reference(reference: &str) -> Result<()> {
+pub(crate) fn validate_reference(reference: &str) -> Result<()> {
     validate_model(group_name(reference).unwrap_or(reference))
 }
 fn validate_key_name(value: &str) -> Result<()> {
@@ -339,7 +339,7 @@ fn validate_mode(mode: &str) -> Result<()> {
     }
     Ok(())
 }
-fn validate_model(model: &str) -> Result<()> {
+pub(crate) fn validate_model(model: &str) -> Result<()> {
     if model.is_empty()
         || model.len() > 128
         || !model
