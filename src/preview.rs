@@ -40,8 +40,14 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
     // Debug path formatting escapes control characters. No raw configuration,
     // endpoint, key value, prompt, or unmanaged settings are formatted here.
     let runtime = match discover_runtime() {
-        Some(path) => format!("discovered {path:?}; version unverified (requires 1.18.30)"),
-        None => "missing; install OpenCode 1.18.30 on an absolute PATH entry".into(),
+        Some(path) => format!(
+            "discovered {path:?}; version unverified (requires {})",
+            crate::opencode::VERSION
+        ),
+        None => format!(
+            "missing; install OpenCode {} on an absolute PATH entry",
+            crate::opencode::VERSION
+        ),
     };
     let scope = match r.permissions {
         Permissions::Deny => "deny: no file/shell grants",

@@ -1,14 +1,14 @@
-//! Local and native OpenCode 1.18.30 isolation and effective capability preflight.
+//! Local and native OpenCode 2.2.5 isolation and effective capability preflight.
 use crate::{
-    config::{Exit, Mode, Permissions, Resolved},
+    config::{Exit, Mode, Resolved},
     process::OwnedChild,
-    project_config::Plan,
 };
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::{ffi::OsString, path::Path, time::Duration};
 use tokio::{io::AsyncReadExt, process::Command};
 
 pub(crate) struct Runtime {
+    config: Value,
     home: PrivateHome,
     pub progress: crate::progress::Progress,
     pub deadline: tokio::time::Instant,
@@ -17,70 +17,25 @@ pub(crate) struct Runtime {
     pub executable: std::path::PathBuf,
 }
 
-pub(crate) fn profile(policy: Permissions, home: &Path) -> (Value, Value) {
-    let mut permissions = json!({"*":"deny", "external_directory": {
-        "*":"deny", home.join("DATA/opencode/tool-output/*").to_string_lossy().as_ref():"deny"
-    }});
-    let mut tools = json!({"*":false});
-    if policy == Permissions::Trusted {
-        for name in ["read", "glob", "grep", "edit", "apply_patch", "bash"] {
-            permissions[name] = json!("ask");
-        }
-        for name in [
-            "read",
-            "glob",
-            "grep",
-            "edit",
-            "write",
-            "apply_patch",
-            "bash",
-        ] {
-            tools[name] = json!(true);
-        }
-    }
-    if policy == Permissions::Trusted {
-        permissions["external_directory"]["*"] = json!("ask");
-    }
-    (permissions, tools)
-}
 impl Runtime {
     pub fn new(
         request: &Resolved,
-        plan: Option<&Plan>,
         deadline: tokio::time::Instant,
         cancelled: tokio_util::sync::CancellationToken,
         progress: crate::progress::Progress,
     ) -> Result<Self, Exit> {
         let executable = crate::preview::discover_runtime().ok_or_else(|| {
-            progress.event("OpenCode missing: install 1.18.30 on an absolute PATH entry");
+            progress.event(format!(
+                "OpenCode missing: install {} on an absolute PATH entry",
+                crate::opencode::VERSION
+            ));
             Exit::Invalid
         })?;
         let key = std::env::var_os(&request.api_key_env)
             .filter(|s| !s.is_empty())
             .ok_or(Exit::Invalid)?;
         let home = PrivateHome::new().map_err(|_| Exit::Failed)?;
-        let mut config = match (request.mode, plan) {
-            (Mode::LocalOnly, Some(plan)) => {
-                let mut config = plan.runtime_routing();
-                config["provider"]["ah-litellm"]["options"]["apiKey"] =
-                    json!("{env:AH_RUNTIME_API_KEY}");
-                config
-            }
-            (Mode::CloudOnly, None) => crate::native::routing(request),
-            _ => return Err(Exit::Invalid),
-        };
-        let (permissions, tools) = profile(request.permissions, home.path());
-        for (key, value) in [
-            ("permission", permissions),
-            ("tools", tools),
-            ("autoupdate", json!(false)),
-            ("share", json!("disabled")),
-            ("plugin", json!([])),
-            ("mcp", json!({})),
-            ("default_agent", json!("build")),
-        ] {
-            config[key] = value;
-        }
+        let config = crate::opencode::config(request);
         let mut env: Vec<(OsString, OsString)> = vec![
             ("HOME".into(), home.path().into()),
             (
@@ -95,9 +50,10 @@ impl Runtime {
                 home.path().join(kind).into(),
             ));
         }
+        // 2.2.5 no longer recognizes OPENCODE_DISABLE_DEFAULT_PLUGINS; the
+        // `plugins: []` document and the sources check stand in for it.
         for name in [
             "OPENCODE_DISABLE_MODELS_FETCH",
-            "OPENCODE_DISABLE_DEFAULT_PLUGINS",
             "OPENCODE_DISABLE_AUTOUPDATE",
             "OPENCODE_DISABLE_PROJECT_CONFIG",
         ] {
@@ -115,6 +71,7 @@ impl Runtime {
             key,
         ));
         Ok(Self {
+            config,
             home,
             progress,
             cancelled,
@@ -154,104 +111,33 @@ impl Runtime {
         result?;
         Ok(bytes)
     }
-    pub async fn preflight(&self, request: &Resolved, plan: Option<&Plan>) -> Result<(), Exit> {
-        if self
-            .inspect(&request.project, &["--version"])
-            .await?
-            .trim_ascii()
-            != b"1.18.30"
-        {
+    /// Every inspection runs `--standalone`: without it 2.x attaches to the
+    /// user's shared background service and its configuration.
+    pub async fn preflight(&self, request: &Resolved) -> Result<(), Exit> {
+        let version = self.inspect(&request.project, &["--version"]).await?;
+        if version.trim_ascii() != format!("opencode v{}", crate::opencode::VERSION).as_bytes() {
             return Err(Exit::Invalid);
         }
-        let bytes = self
-            .inspect(&request.project, &["debug", "config", "--pure"])
-            .await?;
-        let mut effective: Value = serde_json::from_slice(&bytes).map_err(|_| Exit::Invalid)?;
-        match (request.mode, plan) {
-            (Mode::LocalOnly, Some(plan)) => {
-                // OpenCode resolves env references. Compare privately before
-                // restoring the reference for the transaction validator.
-                let actual = effective["provider"]["ah-litellm"]["options"]["apiKey"]
-                    .as_str()
-                    .ok_or(Exit::Invalid)?;
-                let key = std::env::var(&request.api_key_env).map_err(|_| Exit::Invalid)?;
-                if actual != key {
-                    return Err(Exit::Invalid);
-                }
-                effective["provider"]["ah-litellm"]["options"]["apiKey"] =
-                    json!(format!("{{env:{}}}", request.api_key_env));
-                plan.validate_effective(&effective)
-                    .map_err(|_| Exit::Invalid)?;
-            }
-            (Mode::CloudOnly, None) => {
-                crate::native::validate_effective(request, &effective).map_err(|_| Exit::Invalid)?
-            }
-            _ => return Err(Exit::Invalid),
-        }
-        let (permissions, tools) = profile(request.permissions, self.home.path());
-        if effective["permission"] != permissions
-            || effective["tools"] != tools
-            || effective["autoupdate"] != false
-            || effective["share"] != "disabled"
-            || effective["plugin"] != json!([])
-            || effective["mcp"] != json!({})
-            || effective["default_agent"] != "build"
-            || effective["agent"] != json!({})
-            || effective["mode"] != json!({})
-        {
-            return Err(Exit::Invalid);
-        }
+        let parse =
+            |bytes: Vec<u8>| serde_json::from_slice::<Value>(&bytes).map_err(|_| Exit::Invalid);
+        let sources = parse(
+            self.inspect(&request.project, &["debug", "config", "--standalone"])
+                .await?,
+        )?;
+        crate::opencode::validate_sources(&self.config, &sources, self.home.path())
+            .map_err(|_| Exit::Invalid)?;
         if request.mode == Mode::CloudOnly {
-            // Built-in catalog only: model fetching and inherited catalogs are
-            // disabled. This checks support, not credential validity or balance.
             let bytes = self
-                .inspect(&request.project, &["models", "opencode", "--pure"])
+                .inspect(&request.project, &["models", "--standalone"])
                 .await?;
             let models = std::str::from_utf8(&bytes).map_err(|_| Exit::Invalid)?;
-            let target = request.runtime_model();
-            if !models.lines().any(|line| line == target)
-                || models.lines().any(|line| !line.starts_with("opencode/"))
-            {
-                return Err(Exit::Invalid);
-            }
+            crate::opencode::validate_catalog(request, models).map_err(|_| Exit::Invalid)?;
         }
-        let bytes = self
-            .inspect(&request.project, &["debug", "agent", "build", "--pure"])
-            .await?;
-        let agent: Value = serde_json::from_slice(&bytes).map_err(|_| Exit::Invalid)?;
-        let rules = agent["permission"].as_array().ok_or(Exit::Invalid)?;
-        // Runtime defaults may precede our catch-all deny, but nothing may follow
-        // except the exact ask rules in the selected profile.
-        let start = rules
-            .iter()
-            .rposition(|r| r == &json!({"permission":"*","pattern":"*","action":"deny"}))
-            .ok_or(Exit::Invalid)?;
-        let mut expected = Vec::new();
-        for name in [
-            "*",
-            "read",
-            "glob",
-            "grep",
-            "edit",
-            "apply_patch",
-            "bash",
-            "external_directory",
-        ] {
-            let Some(value) = permissions.get(name) else {
-                continue;
-            };
-            if let Some(action) = value.as_str() {
-                expected.push(json!({"permission":name,"pattern":"*","action":action}));
-            } else {
-                for (pattern, action) in value.as_object().unwrap() {
-                    expected.push(json!({"permission":name,"pattern":pattern,"action":action}));
-                }
-            }
-        }
-        if rules[start..] != expected || agent["name"] != "build" {
-            return Err(Exit::Invalid);
-        }
-        Ok(())
+        let agents = parse(
+            self.inspect(&request.project, &["debug", "agents", "--standalone"])
+                .await?,
+        )?;
+        crate::opencode::validate_agents(request, &agents).map_err(|_| Exit::Invalid)
     }
 
     /// Remove runtime-owned state before reporting the final outcome. A plain

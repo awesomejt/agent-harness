@@ -48,14 +48,15 @@ provided in this slice.
 
 ### Separate coding prerequisites
 
-Install **OpenCode 1.18.30**, not an automatically selected latest version.
-Its [pinned official installer](https://github.com/anomalyco/opencode/blob/v1.18.30/install)
+Install **OpenCode 2.2.5**, not an automatically selected latest version.
+Source builds since P3.7 (D035) require it; the published `v0.1.0-alpha.1` still
+requires 1.18.30. Its [pinned official installer](https://github.com/anomalyco/opencode/blob/v2.2.5/install)
 supports an explicit version:
 
 ```sh
-curl -fLo opencode-install.sh https://raw.githubusercontent.com/anomalyco/opencode/v1.18.30/install
+curl -fLo opencode-install.sh https://raw.githubusercontent.com/anomalyco/opencode/v2.2.5/install
 # Inspect the downloaded script, then run:
-bash opencode-install.sh --version 1.18.30 --no-modify-path
+bash opencode-install.sh --version 2.2.5 --no-modify-path
 export PATH="$HOME/.opencode/bin:$PATH"
 opencode --version
 ```
@@ -115,7 +116,7 @@ reconciling/removing them; uninstall performs no automatic project cleanup.
 
 ### Native cloud-only from source (P3.2)
 
-The published `v0.1.0-alpha.1` predates native routing. Build current source with the pinned Rust toolchain to use it. Use the [native configuration example](CONFIGURATION.md#native-opencode-route-p32--d032), install OpenCode 1.18.30 on an absolute PATH entry, and export a valid OpenCode Console/Zen API key under the configured `native.api_key_env` name. Select a model in that runtime's built-in `opencode` catalog. Then run:
+The published `v0.1.0-alpha.1` predates native routing. Build current source with the pinned Rust toolchain to use it. Use the [native configuration example](CONFIGURATION.md#native-opencode-route-p32--d032), install OpenCode 2.2.5 on an absolute PATH entry, and export a valid OpenCode Console/Zen API key under the configured `native.api_key_env` name. Select a model in that runtime's built-in `opencode` catalog. Then run:
 
 ```bash
 ./target/debug/ah single "Review this project" --mode cloud-only --preview

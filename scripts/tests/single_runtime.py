@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P2.2 installed OpenCode edit/test check. Default uses a local model stub.
+"""P2.2 installed OpenCode 2.2.5 edit/test check. Default uses a local model stub.
 
 --live forwards only the explicitly selected alias to the existing LiteLLM host;
 credentials and raw requests/responses remain in memory, never printed.
@@ -31,7 +31,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = json.loads(raw)
             assert body['model'] == self.server.alias
             tools = [t['function']['name'] for t in body.get('tools',[])]
-            assert set(tools) <= {'read','glob','grep','edit','write','apply_patch','bash','invalid'}
+            # 2.2.5 also offers gated `skill` and a built-in worktree tool (D035).
+            assert set(tools) <= {'read','glob','grep','edit','write','shell','skill','opencode_worktree_remove'}
             self.server.records.append(dict(model=body['model'],tools=tools))
             if self.server.upstream:
                 req = urllib.request.Request(self.server.upstream+'/chat/completions',data=raw,
@@ -54,10 +55,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if tools:
                 stage=self.server.stage
                 self.server.stage+=1
-                calls=[('read',dict(filePath=str(self.server.outside/'outside.txt'))),
-                       ('read',dict(filePath=str(self.server.cwd/'calc.py'))),
-                       ('edit',dict(filePath=str(self.server.cwd/'calc.py'),oldString='return a - b',newString='return a + b')),
-                       ('bash',dict(command='cat '+str(self.server.outside/'outside.txt')+' && python3 test_calc.py && touch verified',description='Run arithmetic test'))]
+                calls=[('read',dict(path=str(self.server.outside/'outside.txt'))),
+                       ('read',dict(path=str(self.server.cwd/'calc.py'))),
+                       ('edit',dict(path=str(self.server.cwd/'calc.py'),oldString='return a - b',newString='return a + b')),
+                       ('shell',dict(command='cat '+str(self.server.outside/'outside.txt')+' && python3 test_calc.py && touch verified',description='Run arithmetic test'))]
+                if self.server.refuse:
+                    # The `other`-kind worktree removal must be refused, never granted.
+                    calls=[('opencode_worktree_remove',dict(directory=str(self.server.outside)))]+calls
                 if self.server.cancel and stage == len(calls):
                     event(dict(role='assistant',content='Waiting for cancellation'))
                     self.server.waiting.set()
@@ -87,7 +91,7 @@ def server(args):
     s.upstream=args.endpoint if args.live else None
     s.key=os.environ[args.key_env] if args.live else 'unused'
     s.records=[];s.failed=False;s.stage=0
-    s.cancel=args.cancel; s.waiting=threading.Event(); s.release=threading.Event()
+    s.cancel=args.cancel; s.refuse=args.refuse; s.waiting=threading.Event(); s.release=threading.Event()
     t=threading.Thread(target=s.serve_forever,daemon=True);t.start()
     try:
         yield s,'http://127.0.0.1:'+str(s.server_port)+'/v1'
@@ -103,6 +107,7 @@ def main():
     parser.add_argument('--endpoint',default='http://litellm:4000/v1')
     parser.add_argument('--model',default='macmini-qwen3-coder-30b')
     parser.add_argument('--key-env',default='LITELLM_API_KEY')
+    parser.add_argument('--refuse',action='store_true',help='request an unsupported other-kind tool first; it must be refused and end the turn')
     parser.add_argument('--binary',type=Path,default=ROOT/'target/debug/ah',help='Path to the ah binary to test')
     parser.add_argument('--timeout-secs',type=int,default=300)
     parser.add_argument('--group',help='select the proxy model group through this harness litellm.groups name (P3.3)')
@@ -110,7 +115,8 @@ def main():
     args.binary=args.binary.expanduser().resolve()
     if not args.binary.is_file() or not os.access(args.binary,os.X_OK):
         parser.error(f'not an executable ah binary: {args.binary}')
-    assert not (args.live and args.cancel),"cancellation fixture uses the local deterministic model only"
+    assert not (args.live and (args.cancel or args.refuse)),"cancellation/refusal fixtures use the local deterministic model only"
+    assert not (args.cancel and args.refuse)
     with server(args) as (s,endpoint),tempfile.TemporaryDirectory(prefix='ah-single-runtime-') as d, tempfile.TemporaryDirectory(prefix='ah-outside-') as outside:
         cwd=Path(d).resolve();s.cwd=cwd;s.outside=Path(outside).resolve()
         (s.outside/'outside.txt').write_text('OUTSIDE_READ_OK')
@@ -123,7 +129,7 @@ def main():
             model='group:'+args.group if args.group else s.alias,litellm=litellm)))
         (cwd/'calc.py').write_text('def add(a, b):\n    return a - b\n')
         (cwd/'test_calc.py').write_text('from calc import add\nassert add(2, 3) == 5\nprint("PASS arithmetic")\n')
-        prompt='Fix add in calc.py so it adds correctly. Read calc.py, edit it with the edit tool, then use bash to run python3 test_calc.py and touch verified only if it passes. Do not change test_calc.py. Do not use subagents. Reply briefly.'
+        prompt='Fix add in calc.py so it adds correctly. Read calc.py, edit it with the edit tool, then use the shell tool to run python3 test_calc.py and touch verified only if it passes. Do not change test_calc.py. Do not use subagents. Reply briefly.'
         p=subprocess.Popen([str(args.binary),'single',prompt,'--project',str(cwd),'--permissions','trusted','--timeout-secs',str(args.timeout_secs)],
             env={**os.environ,'TEST_KEY':s.key},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
         if args.cancel:
@@ -133,6 +139,13 @@ def main():
         print('CLI exit:',p.returncode,'; stderr:',stderr.strip(),flush=True)
         print('Wire:',json.dumps(s.records),flush=True)
         print('Observed project effects:',json.dumps(dict(edited='return a + b' in (cwd/'calc.py').read_text(), verified=(cwd/'verified').exists())),flush=True)
+        if args.refuse:
+            # 2.2.5 ends the turn with stopReason=cancelled after a rejected permission.
+            assert p.returncode == 3 and not s.failed and s.stage == 1, (p.returncode, s.stage)
+            assert 'grants: 0' in stderr and 'backend terminal=cancelled' in stderr
+            assert (s.outside/'outside.txt').exists() and 'return a - b' in (cwd/'calc.py').read_text()
+            print('PASS unsupported other-kind tool refused; turn ended; no project or outside effect',flush=True)
+            return
         assert p.returncode == (3 if args.cancel else 0) and not s.failed
         assert not args.group or f'ah-litellm/{s.alias} (group {args.group})' in stderr
         assert s.records and all(r['model'] == s.alias for r in s.records)

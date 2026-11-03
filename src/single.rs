@@ -213,29 +213,54 @@ async fn attempt(
     progress: &crate::progress::Progress,
 ) -> Exit {
     let progress = &progress.attempt(number);
-    let mut adapter = match crate::runtime::Runtime::new(
-        request,
-        plan.as_ref(),
-        deadline,
-        cancelled,
-        progress.clone(),
-    ) {
-        Ok(adapter) => adapter,
-        Err(exit) => return exit,
-    };
+    let mut adapter =
+        match crate::runtime::Runtime::new(request, deadline, cancelled, progress.clone()) {
+            Ok(adapter) => adapter,
+            Err(exit) => return exit,
+        };
     let exit = async {
-        if let Err(exit) = crate::worktree::report(&request.project, deadline, progress).await { return exit; }
-        if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= deadline { return Exit::Cancelled; }
+        if let Err(exit) = crate::worktree::report(&request.project, deadline, progress).await {
+            return exit;
+        }
+        if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= deadline {
+            return Exit::Cancelled;
+        }
         // Preflight consumes an isolated routing snapshot; no project code or
         // plugins execute. Only then persist the already validated plan.
-        if let Err(exit) = adapter.preflight(request, plan.as_ref()).await { progress.event("preflight failed (requires OpenCode 1.18.30 and exact isolated routing/permissions)"); return exit; }
-        if tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
-        if let Some(plan) = plan && let Err(error) = plan.apply() { progress.event(error.0); return Exit::Invalid; }
+        if let Err(exit) = adapter.preflight(request).await {
+            progress.event(format!(
+                "preflight failed (requires OpenCode {} and exact isolated routing/permissions)",
+                crate::opencode::VERSION
+            ));
+            return exit;
+        }
+        if tokio::time::Instant::now() >= adapter.deadline {
+            return Exit::Cancelled;
+        }
+        if let Some(plan) = plan
+            && let Err(error) = plan.apply()
+        {
+            progress.event(error.0);
+            return Exit::Invalid;
+        }
         tokio::task::yield_now().await;
-        if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
-        progress.event(format!("{label} via OpenCode 1.18.30; model {}{}; permissions {:?}", request.runtime_model(), request.group.as_ref().map(|g| format!(" (group {g})")).unwrap_or_default(), request.permissions));
+        if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= adapter.deadline {
+            return Exit::Cancelled;
+        }
+        progress.event(format!(
+            "{label} via OpenCode {}; model {}{}; permissions {:?}",
+            crate::opencode::VERSION,
+            request.runtime_model(),
+            request
+                .group
+                .as_ref()
+                .map(|g| format!(" (group {g})"))
+                .unwrap_or_default(),
+            request.permissions
+        ));
         crate::acp::run(&adapter, request).await
-    }.await;
+    }
+    .await;
     if !adapter.cleanup_private_home().await {
         progress.event(
             "uncertain private runtime cleanup; inspect ah-runtime-* under the system temporary directory before manual removal",

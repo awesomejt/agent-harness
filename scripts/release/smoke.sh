@@ -25,7 +25,7 @@ run() {
 run --help > "$work/help"
 /usr/bin/grep -q 'single' "$work/help"
 run single 'smoke-prompt' --project "$work/project" --preview > "$work/preview" 2> "$work/preview.err"
-/usr/bin/grep -q 'missing; install OpenCode 1.18.30' "$work/preview"
+/usr/bin/grep -q 'missing; install OpenCode [0-9]' "$work/preview"
 /usr/bin/grep -q 'health checks: none' "$work/preview"
 if /usr/bin/grep -E 'smoke-secret|smoke-prompt|127.0.0.1' "$work/preview" "$work/preview.err"; then
     exit 1

@@ -38,10 +38,19 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 - **Decision/readiness gate:** AC02, AC03; test effective behavior, not just selected enum values.
 - **Contract:** [docs/TESTING.md](../docs/TESTING.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
+<a id="p3-7"></a>
+## P3.7 — OpenCode 2.x runtime baseline
+
+- **Depends on:** [P3.4](03-routing.md#p3-4)
+- **Deliverable and boundary:** Replace the OpenCode 1.18.30 pin with exact 2.2.5 (the installed and latest published release) on both routes. Cover the new config schema, `--standalone` inspection, the sources-based effective checks, agent rule tails, the native catalog, and ACP launch and permission shapes. No new route, mode, flag or dependency.
+- **Acceptance evidence:** Captured 2.2.5 protocol records. Updated fixture fake and suites. Installed-runtime edit/test, cancellation, group routing, refusal and native/fallback setup against 2.2.5. A mutation check of the new validators.
+- **Decision/readiness gate:** User-directed baseline change (D035, superseding the D023/D032 runtime pin). Recorded as P3.7 because task IDs are stable references, not execution order. P3.5 live use runs on this baseline.
+- **Contract:** [docs/CONFIGURATION.md](../docs/CONFIGURATION.md), [docs/TESTING.md](../docs/TESTING.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
+
 <a id="p3-5"></a>
 ## P3.5 — Dual-route use gate
 
-- **Depends on:** [P3.4](03-routing.md#p3-4)
+- **Depends on:** [P3.7](03-routing.md#p3-7)
 - **Deliverable and boundary:** Demonstrate local-only, native cloud-only and local-first eligible fallback. Capture route explanations, native-config isolation and recovery limits.
 - **Acceptance evidence:** Live examples, exact versions and known limitations prepare Phase 3 exit evidence for P3.6; docs/decisions match behavior and required review is complete.
 - **Decision/readiness gate:** All preceding Phase 3 implementation/evidence tasks complete; use evidence may reorder later backlog, not weaken mode policy.

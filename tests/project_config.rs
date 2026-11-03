@@ -137,7 +137,7 @@ fn detects_manual_edits_stale_plans_and_interrupted_receipts() {
 }
 
 #[test]
-fn no_sync_validates_without_writing_and_effective_route_must_match() {
+fn no_sync_validates_without_writing() {
     let p = Project::new();
     assert!(Plan::prepare(&p.request("first", true)).is_err());
     Plan::prepare(&p.request("first", false))
@@ -148,13 +148,6 @@ fn no_sync_validates_without_writing_and_effective_route_must_match() {
     let r = p.request("first", true);
     let plan = Plan::prepare(&r).unwrap();
     assert!(!plan.needs_write());
-    let mut effective: Value = serde_json::from_str(&p.read("opencode.json")).unwrap();
-    plan.validate_effective(&effective).unwrap();
-    effective["small_model"] = "native/other".into();
-    assert!(plan.validate_effective(&effective).is_err());
-    effective = serde_json::from_str(&p.read("opencode.json")).unwrap();
-    effective["agent"] = serde_json::json!({"helper":{"model":"native/other"}});
-    assert!(plan.validate_effective(&effective).is_err());
     assert!(Plan::prepare(&p.request("other", true)).is_err());
     let before = fs::read_dir(&p.0).unwrap().count();
     plan.apply().unwrap();
@@ -187,7 +180,7 @@ fn symlinks_streams_and_busy_lock_refuse() {
 }
 
 #[test]
-fn preserves_inactive_providers_and_refuses_malformed_effective_agents() {
+fn preserves_inactive_providers() {
     use std::os::unix::fs::PermissionsExt;
     let p = Project::new();
     let sibling = r#""other" : { "options" : {"baseURL":"http://unused"} }"#;
@@ -211,38 +204,11 @@ fn preserves_inactive_providers_and_refuses_malformed_effective_agents() {
         .apply()
         .unwrap();
     assert!(p.read("opencode.json").contains(sibling));
-    let plan = Plan::prepare(&p.request("next", true)).unwrap();
-    let mut effective: Value = serde_json::from_str(&p.read("opencode.json")).unwrap();
-    plan.validate_effective(&effective).unwrap();
-    for malformed in [
-        serde_json::json!([]),
-        serde_json::json!({"helper":null}),
-        serde_json::json!({"helper":false}),
-    ] {
-        effective["agent"] = malformed;
-        assert!(plan.validate_effective(&effective).is_err());
-    }
-}
-
-#[test]
-fn legacy_mode_models_cannot_override_selected_route() {
-    let p = Project::new();
-    Plan::prepare(&p.request("m", false))
-        .unwrap()
-        .apply()
-        .unwrap();
-    let plan = Plan::prepare(&p.request("m", true)).unwrap();
-    let mut effective: Value = serde_json::from_str(&p.read("opencode.json")).unwrap();
-    effective["mode"] = serde_json::json!({"build":{"model":"ah-litellm/m"}});
-    plan.validate_effective(&effective).unwrap();
-    for bad in [
-        serde_json::json!({"build":{"model":"native/other"}}),
-        serde_json::json!([]),
-        serde_json::json!({"build":null}),
-    ] {
-        effective["mode"] = bad;
-        assert!(plan.validate_effective(&effective).is_err());
-    }
+    assert!(
+        !Plan::prepare(&p.request("next", true))
+            .unwrap()
+            .needs_write()
+    );
 }
 
 #[test]
@@ -266,14 +232,14 @@ fn group_reference_manages_only_the_resolved_proxy_group() {
     )
     .unwrap();
     let plan = Plan::prepare(&r).unwrap();
-    let routing = plan.runtime_routing();
+    plan.apply().unwrap();
+    let routing: Value = serde_json::from_str(&p.read("opencode.json")).unwrap();
     assert_eq!(routing["model"], "ah-litellm/proxy-coder");
     assert_eq!(routing["small_model"], "ah-litellm/proxy-coder");
     let models = routing["provider"]["ah-litellm"]["models"]
         .as_object()
         .unwrap();
     assert_eq!(models.keys().collect::<Vec<_>>(), ["proxy-coder"]);
-    plan.apply().unwrap();
     for name in ["opencode.json", ".ah-opencode-owner.json"] {
         let text = p.read(name);
         // Harness group names and unselected groups are not runtime routing.
@@ -281,13 +247,4 @@ fn group_reference_manages_only_the_resolved_proxy_group() {
         assert!(!text.contains("review") && !text.contains("group:"));
         assert!(!text.contains("SENTINEL_SECRET_DO_NOT_WRITE"));
     }
-    // Effective validation rejects a runtime that selected a different group.
-    let mut effective = routing.clone();
-    effective["model"] = "ah-litellm/proxy-review".into();
-    assert!(
-        Plan::prepare(&r)
-            .unwrap()
-            .validate_effective(&effective)
-            .is_err()
-    );
 }
