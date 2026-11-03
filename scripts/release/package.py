@@ -106,6 +106,13 @@ def build_package(output_directory, version, commit, build_directory):
         for source, target in [('LICENSE', 'LICENSE'), ('docs/OPERATIONS.md', 'INSTALL.md'),
                                ('scripts/release/NOTICES.md', 'THIRD_PARTY_NOTICES.md')]:
             shutil.copy2(ROOT / source, bundle / target)
+        # Sample configs and canonical agents, validated by tests and the archive smoke.
+        examples = bundle / 'examples'
+        (examples / 'agents').mkdir(parents=True)
+        for path in sorted((ROOT / 'examples').glob('ah.*.json')):
+            shutil.copy2(path, examples / path.name)
+        for path in sorted((ROOT / 'agents').glob('*.md')):
+            shutil.copy2(path, examples / 'agents' / path.name)
         install = bundle / 'INSTALL.md'
         def repository_link(match):
             target = match.group(2)

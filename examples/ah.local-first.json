@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "mode": "local-first",
+  "model": "group:coder",
+  "litellm": {
+    "api_base": "http://your-proxy:4000/v1",
+    "api_key_env": "LITELLM_API_KEY",
+    "groups": {
+      "coder": "your-existing-alias",
+      "review": "your-existing-alias"
+    }
+  },
+  "native": {
+    "target": "opencode",
+    "model": "your-catalog-model",
+    "api_key_env": "OPENCODE_API_KEY"
+  },
+  "permissions": "deny",
+  "timeout_secs": 1800
+}

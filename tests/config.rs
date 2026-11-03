@@ -982,3 +982,15 @@ fn project_instructions_are_only_a_regular_root_agents_file_inside_the_project()
     assert!(resolve().is_err());
     std::fs::remove_dir_all(base).unwrap();
 }
+
+#[test]
+fn packaged_example_configs_validate() {
+    let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples");
+    for file in [
+        "ah.local-only.json",
+        "ah.cloud-only.json",
+        "ah.local-first.json",
+    ] {
+        assert!(Config::open(&examples.join(file)).is_ok(), "{file}");
+    }
+}
