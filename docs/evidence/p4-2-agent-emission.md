@@ -61,8 +61,8 @@ New `tests/agent_emission.rs` (temp projects, seven groups):
   with no write.
 
 Unit test `ceiling_never_allows_and_matches_profiles_at_the_extremes` proves the
-full trusted set equals the trusted runtime profile, the empty deny set equals
-the deny profile, read-only search maps to `glob`/`grep`, and no rendered rule
+full trusted set equals the trusted runtime profile, empty deny/read-only sets
+equal the deny profile, an empty trusted set still asks for `external_directory`, read-only search maps to `glob`/`grep`, and no rendered rule
 allows. CLI test `named_agent_preview_reports_selection_and_execution_refuses_without_writes`
 runs the binary: preview exits 0 with the agent line and planned emission, no
 body/key; non-preview exits 2 with the P4.3 diagnostic; project listing unchanged.
@@ -106,3 +106,14 @@ description won), so either source silently shadows the other; both informed D03
   intersection, effort refusal and the `agents.NAME` runtime entry: P4.3.
 
 Next: P4.3 — constrained primary and specialized execution.
+
+## PR review closeout
+
+[Grok PR #35 review](https://github.com/awesomejt/agent-harness/pull/35): 0 blockers,
+1 concern and 1 nit, both addressed. The concern was D037 saying an empty tool set
+equals the deny profile, which is wrong for a trusted ceiling (it still asks for
+`external_directory`). D037 and the `ceiling` comment now state all three cases.
+The nit was the unit test checking only rule count; it now asserts the read-only
+empty case equals deny and the trusted empty case differs with
+`external_directory: ask`. Format, locked Clippy and all 74 root tests pass. No
+critical/high finding, so no mandatory re-review.

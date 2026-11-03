@@ -49,7 +49,8 @@ pub(crate) fn profile(policy: Permissions) -> Value {
 
 /// Static rules for an emitted project agent: only the canonical ceiling and
 /// tool list, each listed tool `ask`, never `allow`. A full trusted tool set
-/// equals the trusted profile and an empty one the deny profile. This is not
+/// equals the trusted profile; an empty deny/read-only set equals the deny
+/// profile, while trusted still asks for `external_directory`. This is not
 /// the enforced runtime entry, which must also intersect invocation (P4.3).
 pub(crate) fn ceiling(agent: &Agent) -> Value {
     let mut rules = vec![rule("*", "deny")];
@@ -355,9 +356,14 @@ mod tests {
         assert_eq!(ceiling(&full), profile(Permissions::Trusted));
         assert_eq!(ceiling(&agent("deny", "[]")), profile(Permissions::Deny));
         assert_eq!(
-            ceiling(&agent("trusted", "[]")).as_array().unwrap().len(),
-            2
+            ceiling(&agent("read-only", "[]")),
+            profile(Permissions::Deny)
         );
+        let trusted_empty = ceiling(&agent("trusted", "[]"));
+        assert_ne!(trusted_empty, profile(Permissions::Deny));
+        assert_eq!(trusted_empty.as_array().unwrap().len(), 2);
+        assert_eq!(trusted_empty[1]["action"], "external_directory");
+        assert_eq!(trusted_empty[1]["effect"], "ask");
         let read_only = ceiling(&agent("read-only", "[search]"));
         let actions: Vec<_> = read_only
             .as_array()
