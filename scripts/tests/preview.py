@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory(prefix='ah-preview-') as directory:
     run(['--prompt-file', str(project / 'prompt.txt')])
     run(['--prompt-file', '-'], stdin=prompt)
     _, err = run(key=False, expected=2)
-    assert 'set the environment variable named by litellm.api_key_env' in err
+    assert 'set the environment variable named by the selected route api_key_env' in err
     run(['--no-sync'], expected=2)
     # Exact no-sync config needs no receipt; it still must use the same planner.
     desired = {'provider': {'ah-litellm': {'npm': '@ai-sdk/openai-compatible',

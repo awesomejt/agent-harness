@@ -1,6 +1,6 @@
-//! First-slice orchestration; input validation always precedes project writes.
+//! Single-attempt local/native orchestration; input validation always precedes project writes.
 use crate::{
-    config::{Config, Exit, Invocation},
+    config::{Config, Exit, Invocation, Mode},
     project_config::Plan,
 };
 use std::ffi::OsString;
@@ -33,17 +33,17 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
             progress.event(format!("{}; use --help", error.0));
             if error.0 == crate::config::MISSING_KEY {
                 progress.event(
-                    "set the environment variable named by litellm.api_key_env before retrying",
+                    "set the environment variable named by the selected route api_key_env before retrying",
                 );
             }
             return Exit::Invalid;
         }
     };
     if request.preview {
-        return match Plan::prepare(&request) {
+        return match prepare_plan(&request) {
             Ok(plan) => {
                 use std::io::Write;
-                let report = crate::preview::render(&request, &plan, &config_path);
+                let report = crate::preview::render(&request, plan.as_ref(), &config_path);
                 if std::io::stdout()
                     .lock()
                     .write_all(report.as_bytes())
@@ -70,7 +70,7 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
     {
         let deadline =
             tokio::time::Instant::now() + std::time::Duration::from_secs(request.timeout_secs);
-        let plan = match Plan::prepare(&request) {
+        let plan = match prepare_plan(&request) {
             Ok(plan) => plan,
             Err(error) => {
                 progress.event(error.0);
@@ -88,18 +88,18 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
             Err(_) => return Exit::Failed,
         };
         runtime.block_on(async {
-            let mut adapter = match crate::runtime::Runtime::new(&request, &plan, deadline, progress.clone()) { Ok(adapter) => adapter, Err(exit) => return exit };
+            let mut adapter = match crate::runtime::Runtime::new(&request, plan.as_ref(), deadline, progress.clone()) { Ok(adapter) => adapter, Err(exit) => return exit };
             let exit = async {
                 if let Err(exit) = crate::worktree::report(&request.project, deadline, progress).await { return exit; }
                 if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= deadline { return Exit::Cancelled; }
                 // Preflight consumes an isolated routing snapshot; no project code or
                 // plugins execute. Only then persist the already validated plan.
-                if let Err(exit) = adapter.preflight(&request, &plan).await { progress.event("preflight failed (requires OpenCode 1.18.30 and exact isolated routing/permissions)"); return exit; }
+                if let Err(exit) = adapter.preflight(&request, plan.as_ref()).await { progress.event("preflight failed (requires OpenCode 1.18.30 and exact isolated routing/permissions)"); return exit; }
                 if tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
-                if let Err(error) = plan.apply() { progress.event(error.0); return Exit::Invalid; }
+                if let Some(plan) = plan && let Err(error) = plan.apply() { progress.event(error.0); return Exit::Invalid; }
                 tokio::task::yield_now().await;
                 if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
-                progress.event(format!("attempt=1 local-only via OpenCode 1.18.30; model ah-litellm/{}; permissions {:?}", request.model, request.permissions));
+                progress.event(format!("attempt=1 {} via OpenCode 1.18.30; model {}; permissions {:?}", if request.mode == Mode::LocalOnly { "local-only" } else { "cloud-only" }, request.runtime_model(), request.permissions));
                 crate::acp::run(&adapter, &request).await
             }.await;
             if !adapter.cleanup_private_home().await {
@@ -111,5 +111,12 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
                 exit
             }
         })
+    }
+}
+
+fn prepare_plan(request: &crate::config::Resolved) -> Result<Option<Plan>, crate::config::Invalid> {
+    match request.mode {
+        Mode::LocalOnly => Plan::prepare(request).map(Some),
+        Mode::CloudOnly => Ok(None),
     }
 }

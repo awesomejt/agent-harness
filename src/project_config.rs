@@ -200,6 +200,9 @@ pub struct Plan {
 impl Plan {
     /// Read-only; never consults HOME, environment values or global settings.
     pub fn prepare(r: &Resolved) -> Result<Self> {
+        if r.mode != crate::config::Mode::LocalOnly || r.api_base.is_none() {
+            return Err(Invalid("managed LiteLLM plan requires local-only routing"));
+        }
         let project = r
             .project
             .canonicalize()

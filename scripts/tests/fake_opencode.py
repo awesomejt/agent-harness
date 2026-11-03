@@ -17,16 +17,36 @@ if (cwd / 'track-runtime-home').exists():
 assert 'ANTHROPIC_API_KEY' not in os.environ
 assert os.environ['OPENCODE_DISABLE_PROJECT_CONFIG'] == 'true'
 assert os.environ['HOME'] != str(cwd)
-config['provider']['ah-litellm']['options']['apiKey'] = os.environ['AH_RUNTIME_API_KEY']
+native = config['enabled_providers'] == ['opencode']
+if native:
+    assert config['provider'] == {}
+    assert 'AH_RUNTIME_API_KEY' not in os.environ
+    assert os.environ['OPENCODE_API_KEY'] == 'SECRET_SENTINEL'
+    assert config['model'] == config['small_model'] == 'opencode/fixture'
+    assert 'TEST_KEY' not in os.environ and 'LITELLM_API_KEY' not in os.environ
+else:
+    assert 'OPENCODE_API_KEY' not in os.environ
+    config['provider']['ah-litellm']['options']['apiKey'] = os.environ['AH_RUNTIME_API_KEY']
+target = config['model']
 config.update(agent={}, mode={})
 if '--version' in sys.argv:
     if case=='preflight-deadline': time.sleep(10)
     print('wrong' if case == 'version' else '1.18.30')
     sys.exit()
+if 'models' in sys.argv:
+    assert native
+    print('opencode/missing' if case == 'native-model-missing' else target)
+    sys.exit()
 if 'debug' in sys.argv:
     if 'config' in sys.argv:
         if case == 'route':
             config['small_model'] = 'other/fixture'
+        if case == 'native-provider':
+            config['provider']['ah-litellm'] = dict(options=dict(baseURL='http://127.0.0.1:9/v1'))
+        if case == 'native-enabled':
+            config['enabled_providers'].append('ah-litellm')
+        if case == 'native-agent':
+            config['agent']['rogue'] = dict(model='ah-litellm/fixture')
         if case == 'widened':
             config['permission']['task'] = 'allow'
         print(json.dumps(config))
@@ -72,8 +92,8 @@ for line in sys.stdin:
         reply(m['id'], dict(protocolVersion=1, agentCapabilities={}))
     elif method == 'session/new':
         reply(m['id'], dict(sessionId=sid, configOptions=[dict(
-            id='model', name='Model', type='select', currentValue='other' if case == 'session-model' else 'ah-litellm/fixture',
-            options=[dict(value='ah-litellm/fixture', name='fixture')])]))
+            id='model', name='Model', type='select', currentValue='other' if case == 'session-model' else target,
+            options=[dict(value=target, name='fixture')])]))
     elif method == 'session/prompt':
         prompt_id = m['id']
         (cwd / 'prompted').touch()

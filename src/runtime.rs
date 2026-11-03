@@ -1,6 +1,6 @@
-//! First-slice OpenCode 1.18.30 isolation and effective capability preflight.
+//! Local and native OpenCode 1.18.30 isolation and effective capability preflight.
 use crate::{
-    config::{Exit, Permissions, Resolved},
+    config::{Exit, Mode, Permissions, Resolved},
     process::OwnedChild,
     project_config::Plan,
 };
@@ -47,7 +47,7 @@ pub(crate) fn profile(policy: Permissions, home: &Path) -> (Value, Value) {
 impl Runtime {
     pub fn new(
         request: &Resolved,
-        plan: &Plan,
+        plan: Option<&Plan>,
         deadline: tokio::time::Instant,
         progress: crate::progress::Progress,
     ) -> Result<Self, Exit> {
@@ -59,8 +59,16 @@ impl Runtime {
             .filter(|s| !s.is_empty())
             .ok_or(Exit::Invalid)?;
         let home = PrivateHome::new().map_err(|_| Exit::Failed)?;
-        let mut config = plan.runtime_routing();
-        config["provider"]["ah-litellm"]["options"]["apiKey"] = json!("{env:AH_RUNTIME_API_KEY}");
+        let mut config = match (request.mode, plan) {
+            (Mode::LocalOnly, Some(plan)) => {
+                let mut config = plan.runtime_routing();
+                config["provider"]["ah-litellm"]["options"]["apiKey"] =
+                    json!("{env:AH_RUNTIME_API_KEY}");
+                config
+            }
+            (Mode::CloudOnly, None) => crate::native::routing(request),
+            _ => return Err(Exit::Invalid),
+        };
         let (permissions, tools) = profile(request.permissions, home.path());
         for (key, value) in [
             ("permission", permissions),
@@ -97,7 +105,15 @@ impl Runtime {
         }
         // Copy only the value to a reserved name: arbitrary user-selected names
         // such as DYLD_INSERT_LIBRARIES must never become runtime controls.
-        env.push(("AH_RUNTIME_API_KEY".into(), key));
+        env.push((
+            if request.mode == Mode::LocalOnly {
+                "AH_RUNTIME_API_KEY"
+            } else {
+                "OPENCODE_API_KEY"
+            }
+            .into(),
+            key,
+        ));
         let cancelled = tokio_util::sync::CancellationToken::new();
         let signal_cancel = cancelled.clone();
         let signals = tokio::spawn(async move {
@@ -145,7 +161,7 @@ impl Runtime {
         result?;
         Ok(bytes)
     }
-    pub async fn preflight(&self, request: &Resolved, plan: &Plan) -> Result<(), Exit> {
+    pub async fn preflight(&self, request: &Resolved, plan: Option<&Plan>) -> Result<(), Exit> {
         if self
             .inspect(&request.project, &["--version"])
             .await?
@@ -158,19 +174,27 @@ impl Runtime {
             .inspect(&request.project, &["debug", "config", "--pure"])
             .await?;
         let mut effective: Value = serde_json::from_slice(&bytes).map_err(|_| Exit::Invalid)?;
-        // OpenCode resolves env references in debug output. Compare privately then
-        // restore the reference for the transaction's exact routing validator.
-        let actual = effective["provider"]["ah-litellm"]["options"]["apiKey"]
-            .as_str()
-            .ok_or(Exit::Invalid)?;
-        let key = std::env::var(&request.api_key_env).map_err(|_| Exit::Invalid)?;
-        if actual != key {
-            return Err(Exit::Invalid);
+        match (request.mode, plan) {
+            (Mode::LocalOnly, Some(plan)) => {
+                // OpenCode resolves env references. Compare privately before
+                // restoring the reference for the transaction validator.
+                let actual = effective["provider"]["ah-litellm"]["options"]["apiKey"]
+                    .as_str()
+                    .ok_or(Exit::Invalid)?;
+                let key = std::env::var(&request.api_key_env).map_err(|_| Exit::Invalid)?;
+                if actual != key {
+                    return Err(Exit::Invalid);
+                }
+                effective["provider"]["ah-litellm"]["options"]["apiKey"] =
+                    json!(format!("{{env:{}}}", request.api_key_env));
+                plan.validate_effective(&effective)
+                    .map_err(|_| Exit::Invalid)?;
+            }
+            (Mode::CloudOnly, None) => {
+                crate::native::validate_effective(request, &effective).map_err(|_| Exit::Invalid)?
+            }
+            _ => return Err(Exit::Invalid),
         }
-        effective["provider"]["ah-litellm"]["options"]["apiKey"] =
-            json!(format!("{{env:{}}}", request.api_key_env));
-        plan.validate_effective(&effective)
-            .map_err(|_| Exit::Invalid)?;
         let (permissions, tools) = profile(request.permissions, self.home.path());
         if effective["permission"] != permissions
             || effective["tools"] != tools
@@ -183,6 +207,20 @@ impl Runtime {
             || effective["mode"] != json!({})
         {
             return Err(Exit::Invalid);
+        }
+        if request.mode == Mode::CloudOnly {
+            // Built-in catalog only: model fetching and inherited catalogs are
+            // disabled. This checks support, not credential validity or balance.
+            let bytes = self
+                .inspect(&request.project, &["models", "opencode", "--pure"])
+                .await?;
+            let models = std::str::from_utf8(&bytes).map_err(|_| Exit::Invalid)?;
+            let target = request.runtime_model();
+            if !models.lines().any(|line| line == target)
+                || models.lines().any(|line| !line.starts_with("opencode/"))
+            {
+                return Err(Exit::Invalid);
+            }
         }
         let bytes = self
             .inspect(&request.project, &["debug", "agent", "build", "--pure"])

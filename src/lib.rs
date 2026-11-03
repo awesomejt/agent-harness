@@ -5,6 +5,8 @@ use std::ffi::OsString;
 #[cfg(target_os = "macos")]
 mod acp;
 pub mod config;
+#[cfg(target_os = "macos")]
+mod native;
 pub mod permission;
 mod preview;
 #[cfg(target_os = "macos")]
@@ -18,7 +20,7 @@ pub mod single;
 #[cfg(target_os = "macos")]
 mod worktree;
 
-const HELP: &str = "agent-harness (ah)\n\nUsage: ah [--help | --version]\n       ah single PROMPT [OPTIONS]\n       ah single --prompt-file PATH|- [OPTIONS]\n\nOptions:\n  -h, --help     Show this help\n  -V, --version  Show package version\n\nSingle options: --project PATH --config PATH --mode local-only --model ALIAS\n                --permissions deny|trusted --timeout-secs N --no-sync --preview\nTrusted permits file and shell access with host privileges. Default: deny.\nCoding runs: macOS with OpenCode 1.18.30. Preview: read-only local plan; no child launch or network checks.\n";
+const HELP: &str = "agent-harness (ah)\n\nUsage: ah [--help | --version]\n       ah single PROMPT [OPTIONS]\n       ah single --prompt-file PATH|- [OPTIONS]\n\nOptions:\n  -h, --help     Show this help\n  -V, --version  Show package version\n\nSingle options: --project PATH --config PATH --mode local-only|cloud-only --model MODEL\n                --permissions deny|trusted --timeout-secs N --no-sync --preview\nTrusted permits file and shell access with host privileges. Default: deny.\nCoding runs: macOS with OpenCode 1.18.30. Preview: read-only local plan; no child launch or network checks.\n";
 
 /// Resolve informational arguments without launching a runtime.
 pub fn response(args: impl IntoIterator<Item = OsString>) -> Result<String, &'static str> {
