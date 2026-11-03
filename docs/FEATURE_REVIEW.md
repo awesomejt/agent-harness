@@ -32,7 +32,7 @@ These projects are examples of feature families, not endorsements of every authe
 | F07 | Ordered prompt sequences and step recovery | Committed / 5 | G6; P5.1–P5.4 |
 | F08 | Fresh-context bounded Ralph loop | Committed / 6 | G7; P6.1–P6.4 |
 | F09 | Additional native CLI adapters | Committed / 7, one at a time | G8; P7.1–P7.6 |
-| F10 | Pi adapter and documented portability limits | Committed / 8 | G8; P8.1–P8.4; workflow parity P8.4 waits for P6.4 |
+| F10 | Pi adapter and documented portability limits | Committed / 8 | G8; P8.1–P8.4; workflow parity P8.4 waits for accepted P6.5 review |
 | F11 | Dependency diagnostics, resolved-plan and sync preview | Committed / basic 2, polish 4 | G1/G4; P2.7, P4.5 |
 | F12 | Inline, file, and stdin prompt inputs | Committed / 2 | G2; P2.2; mutual-exclusion/empty-input rules specified before launch |
 | F13 | Human progress plus machine-readable final result/events | Committed / human progress 2, versioned machine result/events 4 | G2/G8; P2.4, P4.7 |

@@ -1,6 +1,6 @@
 # Validation and acceptance plan
 
-Status: the informational Rust CLI, strict first-slice config/input validation, pure permission policy and isolated ACP lifecycle experiment are implemented. Production coding runs, project sync, workflows and release checks remain planned; add their runnable commands/fixtures with the consuming phase. Phase exit criteria in [IMPLEMENTATION.md](IMPLEMENTATION.md) remain authoritative; a passing mock suite does not prove live compatibility.
+Status: the local-only Rust CLI, strict config/input validation, project routing transactions, ACP coding adapter, bounded progress/cancellation, read-only preview, dirty-project reporting and Apple Silicon release checks are implemented. The standalone ACP lifecycle experiment remains regression tooling. Native routes, named agents, machine output and workflows remain phase-gated. Phase exit criteria in [IMPLEMENTATION.md](IMPLEMENTATION.md) remain authoritative; a passing mock suite does not prove live compatibility.
 
 ## Layers
 
@@ -40,6 +40,11 @@ cargo clippy --all-targets --locked -- -D warnings
 cargo test --locked
 cargo build --release --locked
 ./target/release/ah --version
+python3 scripts/tests/single.py
+python3 scripts/tests/preview.py
+python3 scripts/tests/worktree.py
+python3 scripts/tests/single_runtime.py
+python3 scripts/tests/single_runtime.py --cancel
 cargo build --locked --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml
 cargo fmt --check --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml
 cargo clippy --locked --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml -- -D warnings
@@ -47,7 +52,11 @@ python3 scripts/experiments/acp_lifecycle.py
 python3 scripts/experiments/acp_lifecycle.py --runtime --opencode /opt/homebrew/bin/opencode
 ```
 
-The root suite covers informational CLI behavior, config/input/precedence/permission-profile validation and the permission policy; the standalone driver covers adversarial child behavior and real OpenCode local-stub/unavailable scenarios. Exact observed counts are recorded in the dated evidence and phase review. The last command requires the tested installed OpenCode; replace its path explicitly if needed. These commands do not contact a live model provider. Explicit live commands and observed results are in [P1.3 evidence](evidence/p1-3-lifecycle.md) and [P1.5 acceptance preparation](evidence/p1-5-integration-acceptance.md). The [Phase 1 review](reviews/phase-01.md) records the integrated recheck. P2.1 introduces serde/JSON/URL validation and Unix nonblocking prompt-file dependencies; its locked graph/license summary is in [P2.1 evidence](evidence/p2-1-config-contract.md). The earlier experiment graph and release attribution follow-ups remain in the [Phase 1 inventory](evidence/p1-5-dependencies.md). These checks establish the tested macOS experiment boundary, not production coding readiness.
+The root suite covers CLI/config/input/precedence, permission decisions and managed project transactions. The production Python drivers exercise adversarial public-CLI protocol/process behavior, read-only preview and dirty-project preservation. `single_runtime.py` uses installed OpenCode against a deterministic local model stub for actual read/edit/shell operations, independent arithmetic verification and post-edit cancellation. It accepts `--binary /absolute/path/to/ah` to repeat those checks with a release artifact. The standalone lifecycle driver retains earlier adversarial child and installed-runtime local-stub/unavailable regressions. Exact observed counts belong in dated evidence and review reports.
+
+Installed-runtime commands require OpenCode 1.18.30 on an absolute PATH entry; the lifecycle driver accepts its explicit executable path. None of the commands above contacts a live model provider. Explicit live commands and observed results are in [P2.2 coding evidence](evidence/p2-2-local-only-run.md), [P2.4 supervision evidence](evidence/p2-4-progress-supervision.md) and [P2.6 published-binary first use](evidence/p2-6-first-use.md). P2.6 distinguishes repeatable commands from the manual direct-OpenCode comparison and unavailable-endpoint trial. Prior [Phase 1 review](reviews/phase-01.md) and [dependency inventory](evidence/p1-5-dependencies.md) remain historical experiment evidence; the production attribution refresh is recorded in [P2.5 release evidence](evidence/p2-5-installable-binary.md). No passing stub suite substitutes for the required live-use gate.
+
+Follow [the release runbook](OPERATIONS.md#maintainer-release-procedure) to package a clean merged source commit and smoke the actual archive with `sh scripts/release/smoke.sh /absolute/path/to/assets 0.1.0-alpha.1`. Published assets require checksum verification and a fresh download/install smoke. Do not overwrite versioned assets during validation.
 
 Each supported release target needs an actual build and installation smoke test; compilation alone does not establish process-tree behavior. Record platform limitations instead of implying Windows parity from Rust portability. Verify checksums and upgrade instructions, and distinguish external CLI prerequisites from harness installation.
 
