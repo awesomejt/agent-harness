@@ -1,10 +1,10 @@
-use awesomejt_agent_harness::recovery::{Decision, Evidence, Failure, Mode, decide};
+use awesomejt_agent_harness::recovery::{Decision, Evidence, Failure, Mode, Submission, decide};
 
 fn eligible() -> Evidence {
     Evidence {
         mode: Mode::LocalFirst,
         failure: Failure::Unavailable,
-        prompt_not_sent: true,
+        submission: Submission::NotAttempted,
         cleanup_confirmed: true,
         cancelled_or_expired: false,
         configured_target_validated: true,
@@ -26,7 +26,7 @@ fn only_proven_pre_submission_availability_failures_are_eligible() {
         assert_eq!(
             decide(&Evidence {
                 failure,
-                prompt_not_sent: false,
+                submission: Submission::Attempted,
                 ..eligible()
             }),
             Decision::Stop
@@ -57,6 +57,10 @@ fn every_route_and_recovery_guard_is_required() {
         assert_eq!(decide(&Evidence { mode, ..eligible() }), Decision::Stop);
     }
     for evidence in [
+        Evidence {
+            submission: Submission::Unknown,
+            ..eligible()
+        },
         Evidence {
             cleanup_confirmed: false,
             ..eligible()
