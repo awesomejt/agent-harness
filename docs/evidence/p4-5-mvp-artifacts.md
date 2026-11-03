@@ -105,3 +105,16 @@ All pass. Results:
   are untested and not provided, as in D029.
 - The setup check's runtime version step is manual; preview stays network-free
   and subprocess-free by contract, and execution preflight enforces the pin.
+
+## PR review follow-up
+
+Grok PR #40: 0 blockers, 1 concern, 1 nit; both fixed and verified without
+mandatory re-review. The concern was that `package.py` copied samples with
+open-ended globs. It now packages an explicit allowlist (three configs,
+`coder.md`, `reviewer.md`) and refuses any other content in `examples/` or
+`agents/`. A temporary extra `agents/extra.md` commit made packaging fail with
+`examples/ or agents/ differs from the reviewed sample set`. The nit was that the
+sample test checked only that files open. It now asserts the exact file set, each
+sample's `mode` and its route blocks. The repackaged candidate from `eceaa8b`
+passes the archive smoke (SHA-256 `b91aa544…2d14`); 82 root tests and locked
+Clippy pass.
