@@ -68,13 +68,20 @@ fn closed_stdout_fails_without_panicking() {
 
 #[cfg(unix)]
 #[test]
-fn named_agent_preview_reports_selection_and_execution_refuses_without_writes() {
+fn named_agent_preview_reports_mapping_and_unsupported_effort_refuses_without_writes() {
     let project = std::env::temp_dir().join(format!("ah-cli-agent-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&project);
     std::fs::create_dir_all(project.join("agents")).unwrap();
     std::fs::write(
         project.join("agents/reviewer.md"),
         include_str!("../agents/reviewer.md"),
+    )
+    .unwrap();
+    std::fs::write(
+        project.join("agents/thinker.md"),
+        include_str!("../agents/reviewer.md")
+            .replace("name: reviewer", "name: thinker")
+            .replace("\ntools:", "\neffort: high\ntools:"),
     )
     .unwrap();
     std::fs::write(
@@ -91,31 +98,46 @@ fn named_agent_preview_reports_selection_and_execution_refuses_without_writes() 
         names
     };
     let before = listing();
-    let run = |extra: &[&str]| {
+    let run = |name: &str, extra: &[&str]| {
         Command::new(env!("CARGO_BIN_EXE_ah"))
-            .args(["single", "review it", "--agent", "reviewer"])
+            .args(["single", "review it", "--agent", name])
             .args(extra)
             .current_dir(&project)
             .env("AH_CLI_AGENT_KEY", "secret-value")
             .output()
             .unwrap()
     };
-    let output = run(&["--preview"]);
+    let output = run("reviewer", &["--preview", "--permissions", "trusted"]);
     assert_eq!(output.status.code(), Some(0));
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("agent: \"reviewer\" (capacity specialized; ceiling read-only; tools [read, search]; effort default)"));
     assert!(stdout.contains(".opencode/agents/reviewer.md: emitted agent"));
-    assert!(stdout.contains("named execution refused until constraint enforcement (P4.3)"));
+    assert!(
+        stdout
+            .contains("runtime: default agent with effective permissions [\"read\", \"search\"]\n")
+    );
     assert!(!stdout.contains("Inspect the change") && !stdout.contains("secret-value"));
     assert_eq!(listing(), before);
+    let output = run("reviewer", &["--preview"]);
+    assert!(
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("effective permissions deny (invocation)\n")
+    );
 
-    let output = run(&[]);
+    let output = run("thinker", &["--preview"]);
+    assert_eq!(output.status.code(), Some(0));
+    assert!(String::from_utf8(output.stdout).unwrap().contains(
+        "effort high); OpenCode emission: managed project file (see planned changes); runtime: default agent with effective permissions deny (invocation); execution refused: agent effort is unsupported"
+    ));
+    // Refusal precedes runtime discovery, the network and project writes.
+    let output = run("thinker", &[]);
     assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
     assert!(
         String::from_utf8(output.stderr)
             .unwrap()
-            .contains("named agent execution requires constraint enforcement (P4.3)")
+            .contains("agent effort is unsupported by OpenCode 2.2.5; only default effort runs")
     );
     assert_eq!(listing(), before);
     std::fs::remove_dir_all(project).unwrap();

@@ -107,6 +107,17 @@ if 'debug' in sys.argv:
                        model=dict(id=config['model']['model'], providerID=provider))]
         if case == 'agent-model':
             agents[1]['model'] = dict(id='other', providerID=provider)
+        # P4.3: configured agents append their own rules after the global ones.
+        for name, item in config['agents'].items():
+            if name == 'title':
+                continue
+            rules = builtin + profile + list(item['permissions']) + tail
+            if case == 'named-widened':
+                rules.append(dict(action='edit', resource='*', effect='ask'))
+            agents.append(dict(id=name, name=name, description=item['description'], mode=item['mode'],
+                               hidden=case == 'named-hidden', permissions=rules, request=request,
+                               system=item['system'] + ('x' if case == 'named-system' else ''),
+                               model=dict(id=item['model']['model'], providerID=item['model']['providerID'])))
         print(json.dumps(agents))
     sys.exit()
 assert sys.argv[1:] == ['acp'], sys.argv
@@ -148,19 +159,27 @@ for line in sys.stdin:
             continue
         reply(m['id'], dict(protocolVersion=1, agentCapabilities={}))
     elif method == 'session/new':
+        # 2.2.5 silently selects `build` when the default agent is unusable.
+        default = 'build' if case == 'named-mode-fallback' else config.get('default_agent', 'build')
         reply(m['id'], dict(sessionId=sid, configOptions=[dict(
             id='model', name='Model', category='model', type='select', currentValue='other' if case == 'session-model' else target,
-            options=[dict(value=target, name=target)])]))
+            options=[dict(value=target, name=target)]), dict(
+            id='mode', name='Session Mode', category='mode', type='select', currentValue=default,
+            options=[dict(value=default, name=default)])]))
     elif method == 'session/prompt':
         prompt_id = m['id']
         (cwd / 'prompted').touch()
         if case in ['deadline', 'interrupt','cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission','cancel-term']:
             continue
-        if case in ['deny-progress', 'deny-completed']:
+        if case in ['deny-progress', 'deny-completed', 'named-completed-edit', 'named-completed-read', 'named-completed-unknown']:
             # 2.2.5 reports in_progress while parsing arguments, then fails an unavailable tool.
-            update(sessionUpdate='tool_call', toolCallId='t', kind='read', status='pending', rawInput={})
-            for status in ['in_progress', 'completed' if case == 'deny-completed' else 'failed']:
-                update(sessionUpdate='tool_call_update', toolCallId='t', kind='read', status=status, rawInput=dict(path='/tmp/example'))
+            kind = 'edit' if case == 'named-completed-edit' else 'read'
+            update(sessionUpdate='tool_call', toolCallId='t', **({} if case == 'named-completed-unknown' else dict(kind=kind)), status='pending', rawInput={})
+            for status in ['in_progress', 'failed' if case == 'deny-progress' else 'completed']:
+                fields = dict(sessionUpdate='tool_call_update', toolCallId='t', status=status, rawInput=dict(path='/tmp/example'))
+                if case != 'named-completed-unknown':
+                    fields['kind'] = kind
+                update(**fields)
             reply(prompt_id,dict(stopReason='end_turn'))
             continue
         if case in ['usage','usage-invalid-cost']:

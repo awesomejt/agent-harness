@@ -4,7 +4,7 @@ use crate::permission::{
     PermissionResponse,
 };
 use crate::{
-    config::{Exit, Permissions, Resolved},
+    config::{Exit, Resolved},
     process::OwnedChild,
     runtime::Runtime,
 };
@@ -73,6 +73,8 @@ struct Observed {
     session: Option<String>,
     seen: HashMap<String, u8>,
     calls: HashMap<String, Value>,
+    /// Announced kind per tool call, for checking completions of a named role.
+    kinds: HashMap<String, String>,
     granted: usize,
 }
 
@@ -83,7 +85,12 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
     let project = &request.project;
     let target = request.runtime_model();
     let prompt = &request.prompt;
-    let policy = request.permissions;
+    // Kinds the effective rules may grant; a named role also fails on a
+    // completed call of any other kind, independently of backend rules.
+    let grantable = crate::opencode::grantable(request);
+    let restricted = request.agent.is_some();
+    let permission_kinds = grantable.clone();
+    let agent = request.agent.as_ref().map(|a| a.name().to_owned());
     // 2.2.5 `acp` takes no project flags: the working directory and
     // session/new cwd select the project, and it spawns its own private
     // `serve --stdio` child inside the owned process group.
@@ -162,7 +169,21 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                             notification_progress.event(format!("tool activity; events={}", state.tools));
                         }
                         let update = &value["update"];
+                        let mut completed_kind = None;
                         if let Some(id) = update["toolCallId"].as_str() {
+                            if let Some(kind) = update["kind"].as_str() {
+                                if state.kinds.len() >= 4096 && !state.kinds.contains_key(id) {
+                                    return Err(notification_failure.fail());
+                                }
+                                state.kinds.insert(id.to_owned(), kind.to_owned());
+                            }
+                            match update["status"].as_str() {
+                                Some("completed") => completed_kind = state.kinds.remove(id),
+                                Some("failed") => {
+                                    state.kinds.remove(id);
+                                }
+                                _ => {}
+                            }
                             if (update["status"].is_null()
                                 || matches!(
                                     update["status"].as_str(),
@@ -184,8 +205,12 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                         }
                         // 2.2.5 reports `in_progress` while parsing arguments, before
                         // availability is checked; only completion proves execution.
-                        if policy == Permissions::Deny
-                            && value["update"]["status"].as_str() == Some("completed")
+                        // An unknown kind under a named role fails closed.
+                        if value["update"]["status"].as_str() == Some("completed")
+                            && (grantable.is_empty()
+                                || (restricted
+                                    && !completed_kind
+                                        .is_some_and(|kind| grantable.contains(&kind.as_str()))))
                         {
                             return Err(notification_failure.fail());
                         }
@@ -243,7 +268,9 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                     options,
                 };
                 let mut policy =
-                    if policy == Permissions::Trusted
+                    if value["toolCall"]["kind"]
+                        .as_str()
+                        .is_some_and(|kind| permission_kinds.contains(&kind))
                         && !permission_cancel.is_cancelled()
                         && tokio::time::Instant::now() < permission_deadline
                         && bound(&value["toolCall"], descriptor) {
@@ -359,6 +386,19 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                 .collect();
             if models.len() != 1 || models[0]["currentValue"] != target {
                 return Err(agent_client_protocol::Error::internal_error());
+            }
+            // 2.2.5 silently falls back to `build` when the default agent is
+            // unusable; a named role must be the session's selected mode.
+            if let Some(agent) = &agent {
+                let modes: Vec<&Value> = value["configOptions"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter(|x| x["id"] == "mode")
+                    .collect();
+                if modes.len() != 1 || modes[0]["currentValue"] != agent.as_str() {
+                    return Err(agent_client_protocol::Error::internal_error());
+                }
             }
             foreground.lock().unwrap().session = Some(session.session_id.to_string());
             // Session IDs are opaque backend data: JSON escaping and a length

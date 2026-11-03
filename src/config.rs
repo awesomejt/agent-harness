@@ -158,8 +158,8 @@ pub struct Resolved {
     pub no_sync: bool,
     pub preview: bool,
     pub prompt: String,
-    /// Selected canonical definition. Its ceiling is not yet enforced, so
-    /// execution refuses a named request until P4.3; preview and emission use it.
+    /// Selected canonical definition, enforced at runtime as the default agent
+    /// with its ceiling intersected with `permissions` (D038).
     pub agent: Option<Agent>,
     /// Local-first only: the configured native target, resolved with identical
     /// project, permissions, timeout and prompt. Never nested.
