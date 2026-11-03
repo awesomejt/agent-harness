@@ -151,7 +151,7 @@ flowchart LR
     Installed --> NativeService[Configured native service]
 ```
 
-Release tooling and initial target are chosen in Phase 2; expanded supported platforms are declared in Phase 4 after tests. A binary build does not prove process-tree cleanup on every platform. Native CLIs retain their own installation/runtime prerequisites. No mandatory daemon, hosted control plane, Python bridge or ai-queue runtime dependency is introduced.
+D029 selects a native locked Apple Silicon macOS archive and GitHub pre-release in Phase 2; [the release runbook](OPERATIONS.md#maintainer-release-procedure) describes the manual build/smoke/publication process. The diagram shows the eventual release pipeline; current packaging is not automated CI. Expanded supported platforms are declared in Phase 4 after tests. A binary build does not prove process-tree cleanup on every platform. Native CLIs retain their own installation/runtime prerequisites. No mandatory daemon, hosted control plane, Python bridge or ai-queue runtime dependency is introduced.
 
 ## Ownership and persistence
 

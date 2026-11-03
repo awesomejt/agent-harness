@@ -6,7 +6,7 @@ The goal is to run real project work with explicit routing, portable agent defin
 
 ## Status
 
-Phase 2 is in progress after the accepted [Phase 1 review](docs/reviews/phase-01.md). `ah single` now runs OpenCode **1.18.30** over ACP against the configured LiteLLM alias on macOS. Managed project routing and explicit inline/file/stdin inputs are implemented. Bounded progress/cancellation, read-only preview and dirty-project reporting are implemented. The first Apple Silicon macOS pre-release is published via the [installation runbook](docs/OPERATIONS.md); [real-use evidence](docs/evidence/p2-6-first-use.md) prepares acceptance, and holistic Phase 2 review remains required.
+The [Phase 2 holistic review](docs/reviews/phase-02.md) records first-slice acceptance, effective on its report PR merge. Next is P3.1 failure/recovery policy before dual-route expansion. `ah single` now runs OpenCode **1.18.30** over ACP against the configured LiteLLM alias on macOS. Managed project routing and explicit inline/file/stdin inputs are implemented. Bounded progress/cancellation, read-only preview and dirty-project reporting are implemented. The first Apple Silicon macOS pre-release is published via the [installation runbook](docs/OPERATIONS.md); [real-use evidence](docs/evidence/p2-6-first-use.md) records installed use and direct OpenCode comparison. Source now checks private runtime-state removal explicitly; published alpha.1 retains best-effort deletion, as documented in the runbook.
 
 ## Install
 

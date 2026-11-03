@@ -1,6 +1,6 @@
 # Operations and distribution contract
 
-Status: P2.5 first binary runbook for `0.1.0-alpha.1`; later workflow/native-adapter guidance remains prospective. First-use acceptance (P2.6) and holistic phase review (P2.9) remain required. See [release evidence](evidence/p2-5-installable-binary.md).
+Status: P2.5 first binary runbook for `0.1.0-alpha.1`; later workflow/native-adapter guidance remains prospective. First-use evidence is recorded in P2.6; holistic phase review P2.9 gates phase acceptance. See [release evidence](evidence/p2-5-installable-binary.md).
 
 The [deployment diagram](ARCHITECTURE.md) separates the release pipeline, local executable, installed runtime and external services. Rust library dependencies are linked/packaged for the target as required; binary users do not install Cargo packages manually.
 
@@ -100,6 +100,8 @@ failure, 2 rejected input/capability, 3 confirmed cancellation/deadline, 4 uncer
 outcome. On 4, inspect edits and processes before a new attempt. Never assume an
 interrupted attempt made no changes. See [configuration](CONFIGURATION.md) and
 [execution](EXECUTION.md) for managed config conflicts and finite cleanup bounds.
+
+The published alpha.1 artifact uses best-effort deletion of its private runtime HOME/XDG directory. A source correction from P2.9 checks removal explicitly and returns exit 4 if temporary state may remain; it will require a new versioned artifact. After an interrupted run or retained-state warning, inspect `ah-runtime-*` directories under the system temporary directory for private session/tool state. Normal process cleanup does not prove temporary-state removal. Existing release assets are unchanged.
 
 ### Upgrade, rollback and removal
 
