@@ -194,7 +194,6 @@ pub struct Plan {
     owner_before: Option<String>,
     after: String,
     owner_after: String,
-    desired: BTreeMap<String, Value>,
     no_sync: bool,
 }
 impl Plan {
@@ -261,14 +260,8 @@ impl Plan {
             owner_before,
             after,
             owner_after,
-            desired: wanted,
             no_sync: r.no_sync,
         })
-    }
-    /// The validated routing snapshot for an isolated runtime. Unmanaged project
-    /// settings stay on disk and are never executed by the first-slice adapter.
-    pub fn runtime_routing(&self) -> Value {
-        serde_json::to_value(&self.desired).expect("JSON values")
     }
     pub fn needs_write(&self) -> bool {
         !self.no_sync
@@ -289,46 +282,6 @@ impl Plan {
             }
         }
         changes
-    }
-    /// Inspect the adapter-observed effective config after isolated launch setup.
-    /// P2.2 must separately verify tools, agents, plugins and permission policy.
-    pub fn validate_effective(&self, effective: &Value) -> Result<()> {
-        for (k, v) in &self.desired {
-            if managed_value(k, effective.get(k))?.as_ref() != Some(v) {
-                return Err(Invalid(
-                    "effective runtime routing differs from planned project routing",
-                ));
-            }
-        }
-        for section in ["agent", "mode"] {
-            let (section_error, entry_error, model_error) = if section == "agent" {
-                (
-                    "effective agents must be an object",
-                    "effective agent must be an object",
-                    "effective agent overrides the selected model",
-                )
-            } else {
-                (
-                    "effective modes must be an object",
-                    "effective mode must be an object",
-                    "effective mode overrides the selected model",
-                )
-            };
-            if let Some(agents) = effective.get(section) {
-                let agents = agents.as_object().ok_or(Invalid(section_error))?;
-                for agent in agents.values() {
-                    if !agent.is_object() {
-                        return Err(Invalid(entry_error));
-                    }
-                    if let Some(model) = agent.get("model") {
-                        if model != &self.desired["model"] {
-                            return Err(Invalid(model_error));
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
     }
     /// Atomic file replacement under a nonblocking advisory lock; stale plans
     /// reject. A crash between config and receipt is a visible ownership conflict.

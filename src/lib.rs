@@ -5,8 +5,8 @@ use std::ffi::OsString;
 #[cfg(target_os = "macos")]
 mod acp;
 pub mod config;
-#[cfg(target_os = "macos")]
-mod native;
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+mod opencode;
 pub mod permission;
 mod preview;
 #[cfg(target_os = "macos")]
@@ -22,7 +22,7 @@ pub mod single;
 #[cfg(target_os = "macos")]
 mod worktree;
 
-const HELP: &str = "agent-harness (ah)\n\nUsage: ah [--help | --version]\n       ah single PROMPT [OPTIONS]\n       ah single --prompt-file PATH|- [OPTIONS]\n\nOptions:\n  -h, --help     Show this help\n  -V, --version  Show package version\n\nSingle options: --project PATH --config PATH --mode local-only|cloud-only|local-first\n                --model MODEL|group:NAME --permissions deny|trusted\n                --timeout-secs N --no-sync --preview\nTrusted permits file and shell access with host privileges. Default: deny.\nLocal-first falls back once to configured native only if LiteLLM is unreachable before launch.\nCoding runs: macOS with OpenCode 1.18.30. Preview: read-only local plan; no child launch or network checks.\n";
+const HELP: &str = "agent-harness (ah)\n\nUsage: ah [--help | --version]\n       ah single PROMPT [OPTIONS]\n       ah single --prompt-file PATH|- [OPTIONS]\n\nOptions:\n  -h, --help     Show this help\n  -V, --version  Show package version\n\nSingle options: --project PATH --config PATH --mode local-only|cloud-only|local-first\n                --model MODEL|group:NAME --permissions deny|trusted\n                --timeout-secs N --no-sync --preview\nTrusted permits file and shell access with host privileges. Default: deny.\nLocal-first falls back once to configured native only if LiteLLM is unreachable before launch.\nCoding runs: macOS with OpenCode 2.2.5. Preview: read-only local plan; no child launch or network checks.\n";
 
 /// Resolve informational arguments without launching a runtime.
 pub fn response(args: impl IntoIterator<Item = OsString>) -> Result<String, &'static str> {

@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Fake version/debug/ACP executable used only via disposable PATH in P2.2 tests."""
+"""Fake OpenCode 2.2.5 version/debug/models/ACP executable, used only via a disposable PATH.
+
+Emulates the surfaces recorded in docs/evidence/p3-7-opencode-2-baseline.md: a
+sources list from `debug config`, per-agent rules from `debug agents`, `path`
+tool arguments, a doubled external-directory request and a rejected permission
+ending the turn with stopReason=cancelled.
+"""
 import json
 import os
 from pathlib import Path
@@ -10,7 +16,7 @@ import time
 
 cwd = Path.cwd()
 case = (cwd / 'case').read_text().strip()
-sid = 'test\u009b\u202e\n\x1b' if case=='session-controls' else 'test'
+sid = 'test\u009b‮\n\x1b' if case=='session-controls' else 'test'
 config = json.loads(os.environ['OPENCODE_CONFIG_CONTENT'])
 if (cwd / 'track-runtime-home').exists():
     (cwd / 'runtime-home').write_text(os.environ['HOME'])
@@ -23,62 +29,87 @@ if (cwd / 'track-config').exists():
     # P3.4 matrix: record each invocation's effective inputs for route assertions.
     with open(cwd / 'runtime-config.jsonl', 'a') as record:
         record.write(json.dumps(dict(args=sys.argv[1:], env=sorted(os.environ), config=config)) + '\n')
-native = config['enabled_providers'] == ['opencode']
+provider = config['model']['providerID']
+native = provider == 'opencode'
+assert config['policies'] == [dict(action='provider.use', resource='*', effect='deny'),
+                              dict(action='provider.use', resource=provider, effect='allow')]
 if native:
-    assert config['provider'] == {}
+    assert config['providers'] == {}
     assert 'AH_RUNTIME_API_KEY' not in os.environ
     assert os.environ['OPENCODE_API_KEY'] == 'SECRET_SENTINEL'
-    assert config['model'] == config['small_model'] == 'opencode/fixture'
+    assert config['model'] == config['agents']['title']['model'] == dict(providerID='opencode', model='fixture')
     assert 'TEST_KEY' not in os.environ and 'LITELLM_API_KEY' not in os.environ
 else:
     assert 'OPENCODE_API_KEY' not in os.environ
-    config['provider']['ah-litellm']['options']['apiKey'] = os.environ['AH_RUNTIME_API_KEY']
-target = config['model']
-config.update(agent={}, mode={})
+    assert config['providers']['ah-litellm']['settings']['apiKey'] == '{env:AH_RUNTIME_API_KEY}'
+    assert os.environ['AH_RUNTIME_API_KEY']
+target = provider + '/' + config['model']['model']
+if sys.argv[1:] != ['acp']:
+    # Inspection must never attach to the user's background service.
+    assert '--standalone' in sys.argv, sys.argv
 if '--version' in sys.argv:
     if case=='preflight-deadline': time.sleep(10)
-    print('wrong' if case == 'version' else '1.18.30')
+    print('wrong' if case == 'version' else 'opencode v2.2.5')
     sys.exit()
 if 'models' in sys.argv:
     assert native
     print('opencode/missing' if case == 'native-model-missing' else target)
+    print('ah-litellm/fixture' if case == 'catalog-foreign' else 'opencode/other')
     sys.exit()
 if 'debug' in sys.argv:
     if 'config' in sys.argv:
+        info = json.loads(json.dumps(config))
+        for item in info['providers'].values():
+            item['settings']['apiKey'] = '***'
         if case == 'route':
-            config['small_model'] = 'other/fixture'
+            info['agents']['title']['model'] = dict(providerID=provider, model='other')
         if case == 'native-provider':
-            config['provider']['ah-litellm'] = dict(options=dict(baseURL='http://127.0.0.1:9/v1'))
+            info['providers']['ah-litellm'] = dict(package='aisdk:@ai-sdk/openai-compatible', settings=dict(baseURL='http://127.0.0.1:9/v1'))
         if case == 'native-enabled':
-            config['enabled_providers'].append('ah-litellm')
+            info['policies'].append(dict(action='provider.use', resource='ah-litellm', effect='allow'))
         if case == 'native-agent':
-            config['agent']['rogue'] = dict(model='ah-litellm/fixture')
+            info['agents']['rogue'] = dict(model=dict(providerID='ah-litellm', model='fixture'))
         # Inherited helper/subagent/provider choices, identical for both routes.
         if case == 'inherit-agent':
-            config['agent']['helper'] = dict(model='other/fixture')
+            info['agents']['helper'] = dict(model=dict(providerID='other', model='fixture'))
         if case == 'inherit-subagent':
-            config['agent']['explore'] = dict(mode='subagent', model=config['model'])
+            info['agents']['explore'] = dict(mode='subagent', model=config['model'])
         if case == 'inherit-mode':
-            config['mode']['plan'] = dict(model='other/fixture')
+            info['agents']['plan'] = dict(model=dict(providerID='other', model='fixture'))
         if case == 'inherit-provider':
-            config['provider']['other'] = dict(options=dict(baseURL='http://127.0.0.1:9/v1'))
-            config['enabled_providers'].append('other')
+            info['providers']['other'] = dict(package='aisdk:@ai-sdk/openai-compatible', settings=dict(baseURL='http://127.0.0.1:9/v1'))
+            info['policies'].append(dict(action='provider.use', resource='other', effect='allow'))
         if case == 'widened':
-            config['permission']['task'] = 'allow'
-        print(json.dumps(config))
+            info['permissions'].append(dict(action='subagent', resource='*', effect='allow'))
+        config_dir = Path(os.environ['HOME']) / 'CONFIG' / 'opencode'
+        config_dir.mkdir(parents=True, exist_ok=True)
+        sources = [dict(type='directory', path=str(config_dir))]
+        if case == 'project-source':
+            sources.append(dict(type='document', path=str(cwd / 'opencode.json'), info=dict(model=dict(providerID='other', model='x'))))
+        sources.append(dict(type='document', info=info))
+        print(json.dumps(sources))
     else:
-        rules = []
-        for name in ['*','read','glob','grep','edit','apply_patch','bash','external_directory']:
-            if name not in config['permission']: continue
-            value=config['permission'][name]
-            for pattern, action in (value.items() if isinstance(value, dict) else [('*', value)]):
-                rules.append(dict(permission=name, pattern=pattern, action=action))
+        builtin = [dict(action='*', resource='*', effect='allow'), dict(action='read', resource='*.env', effect='ask')]
+        tail = [dict(action='browser', resource='*', effect='deny'), dict(action='skill', resource='browser', effect='deny')]
+        profile = list(config['permissions'])
         if case == 'agent-reversed':
-            rules[-2:]=reversed(rules[-2:])
+            profile[-2:] = reversed(profile[-2:])
+        build = builtin + profile + tail
         if case == 'agent-widened':
-            rules.append(dict(permission='bash', pattern='*', action='allow'))
-        print(json.dumps(dict(name='build', permission=rules)))
+            build.append(dict(action='shell', resource='*', effect='allow'))
+        explore = builtin + [dict(action='shell', resource='*', effect='allow')] + list(config['permissions']) + tail
+        if case == 'subagent-widened':
+            explore.append(dict(action='edit', resource='*', effect='ask'))
+        request = dict(settings={}, headers={}, body={})
+        agents = [dict(id='build', name='Build', mode='primary', hidden=False, permissions=build, request=request),
+                  dict(id='explore', name='Explore', mode='subagent', hidden=False, permissions=explore, request=request),
+                  dict(id='title', name='Title', mode='primary', hidden=True, permissions=builtin + list(config['permissions']) + tail, request=request,
+                       model=dict(id=config['model']['model'], providerID=provider))]
+        if case == 'agent-model':
+            agents[1]['model'] = dict(id='other', providerID=provider)
+        print(json.dumps(agents))
     sys.exit()
+assert sys.argv[1:] == ['acp'], sys.argv
 (cwd / 'launched').touch()
 with open(cwd / 'launch-routes', 'a') as routes:
     routes.write(('native' if native else 'local') + '\n')
@@ -100,7 +131,15 @@ def reply(identifier, result):
     send(dict(jsonrpc='2.0', id=identifier, result=result))
 
 
+def update(**fields):
+    send(dict(jsonrpc='2.0', method='session/update', params=dict(sessionId=sid, update=fields)))
+
+
+PERMISSION_CASES = ['read','edit','execute','search','other','external','triplicate','duplicate','deny','no-once','empty-id',
+                    'kind-mismatch','unbound','unexpected-write','argument-mismatch','empty-metadata','omitted-metadata','worktree']
 prompt_id = None
+permission = None
+requests = 0
 for line in sys.stdin:
     m = json.loads(line)
     method = m.get('method')
@@ -110,20 +149,22 @@ for line in sys.stdin:
         reply(m['id'], dict(protocolVersion=1, agentCapabilities={}))
     elif method == 'session/new':
         reply(m['id'], dict(sessionId=sid, configOptions=[dict(
-            id='model', name='Model', type='select', currentValue='other' if case == 'session-model' else target,
-            options=[dict(value=target, name='fixture')])]))
+            id='model', name='Model', category='model', type='select', currentValue='other' if case == 'session-model' else target,
+            options=[dict(value=target, name=target)])]))
     elif method == 'session/prompt':
         prompt_id = m['id']
         (cwd / 'prompted').touch()
         if case in ['deadline', 'interrupt','cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission','cancel-term']:
             continue
-        if case == 'deny-progress':
-            for status in ['in_progress','failed']:
-                send(dict(jsonrpc='2.0',method='session/update',params=dict(sessionId=sid,update=dict(sessionUpdate='tool_call_update',toolCallId='t',status=status))))
+        if case in ['deny-progress', 'deny-completed']:
+            # 2.2.5 reports in_progress while parsing arguments, then fails an unavailable tool.
+            update(sessionUpdate='tool_call', toolCallId='t', kind='read', status='pending', rawInput={})
+            for status in ['in_progress', 'completed' if case == 'deny-completed' else 'failed']:
+                update(sessionUpdate='tool_call_update', toolCallId='t', kind='read', status=status, rawInput=dict(path='/tmp/example'))
             reply(prompt_id,dict(stopReason='end_turn'))
             continue
         if case in ['usage','usage-invalid-cost']:
-            send(dict(jsonrpc='2.0',method='session/update',params=dict(sessionId=sid,update=dict(sessionUpdate='usage_update',used=123,size=32000,cost=dict(amount=0.25,currency='USD' if case=='usage' else 'SECRET_SENTINEL')))))
+            update(sessionUpdate='usage_update',used=123,size=32000,cost=dict(amount=0.25,currency='USD' if case=='usage' else 'SECRET_SENTINEL'))
         if case == 'stderr-noise':
             os.write(2, b'SECRET_SENTINEL\xff' * 150000)
         if case == 'truncated-json':
@@ -140,7 +181,7 @@ for line in sys.stdin:
             continue
         if case in ['blocked-stdout','blocked-stderr','progress']:
             for i in range(30000 if case == 'blocked-stderr' else 1):
-                send(dict(jsonrpc='2.0',method='session/update',params=dict(sessionId=sid,update=dict(sessionUpdate='agent_message_chunk',content=dict(type='text',text='x' * (900000 if case=='blocked-stdout' else 1))))))
+                update(sessionUpdate='agent_message_chunk',content=dict(type='text',text='x' * (900000 if case=='blocked-stdout' else 1)))
             if case == 'progress':
                 (cwd/'streamed').touch()
                 time.sleep(1)
@@ -152,10 +193,14 @@ for line in sys.stdin:
         if case == 'oversized':
             print('x' * 8_000_001, flush=True)
             continue
-        if case in ['read','edit','execute','search','other','external','duplicate','deny','no-once','empty-id','kind-mismatch','unbound','unexpected-write','argument-mismatch','empty-metadata','omitted-metadata']:
-            kind = case if case in ['read','edit','execute','search','other'] else ('other' if case == 'external' else 'read')
+        if case in PERMISSION_CASES:
+            kind = {'external': 'read', 'triplicate': 'read', 'worktree': 'other'}.get(case, case if case in ['read','edit','execute','search','other'] else 'read')
             if case == 'kind-mismatch': kind='execute'
-            raw = dict(filepath='/tmp/outside', parentDir='/tmp') if case == 'external' else dict(filePath='/tmp/example', command='true')
+            raw = {'read': dict(path='/tmp/example'), 'search': dict(pattern='*.py'), 'other': dict(path='/tmp/example'),
+                   'edit': dict(path='/tmp/example', oldString='a', newString='b'),
+                   'execute': dict(command='true', description='Run', cwd=str(cwd))}[kind if case != 'worktree' else 'other']
+            if case in ['external', 'triplicate']: raw = dict(path='/tmp/outside')
+            if case == 'worktree': raw = dict(directory='/tmp/worktree')
             options = [dict(optionId='once', name='ALLOW ALWAYS misleading title', kind='allow_once'),
                        dict(optionId='always', name='Once misleading title', kind='allow_always'),
                        dict(optionId='reject', name='Deny', kind='reject_once')]
@@ -164,30 +209,43 @@ for line in sys.stdin:
             if case == 'no-once':
                 options = options[1:]
             if case != 'unbound':
-                send(dict(jsonrpc='2.0', method='session/update', params=dict(sessionId=sid, update=dict(
-                    sessionUpdate='tool_call',toolCallId='tool-1',title='Tool',kind='read' if kind=='other' or case=='kind-mismatch' else kind,rawInput=dict(filePath='/tmp/outside') if case=='external' else raw,status='pending'))))
-            if case=='argument-mismatch': raw={**raw,'filePath':'/tmp/different'}
-            params=dict(sessionId=sid,toolCall=dict(toolCallId='' if case=='empty-id' else 'tool-1',title='Arbitrary',kind=kind,rawInput=raw),options=options)
+                update(sessionUpdate='tool_call', toolCallId='tool-1', title='Tool', kind=kind, status='pending', rawInput={})
+                announced = 'read' if case in ['other', 'kind-mismatch'] else kind
+                update(sessionUpdate='tool_call_update', toolCallId='tool-1', title='Tool', kind=announced, status='in_progress', rawInput=raw)
+            if case=='argument-mismatch': raw={**raw,'path':'/tmp/different'}
+            params=dict(sessionId=sid,toolCall=dict(toolCallId='' if case=='empty-id' else 'tool-1',title='Arbitrary',kind=kind,status='pending',rawInput=raw),options=options)
             if case=='empty-metadata': params['toolCall']['rawInput']={}
             if case=='omitted-metadata': params['toolCall'].pop('rawInput')
+            permission = params
+            requests = 1
             send(dict(jsonrpc='2.0',id=100,method='session/request_permission',params=params))
         else:
-            send(dict(jsonrpc='2.0', method='session/update', params=dict(
-                sessionId='wrong' if case == 'wrong-session' else sid, update=dict(sessionUpdate='agent_message_chunk',content=dict(type='text',text='OK')))))
+            update(sessionUpdate='agent_message_chunk',content=dict(type='text',text='OK'))
+            if case == 'wrong-session':
+                send(dict(jsonrpc='2.0', method='session/update', params=dict(sessionId='wrong', update=dict(sessionUpdate='agent_message_chunk',content=dict(type='text',text='OK')))))
             reply(prompt_id, dict(stopReason='cancelled' if case == 'backend-cancelled' else 'end_turn'))
     elif method == 'session/cancel':
         (cwd / 'cancelled').touch()
         if case in ['cancel-ack','cancel-deadline','cancel-success','cancel-term']:
             reply(prompt_id,dict(stopReason='end_turn' if case=='cancel-success' else 'cancelled'))
         elif case == 'cancel-permission':
-            send(dict(jsonrpc='2.0',method='session/update',params=dict(sessionId=sid,update=dict(sessionUpdate='tool_call',toolCallId='tool-1',title='Tool',kind='read',rawInput=dict(filePath='/tmp/example'),status='pending'))))
-            send(dict(jsonrpc='2.0',id=100,method='session/request_permission',params=dict(sessionId=sid,toolCall=dict(toolCallId='tool-1',title='Tool',kind='read',rawInput=dict(filePath='/tmp/example')),options=[dict(optionId='once',name='Once',kind='allow_once'),dict(optionId='reject',name='Deny',kind='reject_once')])) )
+            update(sessionUpdate='tool_call',toolCallId='tool-1',title='Tool',kind='read',status='pending',rawInput={})
+            update(sessionUpdate='tool_call_update',toolCallId='tool-1',title='Tool',kind='read',status='in_progress',rawInput=dict(path='/tmp/example'))
+            send(dict(jsonrpc='2.0',id=100,method='session/request_permission',params=dict(sessionId=sid,toolCall=dict(toolCallId='tool-1',title='Tool',kind='read',status='pending',rawInput=dict(path='/tmp/example')),options=[dict(optionId='once',name='Once',kind='allow_once'),dict(optionId='reject',name='Deny',kind='reject_once')])) )
         elif case == 'cancel-ack-only':
             # A notification/ACK is not a trustworthy terminal response.
-            send(dict(jsonrpc='2.0',method='session/update',params=dict(sessionId=sid,update=dict(sessionUpdate='agent_message_chunk',content=dict(type='text',text='cancel acknowledged')))))
-    elif m.get('id') == 100:
+            update(sessionUpdate='agent_message_chunk',content=dict(type='text',text='cancel acknowledged'))
+    elif m.get('id') in (100, 101, 102):
+        with open(cwd / 'permission-results.jsonl', 'a') as results:
+            results.write(json.dumps(m) + '\n')
         (cwd / 'permission-result.json').write_text(json.dumps(m))
+        selected = m.get('result', {}).get('outcome', {}).get('optionId')
         if case == 'unexpected-write':
             send(dict(jsonrpc='2.0',id=200,method='fs/write_text_file',params=dict(sessionId=sid,path='/tmp/ungranted-write',content='must not write')))
+        elif selected == 'once' and ((case == 'external' and requests < 2) or (case == 'triplicate' and requests < 3)):
+            # External-directory and tool checks raise byte-identical requests.
+            send(dict(jsonrpc='2.0',id=100+requests,method='session/request_permission',params=permission))
+            requests += 1
         else:
-            reply(prompt_id, dict(stopReason='cancelled' if case=='cancel-permission' else 'end_turn'))
+            # 2.2.5 ends the turn with stopReason=cancelled after a rejected permission.
+            reply(prompt_id, dict(stopReason='cancelled' if case=='cancel-permission' or selected != 'once' else 'end_turn'))

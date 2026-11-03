@@ -124,7 +124,7 @@ assert listener.connections >= 4 and listener.received == b'', (listener.connect
 
 # Unreachable before launch: exactly one native attempt with the same constraints.
 err = check('success', 0, ['native'], unreachable)
-assert 'attempt=2 local-first fallback via OpenCode 1.18.30; model opencode/fixture' in err, err
+assert 'attempt=2 local-first fallback via OpenCode 2.2.5; model opencode/fixture' in err, err
 check('read', 0, ['native'], unreachable, extra=['--permissions', 'trusted'])
 check('success', 0, ['native'], 'http://ah-unresolvable.invalid:4000/v1')
 check('rpc-error', 4, ['native'], unreachable)

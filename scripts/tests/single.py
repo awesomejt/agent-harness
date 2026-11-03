@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P2.2 public CLI fixtures; no model traffic. Build target/debug/ah first."""
+"""P2.2 public CLI fixtures against fake OpenCode 2.2.5; no model traffic. Build target/debug/ah first."""
 import json
 import os
 import re
@@ -117,7 +117,11 @@ def check(case, expected, trusted=False, source='inline', grouped=False):
             result=json.loads((base/'permission-result.json').read_text())
             if case not in ['duplicate','empty-id']:
                 option = result['result']['outcome'].get('optionId')
-                assert option == ('once' if trusted and case in ['read','edit','execute','search','external','unexpected-write','empty-metadata','omitted-metadata'] else 'reject'), (case,result)
+                assert option == ('once' if trusted and case in ['read','edit','execute','search','external','triplicate','unexpected-write'] else 'reject'), (case,result)
+        if case == 'external':
+            # Both byte-identical 2.2.5 requests receive their own one-shot grant.
+            results=[json.loads(l) for l in (base/'permission-results.jsonl').read_text().splitlines()]
+            assert [r['result']['outcome']['optionId'] for r in results] == ['once','once'],results
         assert not (base/'rogue').exists()
         assert not (base/'cloud-native-launched').exists(),case
         if expected == 2:
@@ -153,18 +157,23 @@ def check(case, expected, trusted=False, source='inline', grouped=False):
         print('PASS',case,source,'trusted' if trusted else 'deny',flush=True)
 
 
-for case in ['version','route','widened','agent-widened','agent-reversed','empty']:
+for case in ['version','route','widened','agent-widened','agent-reversed','empty','project-source','subagent-widened','agent-model',
+             'inherit-agent','inherit-subagent','inherit-mode','inherit-provider']:
     check(case,2)
 check('text',2,source='missing')
 for source in ['inline','file','stdin']:
     check('text',0,source=source)
-for case in ['read','edit','execute','search','external','other','no-once','kind-mismatch','unbound','argument-mismatch','empty-metadata','omitted-metadata']:
+for case in ['read','edit','execute','search','external']:
     check(case,0,trusted=True)
-check('deny',0)
+# 2.2.5 ends the turn with stopReason=cancelled after any rejected permission.
+for case in ['other','worktree','no-once','kind-mismatch','unbound','argument-mismatch','empty-metadata','omitted-metadata']:
+    check(case,3,trusted=True)
+check('deny',3)
+check('deny-progress',0)
+check('deny-completed',4)
 check('success',0,grouped=True)
 check('read',0,trusted=True,grouped=True)
-check('deny-progress',4)
-for case in ['duplicate','empty-id','wrong-session','eof','oversized','deadline','interrupt','unexpected-write']:
+for case in ['triplicate','duplicate','empty-id','wrong-session','eof','oversized','deadline','interrupt','unexpected-write']:
     check(case,4,trusted=True)
 check('before-prompt',3)
 check('backend-cancelled',3)

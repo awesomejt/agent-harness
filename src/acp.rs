@@ -11,7 +11,7 @@ use crate::{
 use agent_client_protocol::schema::{ProtocolVersion, v1::*};
 use agent_client_protocol::{ByteStreams, Client};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io;
 use std::sync::{
     Arc, Mutex,
@@ -71,10 +71,9 @@ struct Observed {
     permissions: usize,
     tools: usize,
     session: Option<String>,
-    seen: HashSet<String>,
+    seen: HashMap<String, u8>,
     calls: HashMap<String, Value>,
     granted: usize,
-    edit_paths: HashSet<String>,
 }
 
 pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
@@ -85,10 +84,10 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
     let target = request.runtime_model();
     let prompt = &request.prompt;
     let policy = request.permissions;
-    let Some(project_arg) = project.to_str() else {
-        return Exit::Invalid;
-    };
-    let mut command = runtime.command(project, &["acp", "--pure", "--cwd", project_arg]);
+    // 2.2.5 `acp` takes no project flags: the working directory and
+    // session/new cwd select the project, and it spawns its own private
+    // `serve --stdio` child inside the owned process group.
+    let mut command = runtime.command(project, &["acp"]);
     let mut owned = match OwnedChild::spawn(&mut command) {
         Ok(child) => child,
         Err(_) => {
@@ -183,11 +182,10 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                                 state.calls.remove(id);
                             }
                         }
+                        // 2.2.5 reports `in_progress` while parsing arguments, before
+                        // availability is checked; only completion proves execution.
                         if policy == Permissions::Deny
-                            && matches!(
-                                value["update"]["status"].as_str(),
-                                Some("in_progress" | "completed")
-                            )
+                            && value["update"]["status"].as_str() == Some("completed")
                         {
                             return Err(notification_failure.fail());
                         }
@@ -206,10 +204,18 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                     .as_str()
                     .unwrap_or("")
                     .to_owned();
+                // External-directory and tool checks each raise a byte-identical
+                // request for one call; a third copy is a replay.
+                let repeats = state.seen.len();
+                let copies = {
+                    let copies = state.seen.entry(value["toolCall"].to_string()).or_default();
+                    *copies += 1;
+                    *copies
+                };
                 if id.trim().is_empty()
                     || value["sessionId"].as_str() != state.session.as_deref()
-                    || state.seen.len() >= 4096
-                    || !state.seen.insert(value["toolCall"].to_string())
+                    || repeats >= 4096
+                    || copies > 2
                 {
                     return Err(permission_failure.fail());
                 }
@@ -229,37 +235,18 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                     .collect();
                 // Complete serialized descriptor is bound to a fresh per-request grant, never logged.
                 let descriptor = state.calls.get(&id);
-                let complete = descriptor.is_some_and(|tool| {
-                    tool["rawInput"].as_object().is_some_and(|v| !v.is_empty())
-                        && matches!(
-                            tool["kind"].as_str(),
-                            Some("read" | "search" | "edit" | "execute")
-                        )
-                });
                 let normalized = PermissionRequest {
-                    id: format!("{}:{id}", state.seen.len()),
+                    id: format!("{}:{copies}:{id}", state.seen.len()),
                     action:
                         serde_json::json!({"permission": value["toolCall"], "tool": descriptor})
                             .to_string(),
                     options,
                 };
-                let supported = descriptor.is_some_and(|tool| {
-                    tool["kind"] == value["toolCall"]["kind"]
-                        && consistent_metadata(&value["toolCall"]["rawInput"], &tool["rawInput"])
-                }) && matches!(
-                    value["toolCall"]["kind"].as_str(),
-                    Some("read" | "search" | "edit" | "execute")
-                );
-                // Only external_directory can produce `other` in this verified
-                // profile. Pin its exact v1.18.30 metadata shape; never approve
-                // arbitrary `other` tools or infer semantics from their titles.
-                let external = verified_external(&value["toolCall"], descriptor);
-                let described = complete;
                 let mut policy =
                     if policy == Permissions::Trusted
                         && !permission_cancel.is_cancelled()
                         && tokio::time::Instant::now() < permission_deadline
-                        && (supported || external) && described {
+                        && bound(&value["toolCall"], descriptor) {
                         PermissionPolicy::grant_next_request(normalized.clone())
                     } else {
                         PermissionPolicy::default()
@@ -271,23 +258,6 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                                 && o.kind == PermissionOptionKind::AllowOnce
                         }) {
                             state.granted += 1;
-                            if value["toolCall"]["kind"] == "edit" {
-                                let mut paths = Vec::new();
-                                for input in [
-                                    &value["toolCall"]["rawInput"],
-                                    &state
-                                        .calls
-                                        .get(value["toolCall"]["toolCallId"].as_str().unwrap_or(""))
-                                        .unwrap_or(&Value::Null)["rawInput"],
-                                ] {
-                                    for key in ["filePath", "filepath"] {
-                                        if let Some(path) = input[key].as_str() {
-                                            paths.push(path.to_owned());
-                                        }
-                                    }
-                                }
-                                state.edit_paths.extend(paths);
-                            }
                         }
                         RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(id))
                     }
@@ -315,22 +285,9 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
         )
         .on_receive_request(
             {
+                // 2.2.5 sends no editor synchronization; client-side I/O is never offered.
                 let failure = violation.clone();
-                let writes = observed.clone();
-                async move |request: WriteTextFileRequest, _responder, _cx| {
-                    let value = serde_json::to_value(request)?;
-                    let mut state = writes.lock().unwrap();
-                    if policy == Permissions::Trusted
-                        && value["sessionId"].as_str() == state.session.as_deref()
-                        && value["path"]
-                            .as_str()
-                            .is_some_and(|path| state.edit_paths.remove(path))
-                    {
-                        // v1.18.30 sends this optional editor synchronization even
-                        // when fs capability is absent. Refuse client-side I/O;
-                        // its built-in edit tool still owns the authorized edit.
-                        return Err(agent_client_protocol::Error::internal_error());
-                    }
+                async move |_request: WriteTextFileRequest, _responder, _cx| {
                     Err::<(), _>(failure.fail())
                 }
             },
@@ -522,140 +479,61 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
     Exit::Success
 }
 
-fn verified_external(permission: &Value, descriptor: Option<&Value>) -> bool {
-    use std::path::Path;
-    let Some(tool) = descriptor else {
-        return false;
-    };
-    if permission["kind"] != "other" {
-        return false;
-    }
-    let Some(raw) = permission["rawInput"].as_object() else {
-        return false;
-    };
-    if raw.len() == 2 {
-        let (Some(file), Some(parent)) = (
-            raw.get("filepath").and_then(Value::as_str),
-            raw.get("parentDir").and_then(Value::as_str),
-        ) else {
-            return false;
-        };
-        let path = Path::new(file);
-        let parent = Path::new(parent);
-        return path.is_absolute()
-            && parent.is_absolute()
-            && (path.parent() == Some(parent) || path == parent)
-            && ["filePath", "path", "filepath"]
-                .iter()
-                .any(|key| tool["rawInput"][key].as_str() == Some(file));
-    }
-    if raw.len() != 3 || tool["kind"] != "execute" {
-        return false;
-    }
-    let Some(command) = raw.get("command").and_then(Value::as_str) else {
-        return false;
-    };
-    if command.trim().is_empty() || tool["rawInput"]["command"] != command {
-        return false;
-    }
-    let (Some(dirs), Some(patterns)) = (
-        raw.get("directories").and_then(Value::as_array),
-        raw.get("patterns").and_then(Value::as_array),
-    ) else {
-        return false;
-    };
-    !dirs.is_empty()
-        && dirs.len() == patterns.len()
-        && dirs.iter().zip(patterns).all(|(dir, pattern)| {
-            let (Some(dir), Some(pattern)) = (dir.as_str(), pattern.as_str()) else {
-                return false;
-            };
-            Path::new(dir).is_absolute()
-                && Path::new(pattern).parent() == Some(Path::new(dir))
-                && Path::new(pattern)
-                    .file_name()
-                    .is_some_and(|name| name == "*")
-        })
-}
-
-/// Pinned callbacks can add generated metadata (e.g. an edit diff), while read
-/// metadata is empty. Shared arguments and normalized path aliases must agree.
-fn consistent_metadata(metadata: &Value, arguments: &Value) -> bool {
-    if metadata.is_null() {
-        return arguments.is_object();
-    }
-    let (Some(metadata), Some(arguments)) = (metadata.as_object(), arguments.as_object()) else {
-        return false;
-    };
-    metadata.iter().all(|(key, value)| {
-        if let Some(argument) = arguments.get(key) {
-            return argument == value;
-        }
-        if key == "filepath" {
-            return arguments.get("filePath") == Some(value);
-        }
-        true
+/// A grant binds one request to the latest announced arguments of the same
+/// tool call. Only the verified 2.2.5 built-in kinds qualify; `other` (for
+/// example worktree removal) is always refused. Titles are never interpreted.
+fn bound(permission: &Value, descriptor: Option<&Value>) -> bool {
+    descriptor.is_some_and(|tool| {
+        tool["kind"] == permission["kind"]
+            && matches!(
+                permission["kind"].as_str(),
+                Some("read" | "search" | "edit" | "execute")
+            )
+            && permission["rawInput"]
+                .as_object()
+                .is_some_and(|raw| !raw.is_empty())
+            && tool["rawInput"] == permission["rawInput"]
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{consistent_metadata, verified_external};
+    use super::bound;
     use serde_json::json;
 
     #[test]
-    fn permission_metadata_rejects_changed_arguments_and_path_aliases() {
-        let args = json!({"filePath":"/tmp/file","command":"true"});
-        assert!(consistent_metadata(&json!({}), &args));
-        assert!(consistent_metadata(&json!(null), &args));
-        assert!(!consistent_metadata(&json!([]), &args));
-        assert!(consistent_metadata(
-            &json!({"filepath":"/tmp/file","diff":"generated"}),
-            &args
-        ));
-        assert!(!consistent_metadata(
-            &json!({"filePath":"/tmp/other"}),
-            &args
-        ));
-        assert!(!consistent_metadata(
-            &json!({"filepath":"/tmp/other"}),
-            &args
-        ));
-        assert!(!consistent_metadata(&json!({"command":"false"}), &args));
-    }
-
-    #[test]
-    fn external_shell_metadata_must_bind_command_and_each_directory_pattern() {
-        let tool = json!({"kind":"execute","rawInput":{"command":"cat /tmp/example"}});
-        let request = json!({"kind":"other","rawInput":{"command":"cat /tmp/example","directories":["/tmp"],"patterns":["/tmp/*"]}});
-        assert!(verified_external(&request, Some(&tool)));
+    fn grants_bind_exact_arguments_of_a_supported_kind() {
+        let tool =
+            json!({"kind":"edit","rawInput":{"path":"/tmp/file","oldString":"a","newString":"b"}});
+        let request = json!({"kind":"edit","title":"/tmp/file","rawInput":{"path":"/tmp/file","oldString":"a","newString":"b"},
+                             "content":[{"type":"diff","path":"/tmp/file"}]});
+        assert!(bound(&request, Some(&tool)));
+        assert!(!bound(&request, None));
         for (field, value) in [
-            ("command", json!("different")),
-            ("patterns", json!(["/elsewhere/*"])),
-            ("patterns", json!([])),
-            ("directories", json!(["relative"])),
+            ("kind", json!("execute")),
+            (
+                "rawInput",
+                json!({"path":"/tmp/other","oldString":"a","newString":"b"}),
+            ),
+            ("rawInput", json!({"path":"/tmp/file"})),
+            ("rawInput", json!({})),
+            ("rawInput", json!(null)),
         ] {
-            let mut malformed = request.clone();
-            malformed["rawInput"][field] = value;
-            assert!(!verified_external(&malformed, Some(&tool)));
+            let mut changed = request.clone();
+            changed[field] = value;
+            assert!(!bound(&changed, Some(&tool)), "{field}");
         }
-        assert!(!verified_external(&request, None));
-        assert!(!verified_external(
+        // A pending announcement without arguments never authorizes a request.
+        assert!(!bound(
             &request,
-            Some(&json!({"kind":"read","rawInput":{"command":"cat /tmp/example"}}))
+            Some(&json!({"kind":"edit","rawInput":{}}))
         ));
     }
 
     #[test]
-    fn external_file_metadata_must_match_the_bound_tool_target() {
-        let tool = json!({"kind":"read","rawInput":{"filePath":"/tmp/example"}});
-        let mut request =
-            json!({"kind":"other","rawInput":{"filepath":"/tmp/example","parentDir":"/tmp"}});
-        assert!(verified_external(&request, Some(&tool)));
-        request["rawInput"]["filepath"] = json!("/tmp/different");
-        assert!(!verified_external(&request, Some(&tool)));
-        request["rawInput"]["filepath"] = json!("/tmp/example");
-        request["rawInput"]["parentDir"] = json!("/elsewhere");
-        assert!(!verified_external(&request, Some(&tool)));
+    fn other_kinds_are_never_granted() {
+        let raw = json!({"directory":"/tmp/worktree"});
+        let tool = json!({"kind":"other","rawInput":raw});
+        assert!(!bound(&json!({"kind":"other","rawInput":raw}), Some(&tool)));
     }
 }

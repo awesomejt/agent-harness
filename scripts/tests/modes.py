@@ -23,18 +23,19 @@ MODES = ['local-only', 'cloud-only', 'local-first']
 DECOYS = ['claude', 'codex', 'grok', 'gemini', 'pi']
 RUNTIME_ENV = {'HOME', 'PATH', 'OPENCODE_CONFIG_CONTENT',
                *(f'XDG_{k}_HOME' for k in ['CONFIG', 'DATA', 'CACHE', 'STATE']),
-               *(f'OPENCODE_DISABLE_{k}' for k in ['MODELS_FETCH', 'DEFAULT_PLUGINS', 'AUTOUPDATE', 'PROJECT_CONFIG'])}
+               *(f'OPENCODE_DISABLE_{k}' for k in ['MODELS_FETCH', 'AUTOUPDATE', 'PROJECT_CONFIG'])}
 
 # Exit status is route-independent: the fake behaves identically on both routes.
 SCENARIOS = {
     'success': 0,
     # Inherited default/helper/subagent/provider/permission choices.
     'route': 2, 'inherit-agent': 2, 'inherit-subagent': 2, 'inherit-mode': 2,
-    'inherit-provider': 2, 'widened': 2, 'agent-widened': 2, 'version': 2,
+    'inherit-provider': 2, 'widened': 2, 'agent-widened': 2, 'subagent-widened': 2, 'agent-model': 2,
+    'project-source': 2, 'version': 2,
     # Failures after launch are final in every mode.
     'session-model': 1, 'known-failure': 1, 'backend-cancelled': 3, 'cancel-deadline': 3,
     # Ambiguous side effects stop with uncertainty and are never replayed.
-    'rpc-error': 4, 'eof': 4, 'deny-progress': 4, 'unexpected-write': 4, 'home-cleanup-failure': 4,
+    'rpc-error': 4, 'eof': 4, 'deny-completed': 4, 'unexpected-write': 4, 'home-cleanup-failure': 4,
 }
 TRUSTED = {'unexpected-write'}
 UNPROMPTED = {'session-model'}
@@ -141,9 +142,8 @@ def run(case, cfg, *, extra=(), env_drop=(), timeout='15'):
         return p.returncode, p.stderr, state
 
 
-ROUTING_KEYS = {'model', 'small_model', 'enabled_providers', 'provider', 'permission', 'tools',
-                'autoupdate', 'share', 'plugin', 'mcp', 'default_agent'}
-TRUSTED_TOOLS = {'*': False, **{name: True for name in ['read', 'glob', 'grep', 'edit', 'write', 'apply_patch', 'bash']}}
+ROUTING_KEYS = {'model', 'default_agent', 'update', 'share', 'permissions', 'policies', 'agents',
+                'mcp', 'plugins', 'providers'}
 
 
 def assert_records(records, route, endpoint, key, trusted=False):
@@ -156,22 +156,27 @@ def assert_records(records, route, endpoint, key, trusted=False):
         assert names == RUNTIME_ENV | {key}, (route, sorted(names ^ (RUNTIME_ENV | {key})))
         # Exact outbound shape: no agent/mode/helper entries or other keys are sent.
         assert set(cfg) == ROUTING_KEYS, (route, sorted(set(cfg) ^ ROUTING_KEYS))
-        assert cfg['tools'] == (TRUSTED_TOOLS if trusted else {'*': False}), cfg['tools']
-        assert cfg['permission']['*'] == 'deny', cfg['permission']
-        asks = {k for k, v in cfg['permission'].items() if v == 'ask'}
-        assert asks == ({'read', 'glob', 'grep', 'edit', 'apply_patch', 'bash'} if trusted else set()), cfg['permission']
+        rules = cfg['permissions']
+        assert rules[0] == dict(action='*', resource='*', effect='deny'), rules
+        assert all(r['resource'] == '*' and r['effect'] in ('deny', 'ask') for r in rules), rules
+        asks = {r['action'] for r in rules if r['effect'] == 'ask'}
+        assert asks == ({'read', 'glob', 'grep', 'edit', 'shell', 'external_directory'} if trusted else set()), rules
+        provider = 'opencode' if route == 'native' else 'ah-litellm'
+        assert cfg['policies'] == [dict(action='provider.use', resource='*', effect='deny'),
+                                   dict(action='provider.use', resource=provider, effect='allow')], cfg['policies']
+        assert cfg['model'] == dict(providerID=provider, model='fixture'), cfg['model']
+        assert cfg['agents'] == {'title': {'model': cfg['model']}}, cfg['agents']
         text = json.dumps(cfg)
         assert 'poison' not in text and AMBIENT not in text, (route, text)
         assert REACHABLE not in text or (route == 'local' and endpoint == REACHABLE), (route, text)
         if route == 'native':
-            assert cfg['provider'] == {} and cfg['enabled_providers'] == ['opencode'], cfg
-            assert cfg['model'] == cfg['small_model'] == 'opencode/fixture', cfg
+            assert cfg['providers'] == {}, cfg
             assert 'ah-litellm' not in text and endpoint not in text, cfg
         else:
-            assert cfg['enabled_providers'] == ['ah-litellm'] and list(cfg['provider']) == ['ah-litellm'], cfg
-            assert cfg['provider']['ah-litellm']['options']['baseURL'] == endpoint, cfg
-            assert cfg['model'] == cfg['small_model'] == 'ah-litellm/fixture', cfg
-        assert cfg['plugin'] == [] and cfg['mcp'] == {} and cfg['default_agent'] == 'build', cfg
+            assert list(cfg['providers']) == ['ah-litellm'], cfg
+            assert cfg['providers']['ah-litellm']['settings'] == dict(apiKey='{env:AH_RUNTIME_API_KEY}', baseURL=endpoint), cfg
+        assert cfg['plugins'] == [] and cfg['mcp'] == {} and cfg['default_agent'] == 'build', cfg
+        assert cfg['update'] == 'disable' and cfg['share'] == 'disabled', cfg
 
 
 def expected_route(mode, endpoint):
