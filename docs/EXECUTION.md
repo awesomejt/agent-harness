@@ -4,7 +4,7 @@ Status: design contract, not a published Rust API or wire schema. See [architect
 
 ## Request resolution
 
-Resolve one project path, prompt source, operational mode, runtime, and model alias, plus an optional canonical agent once supported. Record whether each effective choice came from the invocation or configuration. Accept inline text, a file, or stdin; reject conflicting sources and empty content before launching work. D024 and [the first-slice configuration contract](CONFIGURATION.md#selected-invocation-and-preview-syntax) fix flag names, limits and defaults. A missing input must not unexpectedly launch an interactive coding session in CI.
+Resolve one project path, prompt source, operational mode, runtime, and model alias, plus an optional canonical agent (`--agent`, D037: selection, model precedence and preview; named execution refuses until P4.3 enforcement). Record whether each effective choice came from the invocation or configuration. Accept inline text, a file, or stdin; reject conflicting sources and empty content before launching work. D024 and [the first-slice configuration contract](CONFIGURATION.md#selected-invocation-and-preview-syntax) fix flag names, limits and defaults. A missing input must not unexpectedly launch an interactive coding session in CI.
 
 Keep primary versus specialized role separate from route and runtime. A request to review without writes must become enforceable runtime restrictions; advisory system text is insufficient.
 

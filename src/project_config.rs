@@ -12,6 +12,8 @@ use std::path::{Path, PathBuf};
 const CONFIG: &str = "opencode.json";
 const OWNER: &str = ".ah-opencode-owner.json";
 const LOCK: &str = ".ah-opencode.lock";
+const AGENTS: &str = ".ah-opencode-agents.json";
+const AGENT_DIR: &str = ".opencode/agents";
 const PROVIDER: &str = "ah-litellm";
 type Result<T> = std::result::Result<T, Invalid>;
 
@@ -188,6 +190,142 @@ fn patch(source: &str, wanted: &BTreeMap<String, Value>) -> Result<String> {
     Ok(after)
 }
 
+/// Real directory or absent; a symlink or other file type refuses.
+fn directory(path: &Path) -> Result<bool> {
+    match fs::symlink_metadata(path) {
+        Ok(m) if m.is_dir() => Ok(true),
+        Ok(_) => Err(Invalid(
+            "OpenCode project directories must be real, not symlinked",
+        )),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(_) => Err(Invalid("cannot inspect OpenCode project directory")),
+    }
+}
+
+/// Every project source OpenCode 2.2.5 loads agents from (D037). Names compare
+/// case-insensitively: a case-insensitive filesystem would otherwise overwrite
+/// a differently spelled user file. Only the exact emitted path is exempt; its
+/// ownership is decided by the receipt. Global/user sources are never read.
+fn collisions(project: &Path, name: &str) -> Result<()> {
+    const CONFLICT: Invalid =
+        Invalid("user-owned OpenCode agent definition conflicts with the canonical name");
+    let file = format!("{name}.md");
+    directory(&project.join(".opencode"))?;
+    for dir in [AGENT_DIR, ".opencode/agent"] {
+        if !directory(&project.join(dir))? {
+            continue;
+        }
+        for entry in
+            fs::read_dir(project.join(dir)).map_err(|_| Invalid("cannot list OpenCode agents"))?
+        {
+            let entry = entry
+                .map_err(|_| Invalid("cannot list OpenCode agents"))?
+                .file_name();
+            let exact = dir == AGENT_DIR && entry == file.as_str();
+            if !exact && entry.to_str().is_none_or(|e| e.eq_ignore_ascii_case(&file)) {
+                return Err(CONFLICT);
+            }
+        }
+    }
+    if exists(&project.join(".opencode/opencode.jsonc"))? {
+        return Err(Invalid(
+            "opencode.jsonc requires manual migration before sync",
+        ));
+    }
+    for config in [CONFIG, ".opencode/opencode.json"] {
+        let Some(text) = snapshot(&project.join(config))? else {
+            continue;
+        };
+        let fields = values(&text)?;
+        for key in ["agent", "agents"] {
+            let Some(agents) = fields.get(key) else {
+                continue;
+            };
+            let agents = agents
+                .as_object()
+                .ok_or(Invalid("cannot verify OpenCode agent names"))?;
+            if agents.keys().any(|k| k.eq_ignore_ascii_case(name)) {
+                return Err(CONFLICT);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn receipt(text: Option<&str>) -> Result<BTreeMap<String, String>> {
+    const INVALID: Invalid = Invalid("invalid agent ownership receipt");
+    let Some(text) = text else {
+        return Ok(BTreeMap::new());
+    };
+    values(text)
+        .map_err(|_| INVALID)?
+        .into_iter()
+        .map(|(name, content)| match content {
+            Value::String(content) if crate::agents::validate_name(&name).is_ok() => {
+                Ok((name, content))
+            }
+            _ => Err(INVALID),
+        })
+        .collect()
+}
+
+/// Selected agent's project file plus a receipt holding the exact content
+/// the harness last wrote for each owned name. Only an unchanged owned file is
+/// replaced; a missing file is (re)created. Other owned entries stay as-is.
+struct Emission {
+    name: String,
+    before: Option<String>,
+    receipt_before: Option<String>,
+    after: String,
+    receipt_after: String,
+}
+impl Emission {
+    fn prepare(project: &Path, r: &Resolved, agent: &crate::agents::Agent) -> Result<Self> {
+        let name = agent.name().to_owned();
+        collisions(project, &name)?;
+        let before = snapshot(&project.join(agent.opencode_path()))?;
+        let receipt_before = snapshot(&project.join(AGENTS))?;
+        let mut owned = receipt(receipt_before.as_deref())?;
+        if let Some(current) = &before {
+            match owned.get(&name) {
+                Some(old) if old == current => {}
+                Some(_) => {
+                    return Err(Invalid(
+                        "managed agent file was manually edited; reconcile agent ownership receipt",
+                    ));
+                }
+                None => {
+                    return Err(Invalid(
+                        "user-owned OpenCode agent file conflicts with the canonical name",
+                    ));
+                }
+            }
+        }
+        let after = crate::opencode::agent_markdown(agent, r);
+        owned.insert(name.clone(), after.clone());
+        let receipt_after = serde_json::to_string(&owned).unwrap();
+        if after.len() as u64 > MAX_INPUT_BYTES || receipt_after.len() as u64 > MAX_INPUT_BYTES {
+            return Err(Invalid("planned agent emission exceeds 1 MiB"));
+        }
+        Ok(Self {
+            name,
+            before,
+            receipt_before,
+            after,
+            receipt_after,
+        })
+    }
+    fn path(&self) -> PathBuf {
+        Path::new(AGENT_DIR).join(format!("{}.md", self.name))
+    }
+    fn file_changes(&self) -> bool {
+        self.before.as_deref() != Some(&self.after)
+    }
+    fn receipt_changes(&self) -> bool {
+        self.receipt_before.as_deref() != Some(&self.receipt_after)
+    }
+}
+
 pub struct Plan {
     project: PathBuf,
     before: Option<String>,
@@ -195,6 +333,7 @@ pub struct Plan {
     after: String,
     owner_after: String,
     no_sync: bool,
+    agent: Option<Emission>,
 }
 impl Plan {
     /// Read-only; never consults HOME, environment values or global settings.
@@ -254,6 +393,11 @@ impl Plan {
             return Err(Invalid("planned project config exceeds 1 MiB"));
         }
         let owner_after = serde_json::to_string(&wanted).unwrap();
+        // No-sync writes nothing; the isolated runtime never loads this file.
+        let agent = match &r.agent {
+            Some(agent) if !r.no_sync => Some(Emission::prepare(&project, r, agent)?),
+            _ => None,
+        };
         Ok(Self {
             project,
             before,
@@ -261,24 +405,45 @@ impl Plan {
             after,
             owner_after,
             no_sync: r.no_sync,
+            agent,
         })
+    }
+    fn routing_changes(&self) -> bool {
+        self.before.as_deref() != Some(&self.after)
+            || self.owner_before.as_deref() != Some(&self.owner_after)
     }
     pub fn needs_write(&self) -> bool {
         !self.no_sync
-            && (self.before.as_deref() != Some(&self.after)
-                || self.owner_before.as_deref() != Some(&self.owner_after))
+            && (self.routing_changes()
+                || self
+                    .agent
+                    .as_ref()
+                    .is_some_and(|a| a.file_changes() || a.receipt_changes()))
     }
-    /// Static field names only: never expose old user values or credentials.
-    pub fn preview_changes(&self) -> Vec<&'static str> {
+    /// Field names and the validated agent name only: never old user values,
+    /// agent content or credentials.
+    pub fn preview_changes(&self) -> Vec<String> {
         let mut changes = Vec::new();
         if !self.no_sync {
             if self.before.as_deref() != Some(&self.after) {
                 changes.push(
-                    "opencode.json: provider.ah-litellm, enabled_providers, model, small_model",
+                    "opencode.json: provider.ah-litellm, enabled_providers, model, small_model"
+                        .into(),
                 );
             }
             if self.owner_before.as_deref() != Some(&self.owner_after) {
-                changes.push(".ah-opencode-owner.json: managed routing receipt");
+                changes.push(".ah-opencode-owner.json: managed routing receipt".into());
+            }
+        }
+        if let Some(agent) = &self.agent {
+            if agent.file_changes() {
+                changes.push(format!(
+                    "{AGENT_DIR}/{}.md: emitted agent (native frontmatter, ceiling rules)",
+                    agent.name
+                ));
+            }
+            if agent.receipt_changes() {
+                changes.push(format!("{AGENTS}: managed agent receipt"));
             }
         }
         changes
@@ -322,14 +487,47 @@ impl Plan {
             {
                 return Err(Invalid("project config changed since planning; re-plan"));
             }
+            if let Some(agent) = &self.agent {
+                collisions(&self.project, &agent.name)?;
+                if snapshot(&self.project.join(agent.path()))? != agent.before
+                    || snapshot(&self.project.join(AGENTS))? != agent.receipt_before
+                {
+                    return Err(Invalid("project agents changed since planning; re-plan"));
+                }
+            }
             if !self.needs_write() {
                 return Ok(());
             }
-            replace(&self.project, CONFIG, &self.after)?;
-            replace(&self.project, OWNER, &self.owner_after)?;
-            File::open(&self.project)
-                .and_then(|f| f.sync_all())
-                .map_err(|_| Invalid("cannot sync project directory; inspect transaction state"))?;
+            let sync = |dir: &Path| {
+                File::open(dir).and_then(|f| f.sync_all()).map_err(|_| {
+                    Invalid("cannot sync project directory; inspect transaction state")
+                })
+            };
+            if self.routing_changes() {
+                replace(&self.project, CONFIG, &self.after)?;
+                replace(&self.project, OWNER, &self.owner_after)?;
+            }
+            if let Some(agent) = self.agent.as_ref().filter(|a| a.file_changes()) {
+                // A crash before the receipt leaves a visible ownership conflict.
+                for dir in [".opencode", AGENT_DIR] {
+                    let path = self.project.join(dir);
+                    match fs::create_dir(&path) {
+                        Ok(()) => sync(path.parent().unwrap())?,
+                        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+                        Err(_) => return Err(Invalid("cannot create OpenCode agent directory")),
+                    }
+                    if !directory(&path)? {
+                        return Err(Invalid("cannot create OpenCode agent directory"));
+                    }
+                }
+                let dir = self.project.join(AGENT_DIR);
+                replace(&dir, &format!("{}.md", agent.name), &agent.after)?;
+                sync(&dir)?;
+            }
+            if let Some(agent) = self.agent.as_ref().filter(|a| a.receipt_changes()) {
+                replace(&self.project, AGENTS, &agent.receipt_after)?;
+            }
+            sync(&self.project)?;
             Ok(())
         }
     }

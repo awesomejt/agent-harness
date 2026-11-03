@@ -1,5 +1,7 @@
 //! Pinned OpenCode 2.2.5 runtime surface (D035): native-schema config for both
-//! routes and pure validators for its configuration sources, agents and catalog.
+//! routes, project agent emission, and pure validators for its configuration
+//! sources, agents and catalog.
+use crate::agents::{self, Agent, Capacity, Tool};
 use crate::config::{Invalid, Mode, Permissions, Resolved};
 use serde_json::{Value, json};
 use std::path::Path;
@@ -21,11 +23,13 @@ pub(crate) fn model(request: &Resolved) -> Value {
     json!({"providerID": provider(request), "model": request.model})
 }
 
+fn rule(action: &str, effect: &str) -> Value {
+    json!({"action": action, "resource": "*", "effect": effect})
+}
+
 /// Ordered rules; OpenCode appends them after each agent's built-in defaults
 /// and evaluates the last match. Deny removes the tools from the model.
 pub(crate) fn profile(policy: Permissions) -> Value {
-    let rule =
-        |action: &str, effect: &str| json!({"action": action, "resource": "*", "effect": effect});
     let mut rules = vec![rule("*", "deny")];
     if policy == Permissions::Trusted {
         for action in ["read", "glob", "grep", "edit", "shell"] {
@@ -41,6 +45,52 @@ pub(crate) fn profile(policy: Permissions) -> Value {
         },
     ));
     Value::Array(rules)
+}
+
+/// Static rules for an emitted project agent: only the canonical ceiling and
+/// tool list, each listed tool `ask`, never `allow`. A full trusted tool set
+/// equals the trusted profile; an empty deny/read-only set equals the deny
+/// profile, while trusted still asks for `external_directory`. This is not
+/// the enforced runtime entry, which must also intersect invocation (P4.3).
+pub(crate) fn ceiling(agent: &Agent) -> Value {
+    let mut rules = vec![rule("*", "deny")];
+    for (tool, actions) in [
+        (Tool::Read, &["read"][..]),
+        (Tool::Search, &["glob", "grep"]),
+        (Tool::Edit, &["edit"]),
+        (Tool::Execute, &["shell"]),
+    ] {
+        if agent.tools().contains(&tool) {
+            rules.extend(actions.iter().map(|action| rule(action, "ask")));
+        }
+    }
+    rules.push(rule(
+        "external_directory",
+        if agent.permissions() == agents::Permissions::Trusted {
+            "ask"
+        } else {
+            "deny"
+        },
+    ));
+    Value::Array(rules)
+}
+
+/// Project `.opencode/agents/NAME.md` for direct OpenCode use on the local
+/// route (D037): native frontmatter as one JSON flow mapping, which is valid
+/// YAML, then the canonical Markdown body unchanged as `system`.
+pub(crate) fn agent_markdown(agent: &Agent, request: &Resolved) -> String {
+    let mode = match agent.capacity() {
+        Capacity::Primary => "primary",
+        Capacity::Specialized => "subagent",
+        Capacity::Both => "all",
+    };
+    let header = json!({
+        "description": agent.description(),
+        "mode": mode,
+        "model": model(request),
+        "permissions": ceiling(agent),
+    });
+    format!("---\n{header}\n---\n{}", agent.body())
 }
 
 /// Complete runtime configuration passed via OPENCODE_CONFIG_CONTENT. Only the
@@ -295,6 +345,44 @@ mod tests {
                 assert!(validate_agents(&r, &bad).is_err(), "{bad}");
             }
         }
+    }
+
+    #[test]
+    fn ceiling_never_allows_and_matches_profiles_at_the_extremes() {
+        let agent = |permissions: &str, tools: &str| {
+            Agent::read(format!("---\nversion: 1\nname: x\ndescription: d\ncapacity: primary\npermissions: {permissions}\ntools: {tools}\n---\nb\n").as_bytes()).unwrap()
+        };
+        let full = agent("trusted", "[execute, edit, search, read]");
+        assert_eq!(ceiling(&full), profile(Permissions::Trusted));
+        assert_eq!(ceiling(&agent("deny", "[]")), profile(Permissions::Deny));
+        assert_eq!(
+            ceiling(&agent("read-only", "[]")),
+            profile(Permissions::Deny)
+        );
+        let trusted_empty = ceiling(&agent("trusted", "[]"));
+        assert_ne!(trusted_empty, profile(Permissions::Deny));
+        assert_eq!(trusted_empty.as_array().unwrap().len(), 2);
+        assert_eq!(trusted_empty[1]["action"], "external_directory");
+        assert_eq!(trusted_empty[1]["effect"], "ask");
+        let read_only = ceiling(&agent("read-only", "[search]"));
+        let actions: Vec<_> = read_only
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| (r["action"].as_str().unwrap(), r["effect"].as_str().unwrap()))
+            .collect();
+        assert_eq!(
+            actions,
+            [
+                ("*", "deny"),
+                ("glob", "ask"),
+                ("grep", "ask"),
+                ("external_directory", "deny")
+            ]
+        );
+        assert!(
+            !agent_markdown(&full, &request(Mode::LocalOnly, Permissions::Deny)).contains("allow")
+        );
     }
 
     #[test]

@@ -50,6 +50,7 @@ python3 scripts/tests/single_runtime.py --refuse
 python3 scripts/tests/native.py
 python3 scripts/tests/native_runtime.py
 python3 scripts/tests/agents_runtime.py
+python3 scripts/tests/agent_emission_runtime.py
 python3 scripts/tests/local_first.py
 python3 scripts/tests/modes.py
 cargo build --locked --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml

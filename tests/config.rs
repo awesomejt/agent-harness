@@ -216,7 +216,15 @@ fn invalid_invocations_reject_without_io() {
             "timeout must be 1–86400 seconds",
         ),
         (
-            vec!["single", "a", "--agent", "coder"],
+            vec!["single", "a", "--agent", "../coder"],
+            "agent name requires 1–64 lowercase letters/digits with single hyphens",
+        ),
+        (
+            vec!["single", "a", "--agent", "build"],
+            "agent name is reserved by OpenCode",
+        ),
+        (
+            vec!["single", "a", "--runtime", "opencode"],
             "unsupported option",
         ),
     ] {

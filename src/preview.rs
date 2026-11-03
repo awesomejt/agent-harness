@@ -31,6 +31,7 @@ pub(crate) fn discover_runtime() -> Option<PathBuf> {
 fn source(source: Source) -> &'static str {
     match source {
         Source::Invocation => "invocation",
+        Source::Agent => "agent",
         Source::Config => "config",
         Source::Default => "default",
     }
@@ -111,6 +112,52 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
         ),
         None => "disabled".to_owned(),
     };
+    let agent = match &r.agent {
+        None => "none".to_owned(),
+        Some(agent) => {
+            use crate::agents::{Capacity, Effort, Permissions, Tool};
+            let tools = agent
+                .tools()
+                .iter()
+                .map(|t| match t {
+                    Tool::Read => "read",
+                    Tool::Search => "search",
+                    Tool::Edit => "edit",
+                    Tool::Execute => "execute",
+                })
+                .collect::<Vec<_>>();
+            let emission = if !local {
+                "not applicable (native route)"
+            } else if r.no_sync {
+                "skipped (no-sync)"
+            } else {
+                "managed project file (see planned changes)"
+            };
+            // Name grammar excludes quotes/controls; description/body omitted.
+            format!(
+                "\"{}\" (capacity {}; ceiling {}; tools [{}]; effort {}); OpenCode emission: {emission}; named execution refused until constraint enforcement (P4.3)",
+                agent.name(),
+                match agent.capacity() {
+                    Capacity::Primary => "primary",
+                    Capacity::Specialized => "specialized",
+                    Capacity::Both => "both",
+                },
+                match agent.permissions() {
+                    Permissions::Deny => "deny",
+                    Permissions::ReadOnly => "read-only",
+                    Permissions::Trusted => "trusted",
+                },
+                tools.join(", "),
+                match agent.effort() {
+                    Effort::Default => "default",
+                    Effort::Low => "low",
+                    Effort::Medium => "medium",
+                    Effort::High => "high",
+                    Effort::Max => "max",
+                },
+            )
+        }
+    };
     let health = if local {
         "LiteLLM reachability, alias availability"
     } else {
@@ -123,6 +170,7 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
          runtime: OpenCode ACP; {runtime}\n\
          execution platform: {}\n\
          model: {} ({}); helper: same model\n\
+         agent: {agent}\n\
          proxy handoff: {handoff}\n\
          credentials: environment reference present (config); value and endpoint omitted\n\
          permissions: {scope} ({}); external tools/subagents/network tools disabled\n\

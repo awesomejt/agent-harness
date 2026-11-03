@@ -1,4 +1,5 @@
 //! First-slice input validation. No runtime launch, configuration writes or network I/O.
+use crate::agents::Agent;
 use serde::Deserialize;
 use std::ffi::OsString;
 use std::io::Read;
@@ -101,6 +102,7 @@ pub struct Invocation {
     config: Option<PathBuf>,
     mode: Option<String>,
     model: Option<String>,
+    agent: Option<String>,
     permissions: Option<Permissions>,
     timeout_secs: Option<u64>,
     no_sync: bool,
@@ -123,6 +125,8 @@ pub enum Mode {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Source {
     Invocation,
+    /// The selected canonical agent's route-specific model.
+    Agent,
     Config,
     Default,
 }
@@ -154,6 +158,9 @@ pub struct Resolved {
     pub no_sync: bool,
     pub preview: bool,
     pub prompt: String,
+    /// Selected canonical definition. Its ceiling is not yet enforced, so
+    /// execution refuses a named request until P4.3; preview and emission use it.
+    pub agent: Option<Agent>,
     /// Local-first only: the configured native target, resolved with identical
     /// project, permissions, timeout and prompt. Never nested.
     pub fallback: Option<Box<Resolved>>,
@@ -372,6 +379,7 @@ impl Invocation {
             config: None,
             mode: None,
             model: None,
+            agent: None,
             permissions: None,
             timeout_secs: None,
             no_sync: false,
@@ -400,6 +408,7 @@ impl Invocation {
                         | "--config"
                         | "--mode"
                         | "--model"
+                        | "--agent"
                         | "--permissions"
                         | "--timeout-secs"
                         | "--prompt-file"
@@ -421,6 +430,10 @@ impl Invocation {
                     "--model" => {
                         validate_reference(value)?;
                         request.model = Some(value.to_owned());
+                    }
+                    "--agent" => {
+                        crate::agents::validate_name(value)?;
+                        request.agent = Some(value.to_owned());
                     }
                     "--permissions" => {
                         request.permissions = Some(match value {
@@ -488,14 +501,50 @@ impl Invocation {
         }
         let mode = self.mode.as_deref().unwrap_or(&config.mode);
         let key_name = config.key_name(mode)?.to_owned();
-        // `--model` selects only the LiteLLM primary; fallback uses native.model.
+        let agent = self
+            .agent
+            .as_deref()
+            .map(|name| Agent::select(&project, name))
+            .transpose()?;
+        let agent_model = |native: bool| {
+            let models = agent.as_ref().and_then(Agent::models)?;
+            if native {
+                models.native.clone()
+            } else {
+                models.local.clone()
+            }
+        };
+        // Precedence per route: --model, then the agent's route model, then
+        // config. `--model` selects only the LiteLLM primary; fallback uses the
+        // agent's native model, else native.model.
         let fallback = (mode == "local-first")
             .then_some(config.native.as_ref())
             .flatten()
-            .map(|native| (native.model.clone(), native.api_key_env.clone()));
+            .map(|native| {
+                let agent = agent_model(true);
+                let source = if agent.is_some() {
+                    Source::Agent
+                } else {
+                    Source::Config
+                };
+                (
+                    agent.unwrap_or_else(|| native.model.clone()),
+                    native.api_key_env.clone(),
+                    source,
+                )
+            });
+        let route_agent = agent_model(mode == "cloud-only");
+        let model_source = if self.model.is_some() {
+            Source::Invocation
+        } else if route_agent.is_some() {
+            Source::Agent
+        } else {
+            Source::Config
+        };
         let model = self
             .model
             .clone()
+            .or(route_agent)
             .or_else(|| {
                 if mode == "cloud-only" {
                     config.native.as_ref().map(|native| native.model.clone())
@@ -519,7 +568,7 @@ impl Invocation {
         } else {
             Mode::LocalOnly
         };
-        for name in std::iter::once(&key_name).chain(fallback.as_ref().map(|(_, key)| key)) {
+        for name in std::iter::once(&key_name).chain(fallback.as_ref().map(|(_, key, _)| key)) {
             if key_lookup(name).is_none_or(|key| key.is_empty()) {
                 return Err(Invalid(MISSING_KEY));
             }
@@ -541,7 +590,7 @@ impl Invocation {
         };
         let sources = Sources {
             mode: source(self.mode.is_some()),
-            model: source(self.model.is_some()),
+            model: model_source,
             permissions: if self.permissions.is_some() {
                 Source::Invocation
             } else if config.permissions.is_some() {
@@ -590,13 +639,14 @@ impl Invocation {
             no_sync: self.no_sync,
             preview: self.preview,
             prompt,
+            agent,
             fallback: None,
         };
-        if let Some((model, api_key_env)) = fallback {
+        if let Some((model, api_key_env, model_source)) = fallback {
             resolved.fallback = Some(Box::new(Resolved {
                 mode: Mode::CloudOnly,
                 sources: Sources {
-                    model: Source::Config,
+                    model: model_source,
                     ..resolved.sources
                 },
                 project: resolved.project.clone(),
@@ -610,6 +660,7 @@ impl Invocation {
                 no_sync: resolved.no_sync,
                 preview: resolved.preview,
                 prompt: resolved.prompt.clone(),
+                agent: resolved.agent.clone(),
                 fallback: None,
             }));
         }

@@ -39,6 +39,14 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
             return Exit::Invalid;
         }
     };
+    // Never run a named request whose ceiling is not yet enforced (P4.3);
+    // refusing here precedes any runtime, network check or project write.
+    if request.agent.is_some() && !request.preview {
+        progress.event(
+            "named agent execution requires constraint enforcement (P4.3); use --preview to inspect selection and emission",
+        );
+        return Exit::Invalid;
+    }
     if request.preview {
         return match prepare_plan(&request) {
             Ok(plan) => {

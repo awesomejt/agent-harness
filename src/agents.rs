@@ -1,5 +1,5 @@
-//! Canonical agent schema. Parsing is separate from runtime capability checks,
-//! project emission and invocation selection (P4.2/P4.3).
+//! Canonical agent schema and name-based selection. Parsing is separate from
+//! project emission (`project_config`) and runtime capability checks (P4.3).
 use crate::config::{self, Invalid};
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashSet};
@@ -48,7 +48,7 @@ pub enum Effort {
     Max,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Models {
     #[serde(default, deserialize_with = "present_text")]
@@ -84,7 +84,7 @@ fn present_text<'de, D: serde::Deserializer<'de>>(
     text(d).map(Some)
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Header {
     version: u8,
@@ -103,6 +103,7 @@ struct Header {
 
 // No Debug/Serialize: agent instructions and model choices may contain private
 // content. Errors are static; callers choose what to disclose in previews.
+#[derive(Clone)]
 pub struct Agent {
     header: Header,
     body: String,
@@ -224,10 +225,45 @@ impl Agent {
         &self.body
     }
 
-    /// Relative project destination for P4.2's conflict-aware transaction.
+    /// Relative project destination for the conflict-aware transaction.
     /// Runtime execution instead uses the native `agents.NAME` document entry.
     pub fn opencode_path(&self) -> PathBuf {
         Path::new(".opencode/agents").join(format!("{}.md", self.name()))
+    }
+
+    /// Load one canonical definition by name from `PROJECT/agents/`. The
+    /// directory must be real (not a symlink) and contain exactly `NAME.md`;
+    /// a case-insensitive filesystem match on another spelling is refused.
+    /// Other definitions are not parsed, so they cannot affect this selection.
+    pub fn select(project: &Path, name: &str) -> Result<Self> {
+        validate_name(name)?;
+        let dir = project.join("agents");
+        match std::fs::symlink_metadata(&dir) {
+            Ok(m) if m.is_dir() => {}
+            Ok(_) => return Err(Invalid("project agents path must be a real directory")),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Err(Invalid("agent is not defined in project agents/"));
+            }
+            Err(_) => return Err(Invalid("cannot inspect project agents directory")),
+        }
+        let file = format!("{name}.md");
+        let mut found = false;
+        for entry in std::fs::read_dir(&dir).map_err(|_| Invalid("cannot list project agents"))? {
+            let entry = entry.map_err(|_| Invalid("cannot list project agents"))?;
+            let entry = entry.file_name();
+            if entry == file.as_str() {
+                found = true;
+            } else if entry
+                .to_str()
+                .is_some_and(|e| e.eq_ignore_ascii_case(&file))
+            {
+                return Err(Invalid("agent filename must match canonical name exactly"));
+            }
+        }
+        if !found {
+            return Err(Invalid("agent is not defined in project agents/"));
+        }
+        Self::open(&dir.join(file))
     }
 }
 
