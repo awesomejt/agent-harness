@@ -85,6 +85,10 @@ def closed_endpoint():
 
 listener = Listener()
 REACHABLE = listener.endpoint
+# Ambient endpoint variables point at a separate trap, so a configured stand-in
+# can never mask an ambient-URL leak.
+ambient = Listener()
+AMBIENT = ambient.endpoint
 UNREACHABLE = closed_endpoint()
 
 
@@ -114,7 +118,7 @@ def run(case, cfg, *, extra=(), env_drop=(), timeout='15'):
                # Ambient credentials/endpoints must never become runtime inputs.
                'OPENCODE_API_KEY': 'poison', 'OPENCODE_CONFIG_CONTENT': 'poison', 'OPENCODE_CONFIG': 'poison',
                'ANTHROPIC_API_KEY': 'poison', 'OPENAI_API_KEY': 'poison', 'LITELLM_API_KEY': 'poison',
-               'OPENAI_BASE_URL': REACHABLE, 'LITELLM_API_BASE': REACHABLE}
+               'OPENAI_BASE_URL': AMBIENT, 'LITELLM_API_BASE': AMBIENT}
         for name in env_drop:
             env.pop(name)
         args = [str(BINARY), 'single', 'Task', '--project', str(base), '--timeout-secs', timeout, *extra]
@@ -137,7 +141,12 @@ def run(case, cfg, *, extra=(), env_drop=(), timeout='15'):
         return p.returncode, p.stderr, state
 
 
-def assert_records(records, route, endpoint, key):
+ROUTING_KEYS = {'model', 'small_model', 'enabled_providers', 'provider', 'permission', 'tools',
+                'autoupdate', 'share', 'plugin', 'mcp', 'default_agent'}
+TRUSTED_TOOLS = {'*': False, **{name: True for name in ['read', 'glob', 'grep', 'edit', 'write', 'apply_patch', 'bash']}}
+
+
+def assert_records(records, route, endpoint, key, trusted=False):
     """Each runtime invocation receives only its route's routing and credential."""
     for record in records:
         cfg = record['config']
@@ -145,9 +154,14 @@ def assert_records(records, route, endpoint, key):
         # CoreFoundation encoding; neither comes from the harness.
         names = set(record['env']) - {'LC_CTYPE', '__CF_USER_TEXT_ENCODING'}
         assert names == RUNTIME_ENV | {key}, (route, sorted(names ^ (RUNTIME_ENV | {key})))
+        # Exact outbound shape: no agent/mode/helper entries or other keys are sent.
+        assert set(cfg) == ROUTING_KEYS, (route, sorted(set(cfg) ^ ROUTING_KEYS))
+        assert cfg['tools'] == (TRUSTED_TOOLS if trusted else {'*': False}), cfg['tools']
+        assert cfg['permission']['*'] == 'deny', cfg['permission']
+        asks = {k for k, v in cfg['permission'].items() if v == 'ask'}
+        assert asks == ({'read', 'glob', 'grep', 'edit', 'apply_patch', 'bash'} if trusted else set()), cfg['permission']
         text = json.dumps(cfg)
-        assert 'poison' not in text, (route, text)
-        # The ambient OPENAI_BASE_URL/LITELLM_API_BASE trap is never inherited.
+        assert 'poison' not in text and AMBIENT not in text, (route, text)
         assert REACHABLE not in text or (route == 'local' and endpoint == REACHABLE), (route, text)
         if route == 'native':
             assert cfg['provider'] == {} and cfg['enabled_providers'] == ['opencode'], cfg
@@ -185,7 +199,8 @@ for mode in MODES:
             assert s['launched'] == ([route] if expected != 2 else []), (*where, s['launched'], err)
             assert {r for r in s['launched']} <= {route} and len(s['launched']) <= 1, where
             assert s['records'], where  # preflight always reaches the runtime
-            assert_records(s['records'], route, endpoint, 'OPENCODE_API_KEY' if route == 'native' else 'AH_RUNTIME_API_KEY')
+            assert_records(s['records'], route, endpoint, 'OPENCODE_API_KEY' if route == 'native' else 'AH_RUNTIME_API_KEY',
+                           trusted=case in TRUSTED)
             assert listener.settle(before, probes) == probes, (*where, listener.connections - before)
             assert listener.received == b'', listener.received
             # Retry bounds: attempt 2 only for the eligible local-first fallback; never attempt 3.
@@ -204,16 +219,20 @@ for mode in MODES:
         print('PASS', mode, 'reachable' if endpoint == REACHABLE else 'unreachable', len(SCENARIOS), 'scenarios', flush=True)
 
 # --mode overrides the configured mode with identical effective behavior.
-for configured, selected in [('cloud-only', 'local-only'), ('local-only', 'cloud-only'), ('local-only', 'local-first')]:
+for configured, selected in [('cloud-only', 'local-only'), ('local-only', 'cloud-only'),
+                             ('local-only', 'local-first'), ('cloud-only', 'local-first')]:
     for endpoint in [REACHABLE, UNREACHABLE]:
-        before = listener.connections
-        code, err, s = run('success', config(configured, endpoint), extra=['--mode', selected])
-        route = expected_route(selected, endpoint)
-        probes = 1 if selected == 'local-first' and endpoint == REACHABLE else 0
-        assert code == 0 and s['launched'] == [route], (configured, selected, code, s['launched'], err)
-        assert_records(s['records'], route, endpoint, 'OPENCODE_API_KEY' if route == 'native' else 'AH_RUNTIME_API_KEY')
-        assert listener.settle(before, probes) == probes, (configured, selected)
-        count += 1
+        for case, expected in [('success', 0), ('inherit-agent', 2)]:
+            before = listener.connections
+            code, err, s = run(case, config(configured, endpoint), extra=['--mode', selected])
+            route = expected_route(selected, endpoint)
+            probes = 1 if selected == 'local-first' and endpoint == REACHABLE else 0
+            where = (configured, selected, endpoint == REACHABLE, case)
+            assert code == expected and s['launched'] == ([route] if expected == 0 else []), (*where, code, s['launched'], err)
+            assert ('attempt=2' in err) == (selected == 'local-first' and endpoint == UNREACHABLE), (*where, err)
+            assert_records(s['records'], route, endpoint, 'OPENCODE_API_KEY' if route == 'native' else 'AH_RUNTIME_API_KEY')
+            assert listener.settle(before, probes) == probes, where
+            count += 1
 print('PASS --mode override selects the same effective routes', flush=True)
 
 # --no-sync validates effective routing too; a fresh project has nothing to reuse locally.
@@ -263,4 +282,5 @@ for name, cfg, extra, drop, reason in invalid:
 print('PASS', len(invalid), 'invalid route/fallback configurations reject before launch or contact', flush=True)
 
 assert listener.received == b''
+assert ambient.connections == 0 and ambient.received == b'', 'ambient endpoint contacted'
 print(f'PASS {count} mode-matrix cases; forbidden launches/requests absent; uncertainty never replayed')
