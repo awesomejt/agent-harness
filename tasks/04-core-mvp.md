@@ -35,7 +35,7 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 - **Depends on:** [P4.3](04-core-mvp.md#p4-3)
 - **Deliverable and boundary:** Specify and implement final-result/event envelope, ordering/IDs, redaction and version compatibility. Preserve exits and stdout/stderr behavior; cover headless input/permissions.
 - **Acceptance evidence:** Machine-consumer fixtures and CLI tests check terminal outcomes including uncertainty, diagnostics separation, unknown metric representation and no hidden interactive wait.
-- **Decision/readiness gate:** AC06; machine output is public contract, not automatic serialization of internal Rust enums.
+- **Decision/readiness gate:** AC06; machine output is public contract, not automatic serialization of internal Rust enums. Evaluate the [Phase 3 review](../docs/reviews/phase-03.md) recommendation R03-REC1 (post-submission terminal error with zero grants and zero completed tool calls reported as exit 1, never fallback) before freezing the exit contract. Adopt it only with a decision entry and fixtures; until then the conservative exit 4 stands.
 - **Contract:** [docs/EXECUTION.md](../docs/EXECUTION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
 <a id="p4-8"></a>
@@ -62,7 +62,7 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 - **Depends on:** [P4.4](04-core-mvp.md#p4-4)
 - **Deliverable and boundary:** Declare supported platform/runtime matrix, build/smoke-test every artifact, and complete sample config/agents, diagnostics, CI guidance and install/upgrade instructions.
 - **Acceptance evidence:** Every advertised target has artifact/install evidence; docs separate ah from CLI/proxy prerequisites and preserve secrets/config on setup/upgrade.
-- **Decision/readiness gate:** AC09, AC10; no platform claim from compilation alone.
+- **Decision/readiness gate:** AC09, AC10; no platform claim from compilation alone. Per the [Phase 3 review](../docs/reviews/phase-03.md) R03-REC2, the published `v0.1.0-alpha.1` predates native/local-first routing, the OpenCode 2.2.5 pin and D030 cleanup; artifacts here must package current source.
 - **Contract:** [docs/OPERATIONS.md](../docs/OPERATIONS.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
 <a id="p4-6"></a>

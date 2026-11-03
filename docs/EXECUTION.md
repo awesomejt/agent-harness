@@ -55,7 +55,7 @@ Treat project instructions, prompt files and backend output as data/instructions
 
 ## Failure and fallback
 
-P3.1 selects the following policy for the future coordinator. A classification requires reliable structured, adapter-specific evidence; raw error text, HTTP-like substrings, absence of tool events, and missing acknowledgements are insufficient. If evidence is unavailable or contradictory, classify as unknown and stop. The current ACP adapter does not reliably distinguish provider authentication, rate limits or transport errors, and must not infer them from generic failures.
+P3.1 selects the following policy; P3.3 implements the local-first coordinator that applies it. A classification requires reliable structured, adapter-specific evidence; raw error text, HTTP-like substrings, absence of tool events, and missing acknowledgements are insufficient. If evidence is unavailable or contradictory, classify as unknown and stop. The current ACP adapter does not reliably distinguish provider authentication, rate limits or transport errors, and must not infer them from generic failures.
 
 | Failure, established before prompt submission | Automatic native fallback |
 |---|---|
