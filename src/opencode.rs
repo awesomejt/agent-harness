@@ -1,7 +1,7 @@
 //! Pinned OpenCode 2.2.5 runtime surface (D035): native-schema config for both
-//! routes, project agent emission, and pure validators for its configuration
-//! sources, agents and catalog.
-use crate::agents::{self, Agent, Capacity, Tool};
+//! routes, project agent emission, named-role mapping (D038), and pure
+//! validators for its configuration sources, agents and catalog.
+use crate::agents::{self, Agent, Capacity, Effort, Tool};
 use crate::config::{Invalid, Mode, Permissions, Resolved};
 use serde_json::{Value, json};
 use std::path::Path;
@@ -75,6 +75,48 @@ pub(crate) fn ceiling(agent: &Agent) -> Value {
     Value::Array(rules)
 }
 
+/// Enforced runtime rules: the invocation profile intersected with a selected
+/// agent's ceiling and tools. A deny invocation keeps the deny profile; a
+/// trusted one narrows to the agent's rules, never wider than trusted.
+pub(crate) fn effective(request: &Resolved) -> Value {
+    match (&request.agent, request.permissions) {
+        (Some(agent), Permissions::Trusted) => ceiling(agent),
+        (_, policy) => profile(policy),
+    }
+}
+
+/// ACP tool kinds the harness may grant once under the effective rules;
+/// empty when no tool can run. Mirrors the `ceiling` tool mapping.
+pub(crate) fn grantable(request: &Resolved) -> Vec<&'static str> {
+    if request.permissions != Permissions::Trusted {
+        return Vec::new();
+    }
+    let all = [Tool::Read, Tool::Search, Tool::Edit, Tool::Execute];
+    let tools = request.agent.as_ref().map_or(&all[..], Agent::tools);
+    tools
+        .iter()
+        .map(|tool| match tool {
+            Tool::Read => "read",
+            Tool::Search => "search",
+            Tool::Edit => "edit",
+            Tool::Execute => "execute",
+        })
+        .collect()
+}
+
+/// Required capabilities the pinned runtime cannot enforce. 2.2.5 advertises
+/// an `effort` session option, but no mapping to provider requests has been
+/// verified, so only `default` is supported (D038).
+pub(crate) fn supports(agent: &Agent) -> Result<(), Invalid> {
+    if agent.effort() == Effort::Default {
+        Ok(())
+    } else {
+        Err(Invalid(
+            "agent effort is unsupported by OpenCode 2.2.5; only default effort runs",
+        ))
+    }
+}
+
 /// Project `.opencode/agents/NAME.md` for direct OpenCode use on the local
 /// route (D037): native frontmatter as one JSON flow mapping, which is valid
 /// YAML, then the canonical Markdown body unchanged as `system`.
@@ -95,6 +137,10 @@ pub(crate) fn agent_markdown(agent: &Agent, request: &Resolved) -> String {
 
 /// Complete runtime configuration passed via OPENCODE_CONFIG_CONTENT. Only the
 /// selected provider may be used; the title helper is pinned to the same model.
+/// Global rules are the effective rules, so built-in helpers and subagents
+/// never exceed a selected agent. The harness invokes that agent directly as
+/// the default agent, so its entry is always `primary`: 2.2.5 silently falls
+/// back to `build` for a `subagent` default (D038).
 pub(crate) fn config(request: &Resolved) -> Value {
     let provider = provider(request);
     let providers = if request.mode == Mode::LocalOnly {
@@ -106,17 +152,27 @@ pub(crate) fn config(request: &Resolved) -> Value {
     } else {
         json!({})
     };
+    let mut agents = json!({"title": {"model": model(request)}});
+    if let Some(agent) = &request.agent {
+        agents[agent.name()] = json!({
+            "description": agent.description(),
+            "mode": "primary",
+            "model": model(request),
+            "permissions": effective(request),
+            "system": agent.body(),
+        });
+    }
     json!({
         "model": model(request),
-        "default_agent": "build",
+        "default_agent": request.agent.as_ref().map_or("build", Agent::name),
         "update": "disable",
         "share": "disabled",
-        "permissions": profile(request.permissions),
+        "permissions": effective(request),
         "policies": [
             {"action": "provider.use", "resource": "*", "effect": "deny"},
             {"action": "provider.use", "resource": provider, "effect": "allow"},
         ],
-        "agents": {"title": {"model": model(request)}},
+        "agents": agents,
         "mcp": {},
         "plugins": [],
         "providers": providers,
@@ -155,16 +211,17 @@ pub(crate) fn validate_sources(sent: &Value, sources: &Value, home: &Path) -> Re
 }
 
 /// Every agent, including built-in helpers and subagents, must end with the
-/// selected profile followed only by built-in denials, use no other model and
-/// carry no request overrides. `build` must be the visible primary agent.
+/// effective rules followed only by built-in denials, use no other model and
+/// carry no request overrides. The default agent (`build`, or the selected
+/// agent with its exact model and system text) must be a visible primary.
 pub(crate) fn validate_agents(request: &Resolved, agents: &Value) -> Result<(), Invalid> {
     const DIFFERS: Invalid =
         Invalid("effective agents differ from the selected route or permissions");
-    let profile = profile(request.permissions);
+    let profile = effective(request);
     let profile = profile.as_array().expect("profile is an array");
     let wanted = json!({"id": request.model, "providerID": provider(request)});
     let agents = agents.as_array().ok_or(DIFFERS)?;
-    let mut build = false;
+    let mut default = false;
     for agent in agents {
         let rules = agent["permissions"].as_array().ok_or(DIFFERS)?;
         let start = rules
@@ -179,9 +236,19 @@ pub(crate) fn validate_agents(request: &Resolved, agents: &Value) -> Result<(), 
         {
             return Err(DIFFERS);
         }
-        build |= agent["id"] == "build" && agent["mode"] == "primary" && agent["hidden"] == false;
+        let visible = agent["mode"] == "primary" && agent["hidden"] == false;
+        default |= match &request.agent {
+            None => agent["id"] == "build" && visible,
+            Some(named) => {
+                agent["id"] == named.name()
+                    && visible
+                    && agent["model"] == wanted
+                    && agent["system"] == named.body()
+                    && agent["description"] == named.description()
+            }
+        };
     }
-    if build { Ok(()) } else { Err(DIFFERS) }
+    if default { Ok(()) } else { Err(DIFFERS) }
 }
 
 /// Built-in catalog only: the provider policy must hide every other provider.
@@ -383,6 +450,90 @@ mod tests {
         assert!(
             !agent_markdown(&full, &request(Mode::LocalOnly, Permissions::Deny)).contains("allow")
         );
+    }
+
+    fn named(permissions: Permissions, ceiling: &str, tools: &str) -> Resolved {
+        let mut r = request(Mode::LocalOnly, permissions);
+        r.agent = Some(Agent::read(format!("---\nversion: 1\nname: reviewer\ndescription: d\ncapacity: specialized\npermissions: {ceiling}\ntools: {tools}\n---\nBody\r\n").as_bytes()).unwrap());
+        r
+    }
+
+    #[test]
+    fn named_role_is_the_primary_default_with_intersected_rules_everywhere() {
+        let r = named(Permissions::Trusted, "read-only", "[search]");
+        let doc = config(&r);
+        let rules = ceiling(r.agent.as_ref().unwrap());
+        assert_eq!(effective(&r), rules);
+        assert_eq!(doc["permissions"], rules);
+        assert_eq!(doc["default_agent"], "reviewer");
+        assert_eq!(
+            doc["agents"]["reviewer"],
+            json!({"description": "d", "mode": "primary", "model": model(&r),
+                   "permissions": rules, "system": "Body\r\n"})
+        );
+        assert_eq!(grantable(&r), ["search"]);
+        // Deny invocation narrows every role; no kinds are grantable.
+        let denied = named(Permissions::Deny, "trusted", "[read, edit, execute]");
+        assert_eq!(effective(&denied), profile(Permissions::Deny));
+        assert!(grantable(&denied).is_empty());
+        assert!(grantable(&named(Permissions::Trusted, "deny", "[]")).is_empty());
+        assert_eq!(
+            grantable(&request(Mode::LocalOnly, Permissions::Trusted)),
+            ["read", "search", "edit", "execute"]
+        );
+        let plain = config(&request(Mode::LocalOnly, Permissions::Trusted));
+        assert_eq!(plain["default_agent"], "build");
+        assert_eq!(plain["agents"].as_object().unwrap().len(), 1);
+        // Only default effort is supported.
+        let effort = |e: &str| {
+            Agent::read(format!("---\nversion: 1\nname: x\ndescription: d\ncapacity: primary\npermissions: deny\ntools: []\neffort: {e}\n---\nb\n").as_bytes()).unwrap()
+        };
+        assert!(supports(&effort("default")).is_ok());
+        for e in ["low", "medium", "high", "max"] {
+            assert!(supports(&effort(e)).is_err(), "{e}");
+        }
+    }
+
+    #[test]
+    fn named_role_must_be_visible_primary_with_exact_model_and_system() {
+        let r = named(Permissions::Trusted, "read-only", "[read]");
+        let tail = json!({"action": "browser", "resource": "*", "effect": "deny"});
+        let mut full = rules(&r, &[]);
+        full.extend(effective(&r).as_array().unwrap().iter().cloned());
+        full.push(tail);
+        let wanted = json!({"id": "proxy", "providerID": "ah-litellm"});
+        let mut role = agent("reviewer", full.clone(), wanted.clone());
+        role["system"] = json!("Body\r\n");
+        role["description"] = json!("d");
+        let helper = agent("general", full.clone(), Value::Null);
+        validate_agents(&r, &json!([helper, role])).unwrap();
+        // `build` alone no longer satisfies a named request.
+        assert!(validate_agents(&r, &json!([agent("build", full.clone(), Value::Null)])).is_err());
+        let mut bad = Vec::new();
+        for (field, value) in [
+            ("mode", json!("subagent")),
+            ("hidden", json!(true)),
+            ("system", json!("Body")),
+            ("description", json!("other")),
+            ("model", Value::Null),
+        ] {
+            let mut changed = role.clone();
+            changed[field] = value;
+            bad.push(json!([changed]));
+        }
+        // A helper keeping the wider invocation profile fails.
+        let mut wide = rules(&r, &[]);
+        wide.extend(
+            profile(Permissions::Trusted)
+                .as_array()
+                .unwrap()
+                .iter()
+                .cloned(),
+        );
+        bad.push(json!([role.clone(), agent("general", wide, Value::Null)]));
+        for bad in bad {
+            assert!(validate_agents(&r, &bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

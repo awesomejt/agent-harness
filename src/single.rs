@@ -39,12 +39,13 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
             return Exit::Invalid;
         }
     };
-    // Never run a named request whose ceiling is not yet enforced (P4.3);
-    // refusing here precedes any runtime, network check or project write.
-    if request.agent.is_some() && !request.preview {
-        progress.event(
-            "named agent execution requires constraint enforcement (P4.3); use --preview to inspect selection and emission",
-        );
+    // Refuse a required capability the runtime cannot enforce (D038) before
+    // any runtime, network check or project write; both attempts share it.
+    if let Some(agent) = &request.agent
+        && !request.preview
+        && let Err(error) = crate::opencode::supports(agent)
+    {
+        progress.event(error.0);
         return Exit::Invalid;
     }
     if request.preview {
@@ -174,6 +175,9 @@ async fn coordinate(
         configured_target_validated: native.mode == Mode::CloudOnly && native.fallback.is_none(),
         constraints_preserved: native.project == request.project
             && native.permissions == request.permissions
+            && native.agent.as_ref().map(crate::agents::Agent::name)
+                == request.agent.as_ref().map(crate::agents::Agent::name)
+            && crate::opencode::effective(native) == crate::opencode::effective(request)
             && native.timeout_secs == request.timeout_secs
             && native.prompt == request.prompt,
         prior_fallbacks: 0,
@@ -256,7 +260,7 @@ async fn attempt(
             return Exit::Cancelled;
         }
         progress.event(format!(
-            "{label} via OpenCode {}; model {}{}; permissions {:?}",
+            "{label} via OpenCode {}; model {}{}; permissions {:?}{}",
             crate::opencode::VERSION,
             request.runtime_model(),
             request
@@ -264,7 +268,22 @@ async fn attempt(
                 .as_ref()
                 .map(|g| format!(" (group {g})"))
                 .unwrap_or_default(),
-            request.permissions
+            request.permissions,
+            request
+                .agent
+                .as_ref()
+                .map(|a| format!(
+                    "; agent {} (capacity {}; tools {:?}; enforced kinds {:?})",
+                    a.name(),
+                    match a.capacity() {
+                        crate::agents::Capacity::Primary => "primary",
+                        crate::agents::Capacity::Specialized => "specialized",
+                        crate::agents::Capacity::Both => "both",
+                    },
+                    a.tools(),
+                    crate::opencode::grantable(request)
+                ))
+                .unwrap_or_default()
         ));
         crate::acp::run(&adapter, request).await
     }

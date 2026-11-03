@@ -135,7 +135,7 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
             };
             // Name grammar excludes quotes/controls; description/body omitted.
             format!(
-                "\"{}\" (capacity {}; ceiling {}; tools [{}]; effort {}); OpenCode emission: {emission}; named execution refused until constraint enforcement (P4.3)",
+                "\"{}\" (capacity {}; ceiling {}; tools [{}]; effort {}); OpenCode emission: {emission}; runtime: default agent with effective permissions {}{}",
                 agent.name(),
                 match agent.capacity() {
                     Capacity::Primary => "primary",
@@ -154,6 +154,15 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
                     Effort::Medium => "medium",
                     Effort::High => "high",
                     Effort::Max => "max",
+                },
+                if r.permissions == crate::config::Permissions::Deny {
+                    "deny (invocation)".to_owned()
+                } else {
+                    format!("{:?}", crate::opencode::grantable(r))
+                },
+                match crate::opencode::supports(agent) {
+                    Ok(()) => String::new(),
+                    Err(error) => format!("; execution refused: {}", error.0),
                 },
             )
         }
