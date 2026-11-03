@@ -9,7 +9,7 @@ use std::{ffi::OsString, path::Path, time::Duration};
 use tokio::{io::AsyncReadExt, process::Command};
 
 pub(crate) struct Runtime {
-    _home: PrivateHome,
+    home: PrivateHome,
     pub progress: crate::progress::Progress,
     pub deadline: tokio::time::Instant,
     pub cancelled: tokio_util::sync::CancellationToken,
@@ -55,6 +55,9 @@ impl Runtime {
             progress.event("OpenCode missing: install 1.18.30 on an absolute PATH entry");
             Exit::Invalid
         })?;
+        let key = std::env::var_os(&request.api_key_env)
+            .filter(|s| !s.is_empty())
+            .ok_or(Exit::Invalid)?;
         let home = PrivateHome::new().map_err(|_| Exit::Failed)?;
         let mut config = plan.runtime_routing();
         config["provider"]["ah-litellm"]["options"]["apiKey"] = json!("{env:AH_RUNTIME_API_KEY}");
@@ -92,9 +95,6 @@ impl Runtime {
         ] {
             env.push((name.into(), "true".into()));
         }
-        let key = std::env::var_os(&request.api_key_env)
-            .filter(|s| !s.is_empty())
-            .ok_or(Exit::Invalid)?;
         // Copy only the value to a reserved name: arbitrary user-selected names
         // such as DYLD_INSERT_LIBRARIES must never become runtime controls.
         env.push(("AH_RUNTIME_API_KEY".into(), key));
@@ -105,7 +105,7 @@ impl Runtime {
             signal_cancel.cancel();
         });
         Ok(Self {
-            _home: home,
+            home,
             progress,
             cancelled,
             signals,
@@ -171,7 +171,7 @@ impl Runtime {
             json!(format!("{{env:{}}}", request.api_key_env));
         plan.validate_effective(&effective)
             .map_err(|_| Exit::Invalid)?;
-        let (permissions, tools) = profile(request.permissions, self._home.path());
+        let (permissions, tools) = profile(request.permissions, self.home.path());
         if effective["permission"] != permissions
             || effective["tools"] != tools
             || effective["autoupdate"] != false
@@ -222,6 +222,49 @@ impl Runtime {
         }
         Ok(())
     }
+
+    /// Remove runtime-owned state before reporting the final outcome. A plain
+    /// worker thread keeps recursive filesystem cleanup outside Tokio's worker
+    /// pool; dropping its handle after the timeout does not make runtime
+    /// shutdown wait for an unbounded filesystem operation.
+    pub async fn cleanup_private_home(&mut self) -> bool {
+        let Some(path) = self.home.take() else {
+            return true;
+        };
+        let (send, receive) = tokio::sync::oneshot::channel();
+        let worker = std::thread::Builder::new()
+            .name("ah-private-home-cleanup".into())
+            .spawn(move || {
+                fn confirm_absent(path: &Path) -> std::io::Result<()> {
+                    match std::fs::symlink_metadata(path) {
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                        Ok(_) => Err(std::io::Error::new(
+                            std::io::ErrorKind::AlreadyExists,
+                            "private runtime directory remains",
+                        )),
+                        Err(error) => Err(error),
+                    }
+                }
+                let result = match std::fs::remove_dir_all(&path) {
+                    Ok(()) => confirm_absent(&path),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        confirm_absent(&path)
+                    }
+                    Err(error) => Err(error),
+                };
+                let _ = send.send(result);
+            });
+        if worker.is_err() {
+            // No removal was attempted. Do not fall back to recursive I/O on
+            // the supervisor: it has no wall-clock bound. The caller reports
+            // uncertainty and directs the user to inspect retained state.
+            return false;
+        }
+        matches!(
+            tokio::time::timeout(Duration::from_secs(2), receive).await,
+            Ok(Ok(Ok(())))
+        )
+    }
 }
 pub(crate) async fn terminate() {
     if let Ok(mut signal) =
@@ -234,7 +277,7 @@ pub(crate) async fn terminate() {
 }
 
 /// mkdtemp creates a fresh mode-0700 directory without predictable-name races.
-struct PrivateHome(std::path::PathBuf);
+struct PrivateHome(Option<std::path::PathBuf>);
 impl PrivateHome {
     fn new() -> std::io::Result<Self> {
         use std::os::unix::ffi::{OsStrExt, OsStringExt};
@@ -245,15 +288,22 @@ impl PrivateHome {
             return Err(std::io::Error::last_os_error());
         }
         bytes.pop();
-        Ok(Self(OsString::from_vec(bytes).into()))
+        Ok(Self(Some(OsString::from_vec(bytes).into())))
     }
     fn path(&self) -> &Path {
-        &self.0
+        self.0.as_deref().expect("private home is active")
+    }
+    fn take(&mut self) -> Option<std::path::PathBuf> {
+        self.0.take()
     }
 }
 impl Drop for PrivateHome {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        if let Some(path) = self.0.take() {
+            // Constructor failures still get best-effort RAII cleanup. Active
+            // runs use Runtime::cleanup_private_home so failure affects outcome.
+            let _ = std::fs::remove_dir_all(path);
+        }
     }
 }
 

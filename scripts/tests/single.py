@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 import signal
 import subprocess
@@ -19,6 +20,7 @@ def check(case, expected, trusted=False, source='inline'):
         base = Path(d).resolve()
         (base / 'opencode').symlink_to(FAKE)
         (base / 'case').write_text(case)
+        (base / 'track-runtime-home').touch()
         for name in ['claude','codex','grok','gemini','pi']:
             (base/name).write_text('#!/bin/sh\ntouch cloud-native-launched\nexit 99\n')
             (base/name).chmod(0o755)
@@ -60,13 +62,13 @@ def check(case, expected, trusted=False, source='inline'):
         if pipe_write is not None:
             os.close(pipe_write)
             p.stderr=os.fdopen(pipe_read,'r')
-        if case in ['interrupt','before-prompt','cancel-ack','cancel-success','cancel-ack-only','cancel-permission']:
+        if case in ['interrupt','before-prompt','cancel-ack','cancel-success','cancel-ack-only','cancel-permission','cancel-term']:
             marker = base / ('prompted' if case != 'before-prompt' else 'pids.json')
             until = time.monotonic()+10
             while not marker.exists() and p.poll() is None and time.monotonic()<until:
                 time.sleep(.02)
             assert marker.exists(), case
-            p.send_signal(signal.SIGINT)
+            p.send_signal(signal.SIGTERM if case == 'cancel-term' else signal.SIGINT)
         if case == 'blocked-stdout':
             # Deliberately never read one full pipe until the process exits.
             started=time.monotonic()
@@ -88,12 +90,25 @@ def check(case, expected, trusted=False, source='inline'):
                 if 'assistant activity' in line: break
             assert 'run=' in line and p.poll() is None and not (base/'terminal').exists(),line
         out,err = p.communicate(stdin, timeout=30)
+        runtime_home=Path((base/'runtime-home').read_text()) if (base/'runtime-home').exists() else None
+        if case == 'home-cleanup-failure':
+            assert runtime_home is not None,case
+            try:
+                assert runtime_home.exists(),case
+                assert 'uncertain private runtime cleanup; inspect ah-runtime-* under the system temporary directory before manual removal' in err,err
+                assert str(runtime_home) not in err,err
+            finally:
+                if runtime_home.exists():
+                    runtime_home.chmod(0o700)
+                    shutil.rmtree(runtime_home)
         assert p.returncode == expected, (case,p.returncode,err)
         assert 'SECRET_SENTINEL' not in out+err, case
         if (base/'pids.json').exists():
             for pid in json.loads((base/'pids.json').read_text()):
                 status = subprocess.run(['/bin/ps','-o','stat=','-p',str(pid)],capture_output=True,text=True).stdout.strip()
                 assert not status or status.startswith('Z'), (case,pid,status)
+        if runtime_home is not None and case != 'home-cleanup-failure':
+            assert not runtime_home.exists(),(case,runtime_home)
         if (base/'permission-result.json').exists() and case not in ['duplicate','empty-id']:
             result=json.loads((base/'permission-result.json').read_text())
             if case not in ['duplicate','empty-id']:
@@ -113,7 +128,7 @@ def check(case, expected, trusted=False, source='inline'):
             assert snapshots=={name:((base/name).read_bytes(),(base/name).stat().st_mtime_ns) for name in snapshots}
         if (base/'prompted').exists() and case != 'blocked-stderr':
             assert 'attempt=1' in err and 'usage=' in err and 'outcome=' in err, (case,err)
-        if case in ['cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission']:
+        if case in ['cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission','cancel-term']:
             assert (base/'cancelled').exists(),case
         if case == 'session-controls':
             assert not any(c in err for c in ['\u009b','\u202e','\x1b']),repr(err)
@@ -158,6 +173,7 @@ check('known-failure',1)
 for case in ['invalid-utf8','truncated-json','rpc-error','cancel-ack-only']:
     check(case,4)
 check('cancel-ack',3)
+check('cancel-term',3)
 check('cancel-deadline',3)
 check('cancel-success',0)
 check('cancel-permission',3,trusted=True)
@@ -165,3 +181,4 @@ check('usage',0)
 check('usage-invalid-cost',0)
 check('held-pipes',4)
 check('session-controls',0)
+check('home-cleanup-failure',4)
