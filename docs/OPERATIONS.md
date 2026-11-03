@@ -1,6 +1,6 @@
 # Operations and distribution contract
 
-Status: P2.5 first binary runbook for `0.1.0-alpha.1`; later workflow/native-adapter guidance remains prospective. First-use evidence is recorded in P2.6; holistic phase review P2.9 gates phase acceptance. See [release evidence](evidence/p2-5-installable-binary.md).
+Status: P2.5 first binary runbook for `0.1.0-alpha.1`, plus source-only native cloud-only (P3.2) and local-first (P3.3) guidance on OpenCode 2.2.5 (D035). Workflow and additional native-adapter guidance remains prospective. First-use evidence is recorded in P2.6 and dual-route use in P3.5; the Phase 3 holistic review is P3.6. See [release evidence](evidence/p2-5-installable-binary.md).
 
 The [deployment diagram](ARCHITECTURE.md) separates the release pipeline, local executable, installed runtime and external services. Rust library dependencies are linked/packaged for the target as required; binary users do not install Cargo packages manually.
 
@@ -123,7 +123,7 @@ The published `v0.1.0-alpha.1` predates native routing. Build current source wit
 ./target/debug/ah single "Fix the parser and run tests" --mode cloud-only --permissions trusted
 ```
 
-The first command is network-free; the second can consume account credits. Authentication is the official built-in provider's API-key path. Existing `/connect` credentials, subscription logins, OAuth plugins, arbitrary native providers and endpoint overrides are not consumed. The harness uses private HOME/XDG and never copies login stores. Missing/empty selected keys reject before input acquisition or child launch; invalid keys/model access may fail at the native service and do not cause a proxy attempt or retry. Embedded catalog checks do not check account access. Managed LiteLLM config stays untouched, even with `--no-sync`. Required live native use remains P3.5; [P3.2 evidence](evidence/p3-2-native-isolation.md) records non-spending setup/boundary checks.
+The first command is network-free; the second can consume account credits. Authentication is the official built-in provider's API-key path. Existing `/connect` credentials, subscription logins, OAuth plugins, arbitrary native providers and endpoint overrides are not consumed. The harness uses private HOME/XDG and never copies login stores. Missing/empty selected keys reject before input acquisition or child launch; invalid keys/model access may fail at the native service and do not cause a proxy attempt or retry. Embedded catalog checks do not check account access. Managed LiteLLM config stays untouched, even with `--no-sync`. [P3.2 evidence](evidence/p3-2-native-isolation.md) records non-spending setup/boundary checks; [P3.5 evidence](evidence/p3-5-dual-route-use.md) records live native use and a rejected-key check.
 
 ### Local-first from source (P3.3)
 
@@ -162,7 +162,7 @@ authoritative for the final artifact. P4.5 owns broader platform/packaging polis
 
 ## Startup and diagnosis
 
-Diagnostics should identify missing binaries, runtime/version incompatibility, unavailable model aliases, unreadable/conflicting config, missing key references, denied permissions and unreachable permitted services. Read-only resolved-plan/sync preview is separate from launching a task. `ah single PROMPT --preview` uses the execution resolver/planner and reports local binary discovery, expected OpenCode 1.18.30, choice sources, permissions and planned managed changes. It launches no child and performs no health checks. Runtime/service/alias availability remains unverified; normal execution performs effective preflight. Set the environment variable named by the selected route's `litellm.api_key_env` or `native.api_key_env` for missing-key errors; install the pinned OpenCode on an absolute PATH entry when discovery reports it missing.
+Diagnostics should identify missing binaries, runtime/version incompatibility, unavailable model aliases, unreadable/conflicting config, missing key references, denied permissions and unreachable permitted services. Read-only resolved-plan/sync preview is separate from launching a task. `ah single PROMPT --preview` uses the execution resolver/planner and reports local binary discovery, expected OpenCode 2.2.5 (the published alpha.1 reports 1.18.30), choice sources, route and configured fallback, permissions and planned managed changes. It launches no child and performs no health checks. Runtime/service/alias availability remains unverified; normal execution performs effective preflight. Set the environment variable named by the selected route's `litellm.api_key_env` or `native.api_key_env` for missing-key errors; install the pinned OpenCode on an absolute PATH entry when discovery reports it missing.
 
 Errors explain what failed, which attempt/route was affected, whether tools may have run, and a next action that does not silently change mode or credentials. Do not suggest cloud fallback as the automatic fix to local-only unavailability.
 
@@ -170,7 +170,9 @@ Errors explain what failed, which attempt/route was affected, whether tools may 
 |---|---|
 | Binary not found | Show required runtime and install guidance; do not fetch executables automatically. |
 | LiteLLM unavailable/model missing | Show permitted endpoint/model and sanitized error; fix proxy/model config or explicitly choose another permitted mode. |
-| Native login rejected | Use the official CLI login flow; never inspect token stores. |
+| Native API key or model access rejected (cloud-only or local-first fallback) | Check the value exported under `native.api_key_env` and the account's access to `native.model`. The harness consumes no login store, so `/connect` or CLI login does not help; never inspect token stores. A rejection after prompt submission exits 4 even with 0 grants (P3.5). |
+| Provider failure after prompt submission (exit 4, 0 grants) | Seen for a bad key or a missing LiteLLM alias. The outcome is conservatively uncertain; confirm no project change, fix the key or alias, then start a new run. local-first never falls back after the reachability check passes. |
+| local-first ran the native fallback unexpectedly | Progress shows `attempt=2`; the LiteLLM host could not be resolved or reached. A mistyped `api_base` host falls back too (D034); correct it or use `--mode local-only`. |
 | Permission request cannot be answered | Apply documented noninteractive policy and exit/report denial; do not open a hidden TUI. |
 | Managed config conflicts | Show a redacted preview and affected ownership; preserve user content. |
 | Stream disconnect/timeout after work | Report uncertain outcome and project inspection/recovery guidance; do not replay automatically. |
