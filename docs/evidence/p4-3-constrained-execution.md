@@ -104,3 +104,13 @@ runtime now also emits the session `mode` option and configured agents.
 
 Next: P4.7 machine result/event output, then P4.8 inherited capabilities, then
 P4.4 live primary and reviewer acceptance.
+
+## PR review closeout
+
+[Grok PR #36 review](https://github.com/awesomejt/agent-harness/pull/36): 0 blockers,
+1 concern and 1 nit, both addressed. The concern was stale P4.1 destinations prose
+in CONFIGURATION (a future intersection and an unchanged `build` check); both
+sentences now describe the D038 behavior. The nit was progress reporting a `both`
+agent as a primary role; it now reports `capacity primary|specialized|both`,
+matching preview, and D038 says so. Format, locked Clippy, 76 root tests and
+`agents_exec.py` pass. No critical/high finding, so no mandatory re-review.

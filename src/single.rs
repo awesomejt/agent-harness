@@ -273,11 +273,12 @@ async fn attempt(
                 .agent
                 .as_ref()
                 .map(|a| format!(
-                    "; agent {} ({} role; tools {:?}; enforced kinds {:?})",
+                    "; agent {} (capacity {}; tools {:?}; enforced kinds {:?})",
                     a.name(),
                     match a.capacity() {
+                        crate::agents::Capacity::Primary => "primary",
                         crate::agents::Capacity::Specialized => "specialized",
-                        _ => "primary",
+                        crate::agents::Capacity::Both => "both",
                     },
                     a.tools(),
                     crate::opencode::grantable(request)

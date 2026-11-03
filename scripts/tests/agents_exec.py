@@ -84,7 +84,7 @@ named = config['agents']['reviewer']
 assert named == dict(description=named['description'], mode='primary', permissions=READ_ONLY, system=body,
                      model=dict(providerID='ah-litellm', model='fixture')), named
 assert r['selected'] == 'once' and r['emitted']
-assert 'agent reviewer (specialized role; tools [Read, Search]; enforced kinds ["read", "search"])' in r['stderr']
+assert 'agent reviewer (capacity specialized; tools [Read, Search]; enforced kinds ["read", "search"])' in r['stderr']
 assert expect('search', 0)['selected'] == 'once'
 
 # Read-only role refuses edit/execute grants even under trusted invocation.
