@@ -206,6 +206,9 @@ impl Config {
             validate_model(&native.model)?;
             validate_key_name(&native.api_key_env)?;
         }
+        if self.mode == "local-only" && self.model.is_none() {
+            return Err(Invalid("local-only config requires a model default"));
+        }
         self.key_name(&self.mode)?;
         Ok(())
     }
@@ -244,12 +247,11 @@ fn validate_key_name(value: &str) -> Result<()> {
 impl Config {
     fn key_name(&self, mode: &str) -> Result<&str> {
         match mode {
-            "local-only" if self.model.is_some() => self
+            "local-only" => self
                 .litellm
                 .as_ref()
                 .map(|v| v.api_key_env.as_str())
                 .ok_or(Invalid("local-only requires litellm configuration")),
-            "local-only" => Err(Invalid("local-only requires model configuration")),
             "cloud-only" => self
                 .native
                 .as_ref()
@@ -417,13 +419,19 @@ impl Invocation {
         }
         let mode = self.mode.as_deref().unwrap_or(&config.mode);
         let key_name = config.key_name(mode)?.to_owned();
-        let model = self.model.clone().unwrap_or_else(|| {
-            if mode == "cloud-only" {
-                config.native.as_ref().unwrap().model.clone()
-            } else {
-                config.model.as_ref().unwrap().clone()
-            }
-        });
+        let model = self
+            .model
+            .clone()
+            .or_else(|| {
+                if mode == "cloud-only" {
+                    config.native.as_ref().map(|native| native.model.clone())
+                } else {
+                    config.model.clone()
+                }
+            })
+            .ok_or(Invalid(
+                "selected route requires a model default or explicit --model",
+            ))?;
         let mode = if mode == "cloud-only" {
             Mode::CloudOnly
         } else {

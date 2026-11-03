@@ -71,7 +71,7 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
         "native provider reachability, model availability, authentication"
     };
     format!(
-        "ah {} preview: valid local plan; execution readiness unverified\n\
+        "ah {} preview: valid resolved request; execution readiness unverified\n\
          project: {:?}\nconfig: {:?}\n\
          mode: {mode} ({}); route: {route}; fallback: disabled\n\
          runtime: OpenCode ACP; {runtime}\n\

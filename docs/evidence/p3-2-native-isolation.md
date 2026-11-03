@@ -1,6 +1,6 @@
 # P3.2 — Isolated native OpenCode route
 
-Date: 2026-11-02. Entry: `bd4c1a9` (merged P3.1 / PR #25). Task branch: `feature/03/p3-2-native-opencode-isolation`. Completion takes effect on this task's required PR review/merge. [D032](../../DECISIONS.md#2026-11-02--d032-separate-built-in-native-opencode-api-key-route) and the [configuration contract](../CONFIGURATION.md#native-opencode-route-p32--d032) define the selected API-key boundary.
+Date: 2026-11-02. Entry: `bd4c1a9` (merged P3.1 / PR #25). Task branch: `feature/03/p3-2-native-opencode-isolation`. Completion takes effect on [PR #26](https://github.com/awesomejt/agent-harness/pull/26) merge. [D032](../../DECISIONS.md#2026-11-02--d032-separate-built-in-native-opencode-api-key-route) and the [configuration contract](../CONFIGURATION.md#native-opencode-route-p32--d032) define the selected API-key boundary.
 
 ## Delivered behavior
 
@@ -17,7 +17,7 @@ Tested on macOS 27.0.1 arm64, Rust/Cargo 1.88.0, OpenCode 1.18.30. No new depend
 
 | Command | Observed result |
 |---|---|
-| `cargo test --locked` | 43 tests pass: existing policy/config/transaction coverage plus native strict schema, mode/model/key independence and refusal of a managed plan for native requests. |
+| `cargo test --locked` | 44 tests pass: existing policy/config/transaction coverage plus native strict schema, mode/model/key independence and refusal of a managed plan for native requests. |
 | `cargo fmt --check` and `cargo clippy --all-targets --locked -- -D warnings` | Pass. |
 | `cargo build --release --locked` | Pass; source build only, no publication. |
 | `python3 scripts/tests/native.py` | 32 cases pass, with/without no-sync. Loopback LiteLLM trap receives **zero discovery or model requests**. Conflicting/malformed config, JSONC, manual receipt, lock and dirty-file sentinels remain identical. Covers wrong provider/allowlist/helper/agent/permissions/version/catalog/session, absent selected key, trusted allow-once, default denial, confirmed deadline cancellation, post-prompt uncertainty, preview and redaction. Prepared runtime homes are removed. |
@@ -34,3 +34,6 @@ Build debug fixtures with `cargo build --locked` first; ensure `~/.cargo/bin` an
 Independent security review identified that an early draft shared one model default across modes. Corrected before PR: native config now requires its own model; distinct-default override tests cover both directions. Review also caught a stale runtime-key sentence, corrected to distinguish the two reserved environment variables. Reviewed code has no remaining routing/auth/permission/project-write blocker.
 
 No real native API key was supplied or probed, and no native prompt was sent to a service. Native authentication success, account balance, inference, downstream physical hosting and native coding usability remain unverified. P3.5 owns live local-only/cloud-only/eligible-fallback use. Only the built-in OpenCode API-key provider is supported here; official subscription CLI adapters and login integration remain separately gated. P3.3 is next: model-group/proxy handoff followed by policy-guarded configured fallback. P3.4/P3.6 still own the complete three-mode matrix and holistic Phase 3 acceptance.
+
+
+PR #26 Grok closeout: the completed review reported 0 blockers, 1 concern and 1 nit. Corrected both: a cloud-only config with `litellm` but no local default can switch using explicit `--model` (with a regression for success, missing override and invalid local-only default config), and preview now says “valid resolved request.” No critical/high findings; these minor corrections do not require another review under the Git workflow. The automatic result had not posted after eight minutes, so one explicit `/grok review` request was sent; no further requests were made.

@@ -522,3 +522,39 @@ fn native_schema_rejects_proxy_targets_credentials_and_inactive_invalid_blocks()
         assert!(Config::read(input.as_bytes()).is_err());
     }
 }
+
+#[test]
+fn explicit_local_model_completes_a_native_config_mode_switch() {
+    let both = NATIVE.replace("\"version\":1", "\"version\":1,\"litellm\":{\"api_base\":\"http://127.0.0.1:9/v1\",\"api_key_env\":\"LOCAL_KEY\"}");
+    let local = invocation(&[
+        "single",
+        "task",
+        "--mode",
+        "local-only",
+        "--model",
+        "explicit-local",
+    ])
+    .resolve(
+        Config::read(both.as_bytes()).unwrap(),
+        |name| {
+            assert_eq!(name, "LOCAL_KEY");
+            Some("local secret".into())
+        },
+        NeverRead,
+    )
+    .unwrap();
+    assert_eq!(local.runtime_model(), "ah-litellm/explicit-local");
+    assert_eq!(local.sources.model, Source::Invocation);
+    assert!(
+        invocation(&["single", "--prompt-file", "-", "--mode", "local-only"])
+            .resolve(
+                Config::read(both.as_bytes()).unwrap(),
+                |_| panic!("model validation precedes key lookup"),
+                NeverRead
+            )
+            .is_err()
+    );
+    // A config whose own default mode is local-only still needs a model; CLI
+    // flags do not repair malformed default configuration.
+    assert!(Config::read(both.replace("cloud-only", "local-only").as_bytes()).is_err());
+}
