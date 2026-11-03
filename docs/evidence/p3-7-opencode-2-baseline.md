@@ -64,6 +64,8 @@ macOS 27.0.1 arm64, Rust/Cargo 1.88.0, OpenCode 2.2.5 (Homebrew). All commands a
 
 ## Limits
 
+- **Later correction (P4.8):** this baseline did not re-check instruction loading. With `OPENCODE_DISABLE_PROJECT_CONFIG=true`, 2.2.5 loads no project `AGENTS.md`. Until [D040](../../DECISIONS.md#2026-11-03--d040-explicit-project-instructions-and-refused-runtime-commands), isolated runs sent no project instructions. See [P4.8 evidence](p4-8-inherited-capabilities.md).
+
 - No live LiteLLM or native inference ran. Whether `OPENCODE_API_KEY` authenticates native inference on 2.2.5 is unverified until P3.5.
 - In 2.2.5, `opencode_worktree_remove` is offered under trusted and gated only by the adapter's refusal of the `other` kind. No permission action name was found that removes it from the profile.
 - A rejected request now ends the turn, so in trusted mode an unsupported tool call ends the run (exit 3) rather than letting the model try another approach.

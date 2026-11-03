@@ -56,6 +56,12 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
         progress.reject(error.0);
         return Exit::Invalid;
     }
+    if !request.preview
+        && let Err(error) = crate::opencode::prompt_supported(&request.prompt)
+    {
+        progress.reject(error.0);
+        return Exit::Invalid;
+    }
     if request.preview {
         return match prepare_plan(&request) {
             Ok(plan) => {

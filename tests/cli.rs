@@ -143,6 +143,53 @@ fn named_agent_preview_reports_mapping_and_unsupported_effort_refuses_without_wr
     std::fs::remove_dir_all(project).unwrap();
 }
 
+/// D040: preview reports runtime-loaded project instructions without a path,
+/// and a slash-command prompt refuses before any runtime, network or write.
+#[test]
+fn preview_reports_instructions_and_command_prompts_refuse_without_writes() {
+    let project = std::env::temp_dir().join(format!("ah-cli-capabilities-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&project);
+    std::fs::create_dir_all(&project).unwrap();
+    std::fs::write(
+        project.join("ah.json"),
+        r#"{"version":1,"mode":"local-only","model":"proxy","litellm":{"api_base":"http://127.0.0.1:9/v1","api_key_env":"AH_CLI_CAP_KEY"}}"#,
+    )
+    .unwrap();
+    let run = |prompt: &str, extra: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_ah"))
+            .args(["single", prompt])
+            .args(extra)
+            .current_dir(&project)
+            .env("AH_CLI_CAP_KEY", "secret-value")
+            .output()
+            .unwrap()
+    };
+    let stdout = |output: std::process::Output| String::from_utf8(output.stdout).unwrap();
+    assert!(stdout(run("fix it", &["--preview"])).contains(
+        "project instructions: none (no project AGENTS.md); skills/MCP/plugins/project config not inherited\n"
+    ));
+    std::fs::write(project.join("AGENTS.md"), "rules").unwrap();
+    let report = stdout(run("fix it", &["--preview"]));
+    assert!(report.contains("project instructions: project AGENTS.md (runtime-loaded);"));
+    assert!(report.contains("prompt: validated; contents omitted\n"));
+    let output = run("/review", &["--preview"]);
+    assert_eq!(output.status.code(), Some(0));
+    assert!(stdout(output).contains(
+        "prompt: validated; contents omitted; execution refused: prompt starts with a runtime slash command"
+    ));
+    let before = std::fs::read_dir(&project).unwrap().count();
+    let output = run(" /init", &[]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .contains("prompt starts with a runtime slash command, which is unsupported")
+    );
+    assert_eq!(std::fs::read_dir(&project).unwrap().count(), before);
+    std::fs::remove_dir_all(project).unwrap();
+}
+
 /// D039: a machine consumer sees only version-1 records on stdout, ending in
 /// exactly one result record, even when the invocation is rejected.
 #[test]

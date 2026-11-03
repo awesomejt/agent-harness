@@ -801,6 +801,13 @@ fn local_first_resolves_litellm_primary_with_configured_native_fallback() {
     assert_eq!(native.permissions, Permissions::Trusted);
     assert_eq!(native.timeout_secs, 30);
     assert_eq!(native.prompt, r.prompt);
+    // The repository's own AGENTS.md is named for both attempts (D040).
+    assert!(
+        r.instructions
+            .as_ref()
+            .is_some_and(|p| p.ends_with("AGENTS.md"))
+    );
+    assert_eq!(native.instructions, r.instructions);
     let grouped = invocation(&["single", "task"])
         .resolve(
             Config::read(LOCAL_FIRST.as_bytes()).unwrap(),
@@ -922,4 +929,56 @@ fn output_format_parses_and_machine_mode_is_detected_before_validation() {
     assert!(!scan(&["single", "x", "--output", "human"]));
     assert!(!scan(&["single", "x", "--output"]));
     assert!(!scan(&["single", "x", "jsonl", "--output"]));
+}
+
+#[test]
+fn project_instructions_are_only_a_regular_root_agents_file_inside_the_project() {
+    let base = std::env::temp_dir().join(format!("ah-p4-8-instructions-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    let project = base.join("project");
+    std::fs::create_dir_all(project.join("sub")).unwrap();
+    let resolve = || {
+        let args = ["single", "x", "--project"].map(OsString::from);
+        Invocation::parse(args.into_iter().chain([project.clone().into()]), &base)
+            .unwrap()
+            .resolve(config(), |_| Some("key".into()), NeverRead)
+    };
+    // Absent: no instructions. Parent, nested and CLAUDE.md files are never named.
+    std::fs::write(base.join("AGENTS.md"), "parent").unwrap();
+    std::fs::write(project.join("CLAUDE.md"), "claude").unwrap();
+    std::fs::write(project.join("sub/AGENTS.md"), "nested").unwrap();
+    assert_eq!(resolve().unwrap().instructions, None);
+    // A regular file, or a symlink to one inside the project, is named canonically.
+    std::fs::write(project.join("RULES.md"), "rules").unwrap();
+    std::os::unix::fs::symlink("RULES.md", project.join("AGENTS.md")).unwrap();
+    let canonical = project.canonicalize().unwrap();
+    assert_eq!(
+        resolve().unwrap().instructions,
+        Some(canonical.join("RULES.md"))
+    );
+    std::fs::remove_file(project.join("AGENTS.md")).unwrap();
+    std::fs::write(project.join("AGENTS.md"), "rules").unwrap();
+    assert_eq!(
+        resolve().unwrap().instructions,
+        Some(canonical.join("AGENTS.md"))
+    );
+    // Outside targets, dangling links and non-files refuse before key lookup or stdin.
+    std::fs::remove_file(project.join("AGENTS.md")).unwrap();
+    for target in [
+        base.join("AGENTS.md"),
+        project.join("absent"),
+        project.join("sub"),
+    ] {
+        std::os::unix::fs::symlink(&target, project.join("AGENTS.md")).unwrap();
+        let error = resolve().err().map(|e| e.0);
+        assert_eq!(
+            error,
+            Some("project AGENTS.md must resolve to a regular file inside the project"),
+            "{target:?}"
+        );
+        std::fs::remove_file(project.join("AGENTS.md")).unwrap();
+    }
+    std::fs::create_dir(project.join("AGENTS.md")).unwrap();
+    assert!(resolve().is_err());
+    std::fs::remove_dir_all(base).unwrap();
 }

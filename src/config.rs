@@ -166,6 +166,9 @@ pub struct Resolved {
     pub no_sync: bool,
     pub preview: bool,
     pub prompt: String,
+    /// Canonical project-root `AGENTS.md`, named explicitly to the isolated
+    /// runtime, which itself reads it (D040). `None` when absent.
+    pub instructions: Option<PathBuf>,
     /// Selected canonical definition, enforced at runtime as the default agent
     /// with its ceiling intersected with `permissions` (D038).
     pub agent: Option<Agent>,
@@ -196,6 +199,28 @@ pub(crate) fn bounded(mut reader: impl Read) -> Result<String> {
         return Err(Invalid("input exceeds 1 MiB"));
     }
     String::from_utf8(bytes).map_err(|_| Invalid("input must be UTF-8"))
+}
+
+/// Project instructions the isolated runtime may load (D040): only the
+/// project-root `AGENTS.md`, resolving to a regular file inside the project.
+/// OpenCode 2.2.5 skips project instructions once project configuration is
+/// disabled, so the harness names this one path; it never reads or bounds it.
+pub(crate) fn instructions(project: &Path) -> Result<Option<PathBuf>> {
+    const OUTSIDE: Invalid =
+        Invalid("project AGENTS.md must resolve to a regular file inside the project");
+    let path = project.join("AGENTS.md");
+    match std::fs::symlink_metadata(&path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(_) => return Err(OUTSIDE),
+        Ok(_) => {}
+    }
+    let resolved = path.canonicalize().map_err(|_| OUTSIDE)?;
+    let regular = std::fs::metadata(&resolved).is_ok_and(|m| m.is_file());
+    if regular && resolved.starts_with(project) {
+        Ok(Some(resolved))
+    } else {
+        Err(OUTSIDE)
+    }
 }
 
 fn open_regular_file(path: &Path) -> Result<std::fs::File> {
@@ -521,6 +546,7 @@ impl Invocation {
         if !project.is_dir() {
             return Err(Invalid("project must be a directory"));
         }
+        let instructions = instructions(&project)?;
         let mode = self.mode.as_deref().unwrap_or(&config.mode);
         let key_name = config.key_name(mode)?.to_owned();
         let agent = self
@@ -661,6 +687,7 @@ impl Invocation {
             no_sync: self.no_sync,
             preview: self.preview,
             prompt,
+            instructions,
             agent,
             fallback: None,
         };
@@ -682,6 +709,7 @@ impl Invocation {
                 no_sync: resolved.no_sync,
                 preview: resolved.preview,
                 prompt: resolved.prompt.clone(),
+                instructions: resolved.instructions.clone(),
                 agent: resolved.agent.clone(),
                 fallback: None,
             }));
