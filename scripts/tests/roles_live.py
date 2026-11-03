@@ -209,23 +209,24 @@ def main():
 
         # 3. Prohibited operation for the reviewer: edit/shell are not offered and nothing changes.
         p, records, result, wire, diff = live('reviewer prohibited local-only', PROHIBITED, 'local-only', 'reviewer')
-        assert p.returncode in (0, 3) and diff == [], (p.returncode, diff)
+        assert p.returncode == 0 and result['attempts'][-1]['backend_stop'] == 'end_turn' and diff == [], (p.returncode, diff)
         assert all(set(r['tools']) == REVIEWER_TOOLS for r in primary_requests(wire))
 
         # 4. Deny invocation narrows the coder below its trusted ceiling.
         p, records, result, wire, diff = live('coder deny-invocation local-only', FIX, 'local-only', 'coder', permissions='deny')
         assert started(records, 'local-only', 'coder', 'primary')['permissions'] == 'deny'
-        assert p.returncode in (0, 3) and diff == [] and result['attempts'][-1]['grants'] == 0, (p.returncode, diff)
+        assert p.returncode == 0 and result['attempts'][-1]['backend_stop'] == 'end_turn' and diff == [] and result['attempts'][-1]['grants'] == 0, (p.returncode, diff)
         assert all(set(r['tools']) <= {'skill'} for r in wire), wire
 
         # 5–6. Native route: coding role edits; reviewer refuses the prohibited operation.
+        # Native requests are unobservable; the reply marker is recorded, not asserted (model-dependent).
         p, records, result, wire, diff = live('coder cloud-only', FIX, 'cloud-only', 'coder')
         started(records, 'cloud-only', 'coder', 'primary')
         assert not wire and p.returncode == 0 and diff == ['calc.py', 'verified'], (p.returncode, diff)
         assert subprocess.run(['python3', 'test_calc.py'], cwd=cwd, capture_output=True).returncode == 0
         p, records, result, wire, diff = live('reviewer prohibited cloud-only', PROHIBITED, 'cloud-only', 'reviewer')
         started(records, 'cloud-only', 'reviewer', 'specialized')
-        assert not wire and p.returncode in (0, 3) and diff == [], (p.returncode, diff)
+        assert not wire and p.returncode == 0 and result['attempts'][-1]['backend_stop'] == 'end_turn' and diff == [], (p.returncode, diff)
 
         # 7. Local-first: unreachable LiteLLM falls back natively with the same constrained role.
         p, records, result, wire, diff = live('reviewer local-first fallback', REVIEW, 'local-first', 'reviewer', config=fallback_cfg)

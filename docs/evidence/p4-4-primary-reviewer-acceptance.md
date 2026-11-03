@@ -84,8 +84,11 @@ instructions reach a real model under a named role. On the native route and the
 local-first fallback, request contents remain unobserved, but the final reply
 ended with the marker in every native run across all three passes. That is
 behavioral evidence that the instructions were loaded, not a request trace.
-Following the instruction is model-dependent: one local reviewer reply omitted the
-marker although its requests carried it.
+The driver records the reply marker but does not assert it, because following the
+instruction is model-dependent: one local reviewer reply omitted the marker
+although its requests carried it. A native regression that dropped `AGENTS.md`
+would therefore still pass the driver; only the recorded `response_marker` column
+would show it.
 
 **Dirty work (AC05).** After all runs, the uncommitted `AGENTS.md` edit and the
 untracked `scratch.txt` are byte-identical, `git status` still shows both, and
@@ -114,8 +117,8 @@ binary.
 - **AC08:** canonical primary and specialized roles execute through name-based
   OpenCode mapping with their restrictions enforced at the offered-tool and grant
   level. Effort mappings stay unsupported and refused (D038).
-- **AC11:** live instruction delivery is confirmed on LiteLLM and behaviorally on
-  native. Capability limits are unchanged from the P4.8 matrix.
+- **AC11:** live instruction delivery is asserted on LiteLLM (request trace) and
+  observed, not asserted, on native (reply marker). Capability limits are unchanged from the P4.8 matrix.
 
 ## Limits
 
@@ -125,6 +128,20 @@ binary.
   the harness only sees ACP events. The native route's offered tool set is not
   observed directly; it relies on the same generated document and preflight as
   the local route (P4.3).
+- Prohibited-operation and deny cases require exit 0 with `end_turn`; a cancelled
+  run (exit 3) with an unchanged tree fails the driver rather than counting as a
+  constrained refusal.
 - Free native models may have different data-use terms from paid models (P3.5).
 
 Next: P4.5 MVP artifacts and setup polish.
+
+## PR review closeout
+
+[Grok PR #39 review](https://github.com/awesomejt/agent-harness/pull/39): 2 concerns and 1 nit, all addressed.
+Concern: native and fallback paths did not assert instruction delivery. The marker stays
+recorded, not asserted, because instruction following is model-dependent; this record and
+AC11 now say so explicitly. Concern: TESTING listed `roles_live.py` among non-live suites;
+it is now the explicit P4.4 live command with its key requirements and an evidence link.
+Nit: prohibited-operation and deny cases accepted exit 3; they now require exit 0 with
+`end_turn`. Two further live passes with the stricter driver pass. No critical/high finding,
+so no re-review is required.
