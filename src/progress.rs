@@ -19,6 +19,9 @@ pub(crate) struct Progress {
     drained: Arc<Mutex<Option<mpsc::Receiver<()>>>>,
     start: Instant,
     run: String,
+    /// Attempt identity; attempts of one invocation share `run`.
+    attempt: String,
+    recovery: Arc<Mutex<&'static str>>,
 }
 impl Progress {
     pub fn new() -> Self {
@@ -46,6 +49,8 @@ impl Progress {
             dropped: Arc::default(),
             drained: Arc::new(Mutex::new(Some(drained))),
             start: Instant::now(),
+            attempt: String::new(),
+            recovery: Arc::new(Mutex::new("no automatic retry or fallback")),
             run: format!(
                 "{:x}-{:x}",
                 std::process::id(),
@@ -56,13 +61,25 @@ impl Progress {
             ),
         }
     }
+    /// Diagnostics scoped to one linked attempt of this run.
+    pub fn attempt(&self, number: u8) -> Self {
+        Self {
+            attempt: format!("attempt={number} "),
+            ..self.clone()
+        }
+    }
+    /// Recovery summary reported on the final line.
+    pub fn recovery(&self, summary: &'static str) {
+        *self.recovery.lock().unwrap() = summary;
+    }
     pub fn event(&self, message: impl AsRef<str>) {
         // Callers supply safe diagnostics, never backend text, paths or arguments.
         let message: String = message.as_ref().chars().take(512).collect();
         let line = format!(
-            "ah: run={} elapsed={:.1}s {message}",
+            "ah: run={} elapsed={:.1}s {}{message}",
             self.run,
-            self.start.elapsed().as_secs_f64()
+            self.start.elapsed().as_secs_f64(),
+            self.attempt
         );
         if self.sender.try_send(line).is_err() {
             self.dropped.fetch_add(1, Ordering::Relaxed);
@@ -94,7 +111,7 @@ impl Progress {
     }
     pub fn finish(self, exit: Exit) -> Exit {
         *self.terminal.lock().unwrap() = Some(format!(
-            "ah: run={} elapsed={:.1}s outcome={exit:?}; usage={}; no automatic retry or fallback; diagnostics_omitted={}{}",
+            "ah: run={} elapsed={:.1}s outcome={exit:?}; usage={}; {}; diagnostics_omitted={}{}",
             self.run,
             self.start.elapsed().as_secs_f64(),
             self.usage
@@ -102,6 +119,7 @@ impl Progress {
                 .unwrap()
                 .as_deref()
                 .unwrap_or("unknown (OpenCode ACP; no supported report)"),
+            self.recovery.lock().unwrap(),
             self.dropped.load(Ordering::Relaxed),
             if exit == Exit::Uncertain {
                 "; uncertain completion or cleanup; inspect project effects before retrying"

@@ -24,7 +24,7 @@ Strict JSON, no comments. Version and mode are required. Local-only requires top
 
 The model is an existing LiteLLM alias (proxy model group), 1–128 ASCII letters/digits/dot/underscore/hyphen, or an explicit `group:NAME` reference to a harness model group (below). Provider-prefixed models and inline proxy routing are unsupported. `api_base` is an absolute HTTP(S) URL with host and exactly `/v1`, without trailing slash, credentials, query, fragment, surrounding whitespace or controls. Require canonical URL spelling equal to the structured parser output: reject dot segments, empty userinfo, uppercase scheme/host and explicit default ports instead of retaining an unvalidated raw spelling. URL validation does not establish proxy availability or provider policy. HTTP permits the existing private-network deployment; credential transport security is the operator's responsibility. `api_key_env` is an ASCII environment name (`[A-Za-z_][A-Za-z0-9_]*`). Its value must exist and be nonempty in the launch environment; no interpolation or key lookup fallback. Keep the resolved value out of config, request records, diagnostics and logs. The environment lookup value is checked for nonempty content and immediately dropped; only its name is retained in the resolved request.
 
-Validate the whole config even if invocation flags override fields; malformed/unsupported config cannot be repaired by an override. Then explicit `--mode`, `--model`, `--permissions` and `--timeout-secs` override their corresponding config values. Only explicit `--permissions trusted` may authorize host access; a config requesting it rejects even if a flag overrides it. Built-ins apply only to absent optional fields. No other harness environment settings, prompt metadata, user defaults or inherited runtime defaults participate in harness resolution. `local-only` and `cloud-only` are accepted after P3.2; `local-first` and automatic fallback remain unavailable. A mode override requires its explicitly configured route and never inherits the other route's model or credentials. A cloud-only config may include `litellm` without a top-level local model; switching it to local-only then requires explicit `--model`. A config whose own mode is local-only still requires its local model default before any overrides.
+Validate the whole config even if invocation flags override fields; malformed/unsupported config cannot be repaired by an override. Then explicit `--mode`, `--model`, `--permissions` and `--timeout-secs` override their corresponding config values. Only explicit `--permissions trusted` may authorize host access; a config requesting it rejects even if a flag overrides it. Built-ins apply only to absent optional fields. No other harness environment settings, prompt metadata, user defaults or inherited runtime defaults participate in harness resolution. `local-only` and `cloud-only` are accepted after P3.2; P3.3 adds `local-first` with one configured native fallback (below). A mode override requires its explicitly configured route and never inherits the other route's model or credentials. A cloud-only config may include `litellm` without a top-level local model; switching it to local-only then requires explicit `--model`. A config whose own mode is local-only still requires its local model default before any overrides.
 
 ### Native OpenCode route (P3.2 / D032)
 
@@ -75,6 +75,32 @@ Top-level `model` and `--model` accept either a bare proxy model group (unchange
 A harness group is a stable name for one proxy group, not a pool. The harness does not list deployments, rank or order alternatives; LiteLLM keeps load balancing, retries and fallbacks within its group. Resolution replaces the reference with its proxy group before planning: managed `opencode.json`, the ownership receipt, effective-route checks, runtime/session model and wire requests use only `ah-litellm/PROXY_GROUP`. Harness group names and unselected groups never reach the runtime or project files. Switching between a direct alias and a group that resolves to the same proxy name changes no managed values; changing a group's target updates owned routing like any model change, and `--no-sync` requires the resolved values on disk.
 
 **Proxy handoff.** LiteLLM configuration is operator-owned; the harness never writes it, calls admin/model-management APIs, or installs/restarts/reloads the proxy. `--preview` prints a `proxy handoff:` line: the selected harness group (or direct selection), its proxy model group, and every distinct proxy model group that `litellm.groups` requires, marked existence unverified. Operators ensure those `model_name` entries (or LiteLLM aliases) exist at the configured endpoint. The command remains network-free. Before execution, validation is static (schema, references, route) plus the existing exact effective-routing preflight; proxy group existence is established only by actual use. A missing proxy group surfaces as a runtime failure that stops without retry or fallback. The `attempt=1` progress line names the harness group when one was used.
+
+### Local-first route (P3.3 / D034)
+
+```json
+{
+  "version": 1,
+  "mode": "local-first",
+  "model": "group:coder",
+  "litellm": {
+    "api_base": "http://litellm:4000/v1",
+    "api_key_env": "LITELLM_API_KEY",
+    "groups": { "coder": "macmini-qwen3-coder-30b" }
+  },
+  "native": {
+    "target": "opencode",
+    "model": "gpt-5.4",
+    "api_key_env": "OPENCODE_API_KEY"
+  }
+}
+```
+
+`local-first` (config or `--mode`) requires both route blocks and a local model default or `--model`; both key references must be present and nonempty before prompt input is read. The LiteLLM attempt is primary and uses the local model/group exactly as local-only does; `--model` selects only that primary. The fallback target is always `native.model` with the same project, permissions, timeout, deadline and prompt; there is no fallback-specific override.
+
+Before constructing the local runtime, creating private state, running preflight or applying the project plan, execution performs one bounded TCP connect to the `api_base` host and port (five seconds at most, within the overall deadline). It sends no bytes, credential or HTTP request. Only when name resolution fails, or every resolved address refuses, is unreachable or times out, does exactly one native attempt run (`attempt=2`, same `run=`), with a fresh private runtime, fresh grants and the full native preflight. Its outcome is final. A reachable endpoint runs the unchanged local attempt; any later failure, including a missing proxy group, rate limit, authentication or runtime error, stops without fallback. An inconclusive check exits 1 and a cancelled/expired one exits 3, both without fallback. Static validation errors exit 2 before any network contact. The final progress line states whether fallback ran.
+
+Reachability is not model availability, and a mistyped host resolves as unreachable and falls back. Preview stays network-free and reports the configured fallback target; local-only and cloud-only perform no reachability check.
 
 ### Selected invocation and preview syntax
 

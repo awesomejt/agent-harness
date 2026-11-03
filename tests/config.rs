@@ -94,7 +94,11 @@ fn strict_schema_rejects_unknown_duplicate_secret_and_unsupported_fields() {
         ),
         (
             VALID.replace("local-only", "local-first"),
-            "only local-only and cloud-only are supported; local-first is unavailable",
+            "local-first requires litellm and native configuration",
+        ),
+        (
+            VALID.replace("local-only", "hybrid"),
+            "mode must be local-only, cloud-only or local-first",
         ),
         (
             VALID.replace("\"version\":1", "\"version\":1,\"permissions\":\"prompt\""),
@@ -184,8 +188,8 @@ fn invalid_invocations_reject_without_io() {
             "conflicting prompt sources",
         ),
         (
-            vec!["single", "a", "--mode", "local-first"],
-            "only local-only and cloud-only are supported; local-first is unavailable",
+            vec!["single", "a", "--mode", "hybrid"],
+            "mode must be local-only, cloud-only or local-first",
         ),
         (
             vec!["single", "a", "--permissions", "project-shell"],
@@ -748,5 +752,102 @@ fn group_schema_rejects_duplicates_bounds_and_unresolved_defaults() {
                 .as_bytes()
         )
         .is_ok()
+    );
+}
+
+const LOCAL_FIRST: &str = r#"{"version":1,"mode":"local-first","model":"group:coder","litellm":{"api_base":"http://litellm:4000/v1","api_key_env":"TEST_KEY","groups":{"coder":"proxy-coder"}},"native":{"target":"opencode","model":"gpt-5.4","api_key_env":"NATIVE_KEY"}}"#;
+
+#[test]
+fn local_first_resolves_litellm_primary_with_configured_native_fallback() {
+    let r = invocation(&[
+        "single",
+        "task",
+        "--model",
+        "direct-alias",
+        "--permissions",
+        "trusted",
+        "--timeout-secs",
+        "30",
+    ])
+    .resolve(
+        Config::read(LOCAL_FIRST.as_bytes()).unwrap(),
+        |name| {
+            assert!(matches!(name, "TEST_KEY" | "NATIVE_KEY"));
+            Some("secret".into())
+        },
+        NeverRead,
+    )
+    .unwrap();
+    assert_eq!(r.mode, Mode::LocalOnly);
+    assert_eq!(r.runtime_model(), "ah-litellm/direct-alias");
+    assert!(r.api_base.is_some());
+    let native = r.fallback.as_deref().unwrap();
+    // --model selects only the primary; the fallback is the configured target.
+    assert_eq!(native.mode, Mode::CloudOnly);
+    assert_eq!(native.runtime_model(), "opencode/gpt-5.4");
+    assert_eq!(native.sources.model, Source::Config);
+    assert_eq!(native.api_key_env, "NATIVE_KEY");
+    assert!(native.api_base.is_none() && native.group.is_none());
+    assert!(native.proxy_groups.is_empty() && native.fallback.is_none());
+    assert_eq!(native.project, r.project);
+    assert_eq!(native.permissions, Permissions::Trusted);
+    assert_eq!(native.timeout_secs, 30);
+    assert_eq!(native.prompt, r.prompt);
+    let grouped = invocation(&["single", "task"])
+        .resolve(
+            Config::read(LOCAL_FIRST.as_bytes()).unwrap(),
+            |_| Some("secret".into()),
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!(grouped.runtime_model(), "ah-litellm/proxy-coder");
+    assert_eq!(grouped.group.as_deref(), Some("coder"));
+}
+
+#[test]
+fn local_first_requires_both_routes_and_both_keys_before_stdin() {
+    for name in ["TEST_KEY", "NATIVE_KEY"] {
+        let missing = invocation(&["single", "--prompt-file", "-"]).resolve(
+            Config::read(LOCAL_FIRST.as_bytes()).unwrap(),
+            |key| (key != name).then(|| "secret".into()),
+            NeverRead,
+        );
+        assert_eq!(
+            missing.err(),
+            Some(Invalid("API key environment reference is missing or empty"))
+        );
+    }
+    let no_native = r#"{"version":1,"mode":"local-first","model":"a","litellm":{"api_base":"http://litellm:4000/v1","api_key_env":"TEST_KEY"}}"#;
+    let no_local = r#"{"version":1,"mode":"local-first","model":"a","native":{"target":"opencode","model":"gpt-5.4","api_key_env":"NATIVE_KEY"}}"#;
+    let no_model = LOCAL_FIRST.replace("\"model\":\"group:coder\",", "");
+    for (input, error) in [
+        (
+            no_native,
+            "local-first requires litellm and native configuration",
+        ),
+        (
+            no_local,
+            "local-first requires litellm and native configuration",
+        ),
+        (
+            no_model.as_str(),
+            "local-only and local-first config require a model default",
+        ),
+    ] {
+        assert_eq!(Config::read(input.as_bytes()).err(), Some(Invalid(error)));
+    }
+    // An explicit mode switch needs the selected route's own configuration.
+    let cloud = NATIVE.to_owned();
+    assert_eq!(
+        invocation(&["single", "--prompt-file", "-", "--mode", "local-first"])
+            .resolve(
+                Config::read(cloud.as_bytes()).unwrap(),
+                |_| panic!("missing route must reject before key lookup"),
+                NeverRead
+            )
+            .err(),
+        Some(Invalid(
+            "local-first requires litellm and native configuration"
+        ))
     );
 }

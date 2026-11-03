@@ -95,19 +95,17 @@ flowchart TD
     LocalOnly --> LocalOutcome[Return outcome; no native fallback]
     Mode -->|cloud-only| NativeOnly[Attempt configured native route; no LiteLLM discovery]
     NativeOnly --> NativeOutcome[Return outcome]
-    Mode -->|local-first| LocalFirst[Attempt LiteLLM route]
-    LocalFirst --> Result{Outcome}
-    Result -->|success| Finish[Return success after cleanup]
-    Result -->|uncertain or ineligible failure| Stop[Return failure or uncertainty; no blind replay]
-    Result -->|eligible deterministic failure| Fallback[Record failure and resolve configured native target]
-    Fallback -->|target missing| Stop
-    Fallback -->|target configured| Revalidate[Revalidate route, constraints and retry bounds]
-    Revalidate -->|not permitted or bounds exhausted| Stop
-    Revalidate -->|permitted and within bounds| NativeAttempt[Launch a new native attempt]
-    NativeAttempt --> Final[Return final attempt outcome and history]
+    Mode -->|local-first| Probe[Bounded TCP reachability check of LiteLLM; no bytes sent]
+    Probe -->|reachable| LocalFirst[Attempt LiteLLM route]
+    LocalFirst --> Result[Return outcome; later failures never fall back]
+    Probe -->|cancelled, deadline or inconclusive| Stop[Stop; no prompt submitted]
+    Probe -->|unreachable before launch| Decide[recovery::decide: NotAttempted, cleanup confirmed, constraints preserved]
+    Decide -->|not permitted| Stop
+    Decide -->|permitted| NativeAttempt[attempt=2: configured native target, fresh runtime and grants, shared deadline]
+    NativeAttempt --> Final[Return final attempt outcome]
 ```
 
-All validation failures stop without launch. Missing fallback configuration, insufficient capabilities or exhausted bounds stop without a native attempt. Phase 3 fixes eligibility and retry limits. Cross-provider fallback is a new attempt, not a portable session resume. Cancellation by itself is not permission to retry.
+All validation failures, including a missing fallback route or key, stop without launch or network contact. D031 fixes eligibility and retry limits; D034 selects the reachability check as the only pre-submission evidence. Cross-provider fallback is a new attempt, not a portable session resume. Cancellation by itself is not permission to retry.
 
 ## Run lifecycle
 

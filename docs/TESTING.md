@@ -1,6 +1,6 @@
 # Validation and acceptance plan
 
-Status: the local-only Rust CLI, strict config/input validation, project routing transactions, ACP coding adapter, bounded progress/cancellation, read-only preview, dirty-project reporting and Apple Silicon release checks are implemented. The standalone ACP lifecycle experiment remains regression tooling. P3.2 adds isolated native OpenCode cloud-only execution; local-first coordination, named agents, machine output and workflows remain gated. Phase exit criteria in [IMPLEMENTATION.md](IMPLEMENTATION.md) remain authoritative; a passing mock suite does not prove live compatibility.
+Status: the local-only Rust CLI, strict config/input validation, project routing transactions, ACP coding adapter, bounded progress/cancellation, read-only preview, dirty-project reporting and Apple Silicon release checks are implemented. The standalone ACP lifecycle experiment remains regression tooling. P3.2 adds isolated native OpenCode cloud-only execution and P3.3 the local-first coordinator with one pre-submission native fallback; named agents, machine output and workflows remain gated. Phase exit criteria in [IMPLEMENTATION.md](IMPLEMENTATION.md) remain authoritative; a passing mock suite does not prove live compatibility.
 
 ## Layers
 
@@ -47,6 +47,7 @@ python3 scripts/tests/single_runtime.py
 python3 scripts/tests/single_runtime.py --cancel
 python3 scripts/tests/native.py
 python3 scripts/tests/native_runtime.py
+python3 scripts/tests/local_first.py
 cargo build --locked --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml
 cargo fmt --check --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml
 cargo clippy --locked --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml -- -D warnings

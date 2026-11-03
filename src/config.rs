@@ -127,6 +127,7 @@ pub enum Source {
     Default,
 }
 
+#[derive(Clone, Copy)]
 pub struct Sources {
     pub mode: Source,
     pub model: Source,
@@ -135,6 +136,7 @@ pub struct Sources {
 }
 
 pub struct Resolved {
+    /// Route of this attempt; local-first resolves a LiteLLM primary.
     pub mode: Mode,
     pub sources: Sources,
     pub project: PathBuf,
@@ -152,6 +154,9 @@ pub struct Resolved {
     pub no_sync: bool,
     pub preview: bool,
     pub prompt: String,
+    /// Local-first only: the configured native target, resolved with identical
+    /// project, permissions, timeout and prompt. Never nested.
+    pub fallback: Option<Box<Resolved>>,
 }
 
 /// Numeric shell contract; runtime mapping is implemented by P2.2/P2.4.
@@ -248,8 +253,10 @@ impl Config {
             validate_model(&native.model)?;
             validate_key_name(&native.api_key_env)?;
         }
-        if self.mode == "local-only" && self.model.is_none() {
-            return Err(Invalid("local-only config requires a model default"));
+        if self.mode != "cloud-only" && self.model.is_none() {
+            return Err(Invalid(
+                "local-only and local-first config require a model default",
+            ));
         }
         self.key_name(&self.mode)?;
         Ok(())
@@ -313,28 +320,22 @@ impl Config {
             ))
     }
     fn key_name(&self, mode: &str) -> Result<&str> {
+        let local = self.litellm.as_ref().map(|v| v.api_key_env.as_str());
+        let native = self.native.as_ref().map(|v| v.api_key_env.as_str());
         match mode {
-            "local-only" => self
-                .litellm
-                .as_ref()
-                .map(|v| v.api_key_env.as_str())
-                .ok_or(Invalid("local-only requires litellm configuration")),
-            "cloud-only" => self
-                .native
-                .as_ref()
-                .map(|v| v.api_key_env.as_str())
-                .ok_or(Invalid("cloud-only requires native configuration")),
-            _ => Err(Invalid(
-                "only local-only and cloud-only are supported; local-first is unavailable",
+            "local-only" => local.ok_or(Invalid("local-only requires litellm configuration")),
+            "cloud-only" => native.ok_or(Invalid("cloud-only requires native configuration")),
+            "local-first" => native.and(local).ok_or(Invalid(
+                "local-first requires litellm and native configuration",
             )),
+            _ => Err(Invalid(UNSUPPORTED_MODE)),
         }
     }
 }
+const UNSUPPORTED_MODE: &str = "mode must be local-only, cloud-only or local-first";
 fn validate_mode(mode: &str) -> Result<()> {
-    if !matches!(mode, "local-only" | "cloud-only") {
-        return Err(Invalid(
-            "only local-only and cloud-only are supported; local-first is unavailable",
-        ));
+    if !matches!(mode, "local-only" | "cloud-only" | "local-first") {
+        return Err(Invalid(UNSUPPORTED_MODE));
     }
     Ok(())
 }
@@ -469,11 +470,12 @@ impl Invocation {
 
     /// Checks configuration and credentials before consuming potentially blocking
     /// stdin. The lookup result is checked for nonempty content and immediately
-    /// dropped; the resolved request stores only the environment name.
+    /// dropped; the resolved request stores only the environment name. Local-first
+    /// checks both route keys: its fallback target must be usable before launch.
     pub fn resolve(
         self,
         config: Config,
-        key_lookup: impl FnOnce(&str) -> Option<OsString>,
+        key_lookup: impl Fn(&str) -> Option<OsString>,
         stdin: impl Read,
     ) -> Result<Resolved> {
         config.validate()?;
@@ -486,6 +488,11 @@ impl Invocation {
         }
         let mode = self.mode.as_deref().unwrap_or(&config.mode);
         let key_name = config.key_name(mode)?.to_owned();
+        // `--model` selects only the LiteLLM primary; fallback uses native.model.
+        let fallback = (mode == "local-first")
+            .then_some(config.native.as_ref())
+            .flatten()
+            .map(|native| (native.model.clone(), native.api_key_env.clone()));
         let model = self
             .model
             .clone()
@@ -512,8 +519,10 @@ impl Invocation {
         } else {
             Mode::LocalOnly
         };
-        if key_lookup(&key_name).is_none_or(|key| key.is_empty()) {
-            return Err(Invalid(MISSING_KEY));
+        for name in std::iter::once(&key_name).chain(fallback.as_ref().map(|(_, key)| key)) {
+            if key_lookup(name).is_none_or(|key| key.is_empty()) {
+                return Err(Invalid(MISSING_KEY));
+            }
         }
         let prompt = match self.prompt {
             PromptSource::Inline(text) => bounded(text.as_bytes())?,
@@ -548,7 +557,7 @@ impl Invocation {
                 Source::Default
             },
         };
-        Ok(Resolved {
+        let mut resolved = Resolved {
             mode,
             sources,
             project,
@@ -581,7 +590,30 @@ impl Invocation {
             no_sync: self.no_sync,
             preview: self.preview,
             prompt,
-        })
+            fallback: None,
+        };
+        if let Some((model, api_key_env)) = fallback {
+            resolved.fallback = Some(Box::new(Resolved {
+                mode: Mode::CloudOnly,
+                sources: Sources {
+                    model: Source::Config,
+                    ..resolved.sources
+                },
+                project: resolved.project.clone(),
+                model,
+                group: None,
+                proxy_groups: Vec::new(),
+                api_base: None,
+                api_key_env,
+                permissions: resolved.permissions,
+                timeout_secs: resolved.timeout_secs,
+                no_sync: resolved.no_sync,
+                preview: resolved.preview,
+                prompt: resolved.prompt.clone(),
+                fallback: None,
+            }));
+        }
+        Ok(resolved)
     }
 }
 

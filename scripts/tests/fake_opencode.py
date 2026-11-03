@@ -14,6 +14,8 @@ sid = 'test\u009b\u202e\n\x1b' if case=='session-controls' else 'test'
 config = json.loads(os.environ['OPENCODE_CONFIG_CONTENT'])
 if (cwd / 'track-runtime-home').exists():
     (cwd / 'runtime-home').write_text(os.environ['HOME'])
+    with open(cwd / 'runtime-homes', 'a') as homes:
+        homes.write(os.environ['HOME'] + '\n')
 assert 'ANTHROPIC_API_KEY' not in os.environ
 assert os.environ['OPENCODE_DISABLE_PROJECT_CONFIG'] == 'true'
 assert os.environ['HOME'] != str(cwd)
@@ -64,6 +66,8 @@ if 'debug' in sys.argv:
         print(json.dumps(dict(name='build', permission=rules)))
     sys.exit()
 (cwd / 'launched').touch()
+with open(cwd / 'launch-routes', 'a') as routes:
+    routes.write(('native' if native else 'local') + '\n')
 if case == 'home-cleanup-failure':
     (Path(os.environ['HOME']) / 'retained-state').write_text('runtime state')
     os.chmod(os.environ['HOME'], 0)
