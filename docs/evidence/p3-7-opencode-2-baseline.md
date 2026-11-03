@@ -68,3 +68,14 @@ macOS 27.0.1 arm64, Rust/Cargo 1.88.0, OpenCode 2.2.5 (Homebrew). All commands a
 - In 2.2.5, `opencode_worktree_remove` is offered under trusted and gated only by the adapter's refusal of the `other` kind. No permission action name was found that removes it from the profile.
 - A rejected request now ends the turn, so in trusted mode an unsupported tool call ends the run (exit 3) rather than letting the model try another approach.
 - Published `v0.1.0-alpha.1` still requires 1.18.30. A new release is needed before binary users can use 2.2.5.
+
+## Review
+
+The Grok review of PR #30 reported 0 blockers, 2 concerns and 2 nits. All four were corrected and verified:
+
+- **Version probe (concern):** it ran without `--standalone`, against the stated invariant. It now passes `--standalone`, which 2.2.5 accepts (`opencode v2.2.5`), and the fake enforces the flag for every non-ACP invocation.
+- **Stale grant contract (concern):** the trusted-grant paragraph in CONFIGURATION.md still described 1.x empty-metadata and alias correlation. It now states the exact `bound()` contract.
+- **Disk vs runtime config (nit):** CONFIGURATION.md now describes the two deliberate generators: the legacy-key project file versus the native-schema runtime document.
+- **`--no-sync` paragraph (nit):** it now points to the D035 effective checks instead of the 1.x merged-config validation.
+
+After the fixes, the fixture suites (69 local, 40 native, 165 matrix, local-first and preview), installed `single_runtime.py` and `native_runtime.py` re-passed.

@@ -114,7 +114,9 @@ impl Runtime {
     /// Every inspection runs `--standalone`: without it 2.x attaches to the
     /// user's shared background service and its configuration.
     pub async fn preflight(&self, request: &Resolved) -> Result<(), Exit> {
-        let version = self.inspect(&request.project, &["--version"]).await?;
+        let version = self
+            .inspect(&request.project, &["--version", "--standalone"])
+            .await?;
         if version.trim_ascii() != format!("opencode v{}", crate::opencode::VERSION).as_bytes() {
             return Err(Exit::Invalid);
         }

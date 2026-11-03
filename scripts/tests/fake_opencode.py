@@ -44,13 +44,13 @@ else:
     assert config['providers']['ah-litellm']['settings']['apiKey'] == '{env:AH_RUNTIME_API_KEY}'
     assert os.environ['AH_RUNTIME_API_KEY']
 target = provider + '/' + config['model']['model']
+if sys.argv[1:] != ['acp']:
+    # Inspection must never attach to the user's background service.
+    assert '--standalone' in sys.argv, sys.argv
 if '--version' in sys.argv:
     if case=='preflight-deadline': time.sleep(10)
     print('wrong' if case == 'version' else 'opencode v2.2.5')
     sys.exit()
-if sys.argv[1:] != ['acp']:
-    # Inspection must never attach to the user's background service.
-    assert '--standalone' in sys.argv, sys.argv
 if 'models' in sys.argv:
     assert native
     print('opencode/missing' if case == 'native-model-missing' else target)
