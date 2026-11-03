@@ -13,7 +13,6 @@ pub(crate) struct Runtime {
     pub progress: crate::progress::Progress,
     pub deadline: tokio::time::Instant,
     pub cancelled: tokio_util::sync::CancellationToken,
-    signals: tokio::task::JoinHandle<()>,
     env: Vec<(OsString, OsString)>,
     pub executable: std::path::PathBuf,
 }
@@ -49,6 +48,7 @@ impl Runtime {
         request: &Resolved,
         plan: Option<&Plan>,
         deadline: tokio::time::Instant,
+        cancelled: tokio_util::sync::CancellationToken,
         progress: crate::progress::Progress,
     ) -> Result<Self, Exit> {
         let executable = crate::preview::discover_runtime().ok_or_else(|| {
@@ -114,17 +114,10 @@ impl Runtime {
             .into(),
             key,
         ));
-        let cancelled = tokio_util::sync::CancellationToken::new();
-        let signal_cancel = cancelled.clone();
-        let signals = tokio::spawn(async move {
-            tokio::select! { _ = tokio::signal::ctrl_c() => {}, _ = terminate() => {} }
-            signal_cancel.cancel();
-        });
         Ok(Self {
             home,
             progress,
             cancelled,
-            signals,
             env,
             executable,
             deadline,
@@ -304,6 +297,34 @@ impl Runtime {
         )
     }
 }
+/// One invocation-wide SIGINT/SIGTERM watcher shared by every linked attempt,
+/// so a signal between attempts cannot be lost.
+pub(crate) struct Signals(
+    tokio::task::JoinHandle<()>,
+    tokio_util::sync::CancellationToken,
+);
+impl Signals {
+    pub fn watch() -> Self {
+        let cancelled = tokio_util::sync::CancellationToken::new();
+        let signal_cancel = cancelled.clone();
+        Self(
+            tokio::spawn(async move {
+                tokio::select! { _ = tokio::signal::ctrl_c() => {}, _ = terminate() => {} }
+                signal_cancel.cancel();
+            }),
+            cancelled,
+        )
+    }
+    pub fn token(&self) -> tokio_util::sync::CancellationToken {
+        self.1.clone()
+    }
+}
+impl Drop for Signals {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 pub(crate) async fn terminate() {
     if let Ok(mut signal) =
         tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
@@ -342,11 +363,5 @@ impl Drop for PrivateHome {
             // runs use Runtime::cleanup_private_home so failure affects outcome.
             let _ = std::fs::remove_dir_all(path);
         }
-    }
-}
-
-impl Drop for Runtime {
-    fn drop(&mut self) {
-        self.signals.abort();
     }
 }

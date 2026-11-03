@@ -54,8 +54,14 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
         changes.join("; ")
     };
     let local = r.mode == Mode::LocalOnly;
-    let mode = if local { "local-only" } else { "cloud-only" };
-    let route = if local {
+    let mode = match (local, &r.fallback) {
+        (true, Some(_)) => "local-first",
+        (true, None) => "local-only",
+        _ => "cloud-only",
+    };
+    let route = if r.fallback.is_some() {
+        "LiteLLM primary; configured native OpenCode fallback"
+    } else if local {
         "LiteLLM only"
     } else {
         "native OpenCode built-in opencode API-key provider"
@@ -92,6 +98,13 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
             quoted(&r.proxy_groups)
         )
     };
+    let fallback = match &r.fallback {
+        Some(native) => format!(
+            "configured native {} (native.model; key reference present), at most once and only when execution's TCP reachability check finds LiteLLM unreachable before launch; no fallback after the local attempt starts",
+            native.runtime_model()
+        ),
+        None => "disabled".to_owned(),
+    };
     let health = if local {
         "LiteLLM reachability, alias availability"
     } else {
@@ -100,7 +113,7 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
     format!(
         "ah {} preview: valid resolved request; execution readiness unverified\n\
          project: {:?}\nconfig: {:?}\n\
-         mode: {mode} ({}); route: {route}; fallback: disabled\n\
+         mode: {mode} ({}); route: {route}; fallback: {fallback}\n\
          runtime: OpenCode ACP; {runtime}\n\
          execution platform: {}\n\
          model: {} ({}); helper: same model\n\

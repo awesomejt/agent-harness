@@ -1,4 +1,4 @@
-//! Single-attempt local/native orchestration; input validation always precedes project writes.
+//! Local/native orchestration with at most one local-first fallback; input validation always precedes project writes.
 use crate::{
     config::{Config, Exit, Invocation, Mode},
     project_config::Plan,
@@ -88,29 +88,161 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
             Err(_) => return Exit::Failed,
         };
         runtime.block_on(async {
-            let mut adapter = match crate::runtime::Runtime::new(&request, plan.as_ref(), deadline, progress.clone()) { Ok(adapter) => adapter, Err(exit) => return exit };
-            let exit = async {
-                if let Err(exit) = crate::worktree::report(&request.project, deadline, progress).await { return exit; }
-                if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= deadline { return Exit::Cancelled; }
-                // Preflight consumes an isolated routing snapshot; no project code or
-                // plugins execute. Only then persist the already validated plan.
-                if let Err(exit) = adapter.preflight(&request, plan.as_ref()).await { progress.event("preflight failed (requires OpenCode 1.18.30 and exact isolated routing/permissions)"); return exit; }
-                if tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
-                if let Some(plan) = plan && let Err(error) = plan.apply() { progress.event(error.0); return Exit::Invalid; }
-                tokio::task::yield_now().await;
-                if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
-                progress.event(format!("attempt=1 {} via OpenCode 1.18.30; model {}{}; permissions {:?}", if request.mode == Mode::LocalOnly { "local-only" } else { "cloud-only" }, request.runtime_model(), request.group.as_ref().map(|g| format!(" (group {g})")).unwrap_or_default(), request.permissions));
-                crate::acp::run(&adapter, &request).await
-            }.await;
-            if !adapter.cleanup_private_home().await {
-                progress.event(
-                    "uncertain private runtime cleanup; inspect ah-runtime-* under the system temporary directory before manual removal",
-                );
-                Exit::Uncertain
-            } else {
-                exit
-            }
+            let signals = crate::runtime::Signals::watch();
+            let cancelled = signals.token();
+            let Some(native) = request.fallback.as_deref() else {
+                let label = if request.mode == Mode::LocalOnly {
+                    "local-only"
+                } else {
+                    "cloud-only"
+                };
+                return attempt(&request, plan, 1, label, deadline, cancelled, progress).await;
+            };
+            coordinate(&request, native, plan, deadline, cancelled, progress).await
         })
+    }
+}
+
+/// Local-first (D031/D034): the only eligible evidence is a pre-submission
+/// LiteLLM transport failure, established before any runtime, private state or
+/// project write exists. Once the local attempt starts, every outcome is final.
+#[cfg(target_os = "macos")]
+async fn coordinate(
+    request: &crate::config::Resolved,
+    native: &crate::config::Resolved,
+    plan: Option<Plan>,
+    deadline: tokio::time::Instant,
+    cancelled: tokio_util::sync::CancellationToken,
+    progress: &crate::progress::Progress,
+) -> Exit {
+    use crate::probe::Reachability;
+    use crate::recovery::{Decision, Evidence, Failure, Submission};
+    let first = progress.attempt(1);
+    first.event(
+        "local-first LiteLLM reachability check (TCP connect only; no request or credential sent)",
+    );
+    let Some(api_base) = request.api_base.as_deref() else {
+        return Exit::Invalid;
+    };
+    let failure = match crate::probe::litellm(api_base, deadline, &cancelled).await {
+        Reachability::Reachable => {
+            first.event("LiteLLM endpoint reachable; later failures stop without fallback");
+            progress
+                .recovery("no automatic retry; fallback not eligible after the reachability check");
+            return attempt(
+                request,
+                plan,
+                1,
+                "local-first",
+                deadline,
+                cancelled,
+                progress,
+            )
+            .await;
+        }
+        Reachability::Unreachable => Failure::Transport,
+        Reachability::Unknown => Failure::Unknown,
+        Reachability::Stopped if cancelled.is_cancelled() => Failure::Cancelled,
+        Reachability::Stopped => Failure::Deadline,
+    };
+    // Cancellation or deadline arriving after classification still takes
+    // precedence (D031), for both the decision and the exit code.
+    let stopped = cancelled.is_cancelled() || tokio::time::Instant::now() >= deadline;
+    let failure = match failure {
+        _ if cancelled.is_cancelled() => Failure::Cancelled,
+        _ if stopped => Failure::Deadline,
+        failure => failure,
+    };
+    let decision = crate::recovery::decide(&Evidence {
+        mode: crate::recovery::Mode::LocalFirst,
+        failure,
+        // No runtime was launched, so nothing was submitted and no created
+        // resource awaits cleanup; no project write has occurred.
+        submission: Submission::NotAttempted,
+        cleanup_confirmed: true,
+        cancelled_or_expired: stopped,
+        // Static target validation and key presence precede launch; attempt 2
+        // still runs the full native preflight before any prompt.
+        configured_target_validated: native.mode == Mode::CloudOnly && native.fallback.is_none(),
+        constraints_preserved: native.project == request.project
+            && native.permissions == request.permissions
+            && native.timeout_secs == request.timeout_secs
+            && native.prompt == request.prompt,
+        prior_fallbacks: 0,
+    });
+    if decision == Decision::Stop {
+        first.event(match failure {
+            Failure::Cancelled | Failure::Deadline => {
+                "stopped during reachability check; no prompt submitted"
+            }
+            _ => "reachability check inconclusive; no prompt submitted; no fallback",
+        });
+        progress.recovery("no automatic retry or fallback");
+        return match failure {
+            Failure::Cancelled | Failure::Deadline => Exit::Cancelled,
+            _ => Exit::Failed,
+        };
+    }
+    first.event(
+        "LiteLLM endpoint unreachable before submission; no runtime launched; no project changes",
+    );
+    progress.recovery("fallback=attempt 2 (native) after pre-submission LiteLLM transport failure; no further retry");
+    progress
+        .attempt(2)
+        .event("fallback from attempt=1; fresh runtime state and grants; shared deadline");
+    attempt(
+        native,
+        None,
+        2,
+        "local-first fallback",
+        deadline,
+        cancelled,
+        progress,
+    )
+    .await
+}
+
+#[cfg(target_os = "macos")]
+async fn attempt(
+    request: &crate::config::Resolved,
+    plan: Option<Plan>,
+    number: u8,
+    label: &str,
+    deadline: tokio::time::Instant,
+    cancelled: tokio_util::sync::CancellationToken,
+    progress: &crate::progress::Progress,
+) -> Exit {
+    let progress = &progress.attempt(number);
+    let mut adapter = match crate::runtime::Runtime::new(
+        request,
+        plan.as_ref(),
+        deadline,
+        cancelled,
+        progress.clone(),
+    ) {
+        Ok(adapter) => adapter,
+        Err(exit) => return exit,
+    };
+    let exit = async {
+        if let Err(exit) = crate::worktree::report(&request.project, deadline, progress).await { return exit; }
+        if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= deadline { return Exit::Cancelled; }
+        // Preflight consumes an isolated routing snapshot; no project code or
+        // plugins execute. Only then persist the already validated plan.
+        if let Err(exit) = adapter.preflight(request, plan.as_ref()).await { progress.event("preflight failed (requires OpenCode 1.18.30 and exact isolated routing/permissions)"); return exit; }
+        if tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
+        if let Some(plan) = plan && let Err(error) = plan.apply() { progress.event(error.0); return Exit::Invalid; }
+        tokio::task::yield_now().await;
+        if adapter.cancelled.is_cancelled() || tokio::time::Instant::now() >= adapter.deadline { return Exit::Cancelled; }
+        progress.event(format!("{label} via OpenCode 1.18.30; model {}{}; permissions {:?}", request.runtime_model(), request.group.as_ref().map(|g| format!(" (group {g})")).unwrap_or_default(), request.permissions));
+        crate::acp::run(&adapter, request).await
+    }.await;
+    if !adapter.cleanup_private_home().await {
+        progress.event(
+            "uncertain private runtime cleanup; inspect ah-runtime-* under the system temporary directory before manual removal",
+        );
+        Exit::Uncertain
+    } else {
+        exit
     }
 }
 

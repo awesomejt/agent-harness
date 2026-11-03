@@ -124,6 +124,10 @@ The published `v0.1.0-alpha.1` predates native routing. Build current source wit
 
 The first command is network-free; the second can consume account credits. Authentication is the official built-in provider's API-key path. Existing `/connect` credentials, subscription logins, OAuth plugins, arbitrary native providers and endpoint overrides are not consumed. The harness uses private HOME/XDG and never copies login stores. Missing/empty selected keys reject before input acquisition or child launch; invalid keys/model access may fail at the native service and do not cause a proxy attempt or retry. Embedded catalog checks do not check account access. Managed LiteLLM config stays untouched, even with `--no-sync`. Required live native use remains P3.5; [P3.2 evidence](evidence/p3-2-native-isolation.md) records non-spending setup/boundary checks.
 
+### Local-first from source (P3.3)
+
+Combine both route blocks as in the [local-first example](CONFIGURATION.md#local-first-route-p33--d034) and export both key references. Execution first makes one bounded TCP connect to the LiteLLM host/port (no request or credential sent). If the proxy cannot be resolved or reached, `ah` runs exactly one native attempt, which can consume account credits; progress shows `attempt=2 fallback from attempt=1` and the final line names the fallback. If the proxy is reachable, the run is local, and later local failures (missing group, rate limit, runtime errors) never fall back. Check `--preview` for the configured fallback target; it makes no network contact.
+
 ### Maintainer release procedure
 
 D029 selects manual locked Cargo packaging after evaluating
