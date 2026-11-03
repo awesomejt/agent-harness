@@ -79,7 +79,7 @@ create `ah.json` (substitute your endpoint/alias):
 ```
 
 Set `LITELLM_API_KEY` in your shell through your normal secret mechanism. No
-native cloud login is needed for this slice. Run from the project:
+native cloud login is needed for this published slice. Run from the project:
 
 ```sh
 ah single "Review the parser" --preview
@@ -112,6 +112,17 @@ Rollback restores the retained binary; it does not undo project/runtime edits.
 Remove `~/.local/bin/ah` and its PATH entry to uninstall. Inspect managed
 `opencode.json` fields and `.ah-opencode-owner.json` together before deliberately
 reconciling/removing them; uninstall performs no automatic project cleanup.
+
+### Native cloud-only from source (P3.2)
+
+The published `v0.1.0-alpha.1` predates native routing. Build current source with the pinned Rust toolchain to use it. Use the [native configuration example](CONFIGURATION.md#native-opencode-route-p32--d032), install OpenCode 1.18.30 on an absolute PATH entry, and export a valid OpenCode Console/Zen API key under the configured `native.api_key_env` name. Select a model in that runtime's built-in `opencode` catalog. Then run:
+
+```bash
+./target/debug/ah single "Review this project" --mode cloud-only --preview
+./target/debug/ah single "Fix the parser and run tests" --mode cloud-only --permissions trusted
+```
+
+The first command is network-free; the second can consume account credits. Authentication is the official built-in provider's API-key path. Existing `/connect` credentials, subscription logins, OAuth plugins, arbitrary native providers and endpoint overrides are not consumed. The harness uses private HOME/XDG and never copies login stores. Missing/empty selected keys reject before input acquisition or child launch; invalid keys/model access may fail at the native service and do not cause a proxy attempt or retry. Embedded catalog checks do not check account access. Managed LiteLLM config stays untouched, even with `--no-sync`. Required live native use remains P3.5; [P3.2 evidence](evidence/p3-2-native-isolation.md) records non-spending setup/boundary checks.
 
 ### Maintainer release procedure
 
@@ -146,7 +157,7 @@ authoritative for the final artifact. P4.5 owns broader platform/packaging polis
 
 ## Startup and diagnosis
 
-Diagnostics should identify missing binaries, runtime/version incompatibility, unavailable model aliases, unreadable/conflicting config, missing key references, denied permissions and unreachable permitted services. Read-only resolved-plan/sync preview is separate from launching a task. `ah single PROMPT --preview` uses the execution resolver/planner and reports local binary discovery, expected OpenCode 1.18.30, choice sources, permissions and planned managed changes. It launches no child and performs no health checks. Runtime/service/alias availability remains unverified; normal execution performs effective preflight. Set the environment variable named by `litellm.api_key_env` for missing-key errors; install the pinned OpenCode on an absolute PATH entry when discovery reports it missing.
+Diagnostics should identify missing binaries, runtime/version incompatibility, unavailable model aliases, unreadable/conflicting config, missing key references, denied permissions and unreachable permitted services. Read-only resolved-plan/sync preview is separate from launching a task. `ah single PROMPT --preview` uses the execution resolver/planner and reports local binary discovery, expected OpenCode 1.18.30, choice sources, permissions and planned managed changes. It launches no child and performs no health checks. Runtime/service/alias availability remains unverified; normal execution performs effective preflight. Set the environment variable named by the selected route's `litellm.api_key_env` or `native.api_key_env` for missing-key errors; install the pinned OpenCode on an absolute PATH entry when discovery reports it missing.
 
 Errors explain what failed, which attempt/route was affected, whether tools may have run, and a next action that does not silently change mode or credentials. Do not suggest cloud fallback as the automatic fix to local-only unavailability.
 

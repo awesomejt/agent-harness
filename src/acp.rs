@@ -82,7 +82,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
         return Exit::Cancelled;
     }
     let project = &request.project;
-    let target = format!("ah-litellm/{}", request.model);
+    let target = request.runtime_model();
     let prompt = &request.prompt;
     let policy = request.permissions;
     let Some(project_arg) = project.to_str() else {

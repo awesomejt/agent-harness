@@ -1,6 +1,6 @@
-//! Local-only diagnosis. Never execute a discovered binary or inspect its output.
+//! Network-free diagnosis of the selected route. Never execute a discovered binary or inspect its output.
 use crate::{
-    config::{Permissions, Resolved, Source},
+    config::{Mode, Permissions, Resolved, Source},
     project_config::Plan,
 };
 use std::path::{Path, PathBuf};
@@ -36,7 +36,7 @@ fn source(source: Source) -> &'static str {
     }
 }
 
-pub(crate) fn render(r: &Resolved, plan: &Plan, config: &Path) -> String {
+pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String {
     // Debug path formatting escapes control characters. No raw configuration,
     // endpoint, key value, prompt, or unmanaged settings are formatted here.
     let runtime = match discover_runtime() {
@@ -47,26 +47,43 @@ pub(crate) fn render(r: &Resolved, plan: &Plan, config: &Path) -> String {
         Permissions::Deny => "deny: no file/shell grants",
         Permissions::Trusted => "trusted: read/write/shell with host privileges; no OS sandbox",
     };
-    let changes = plan.preview_changes();
+    let changes = plan.map(Plan::preview_changes).unwrap_or_default();
     let changes = if changes.is_empty() {
         "none".into()
     } else {
         changes.join("; ")
     };
+    let local = r.mode == Mode::LocalOnly;
+    let mode = if local { "local-only" } else { "cloud-only" };
+    let route = if local {
+        "LiteLLM only"
+    } else {
+        "native OpenCode built-in opencode API-key provider"
+    };
+    let before = if local {
+        "ensure configured LiteLLM /v1 service is reachable and selected alias exists"
+    } else {
+        "ensure the native API key and built-in model are available; login stores are not consumed"
+    };
+    let health = if local {
+        "LiteLLM reachability, alias availability"
+    } else {
+        "native provider reachability, model availability, authentication"
+    };
     format!(
         "ah {} preview: valid local plan; execution readiness unverified\n\
          project: {:?}\nconfig: {:?}\n\
-         mode: local-only ({}); route: LiteLLM only; fallback: disabled\n\
+         mode: {mode} ({}); route: {route}; fallback: disabled\n\
          runtime: OpenCode ACP; {runtime}\n\
          execution platform: {}\n\
-         model: ah-litellm/{} ({}); helper: same alias\n\
+         model: {} ({}); helper: same model\n\
          credentials: environment reference present (config); value and endpoint omitted\n\
          permissions: {scope} ({}); external tools/subagents/network tools disabled\n\
          timeout: {} seconds ({})\n\
          sync: {} ({}); planned changes: {changes}\n\
          prompt: validated; contents omitted\n\
-         health checks: none; LiteLLM reachability, alias availability, runtime version and effective capabilities unverified\n\
-         before execution: ensure configured LiteLLM /v1 service is reachable and selected alias exists; execution preflight verifies runtime routing/permissions\n",
+         health checks: none; {health}, runtime version and effective capabilities unverified\n\
+         before execution: {before}; execution preflight verifies runtime routing/permissions\n",
         env!("CARGO_PKG_VERSION"),
         r.project,
         config,
@@ -76,12 +93,14 @@ pub(crate) fn render(r: &Resolved, plan: &Plan, config: &Path) -> String {
         } else {
             "unsupported for coding runs; requires tested macOS"
         },
-        r.model,
+        r.runtime_model(),
         source(r.sources.model),
         source(r.sources.permissions),
         r.timeout_secs,
         source(r.sources.timeout),
-        if r.no_sync {
+        if !local {
+            "native isolation; managed project config untouched"
+        } else if r.no_sync {
             "no-sync; exact disk route validated"
         } else {
             "managed project sync"

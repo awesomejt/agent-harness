@@ -94,7 +94,7 @@ fn strict_schema_rejects_unknown_duplicate_secret_and_unsupported_fields() {
         ),
         (
             VALID.replace("local-only", "local-first"),
-            "only local-only is supported in the first slice",
+            "only local-only and cloud-only are supported; local-first is unavailable",
         ),
         (
             VALID.replace("\"version\":1", "\"version\":1,\"permissions\":\"prompt\""),
@@ -121,7 +121,7 @@ fn strict_schema_rejects_unknown_duplicate_secret_and_unsupported_fields() {
         ),
         (
             VALID.replace("test-alias", "provider/model"),
-            "model must be a 1–128 byte LiteLLM alias using letters, digits, dot, underscore or hyphen",
+            "model must be a 1–128 byte identifier using letters, digits, dot, underscore or hyphen",
         ),
         (
             VALID.replace("TEST_KEY", "not a key name"),
@@ -184,8 +184,8 @@ fn invalid_invocations_reject_without_io() {
             "conflicting prompt sources",
         ),
         (
-            vec!["single", "a", "--mode", "cloud-only"],
-            "only local-only is supported in the first slice",
+            vec!["single", "a", "--mode", "local-first"],
+            "only local-only and cloud-only are supported; local-first is unavailable",
         ),
         (
             vec!["single", "a", "--permissions", "project-shell"],
@@ -205,7 +205,7 @@ fn invalid_invocations_reject_without_io() {
         ),
         (
             vec!["single", "a", "--model", "bad/model"],
-            "model must be a 1–128 byte LiteLLM alias using letters, digits, dot, underscore or hyphen",
+            "model must be a 1–128 byte identifier using letters, digits, dot, underscore or hyphen",
         ),
         (
             vec!["single", "a", "--timeout-secs", "0"],
@@ -402,4 +402,123 @@ fn config_file_open_is_regular_and_bounded() {
         );
     }
     std::fs::remove_dir(&directory).unwrap();
+}
+
+const NATIVE: &str = r#"{"version":1,"mode":"cloud-only","native":{"target":"opencode","model":"gpt-5.4","api_key_env":"NATIVE_KEY"}}"#;
+
+#[test]
+fn native_resolution_needs_only_selected_credential_and_never_a_local_plan() {
+    let both = NATIVE.replace("\"version\":1", "\"version\":1,\"litellm\":{\"api_base\":\"http://127.0.0.1:9/v1\",\"api_key_env\":\"UNAVAILABLE_LOCAL_KEY\"}");
+    for input in [NATIVE, both.as_str()] {
+        let r = invocation(&["single", "task", "--model", "selected-model", "--no-sync"])
+            .resolve(
+                Config::read(input.as_bytes()).unwrap(),
+                |name| {
+                    assert_eq!(name, "NATIVE_KEY");
+                    Some("native secret".into())
+                },
+                NeverRead,
+            )
+            .unwrap();
+        assert_eq!(r.mode, Mode::CloudOnly);
+        assert_eq!(r.runtime_model(), "opencode/selected-model");
+        assert!(r.api_base.is_none());
+        assert!(awesomejt_agent_harness::project_config::Plan::prepare(&r).is_err());
+    }
+}
+
+#[test]
+fn mode_override_selects_explicit_route_and_credentials_before_stdin() {
+    let both = VALID.replace(
+        "\"version\":1",
+        "\"version\":1,\"native\":{\"target\":\"opencode\",\"model\":\"gpt-5.4\",\"api_key_env\":\"NATIVE_KEY\"}",
+    );
+    let r = invocation(&["single", "task", "--mode", "cloud-only"])
+        .resolve(
+            Config::read(both.as_bytes()).unwrap(),
+            |name| {
+                assert_eq!(name, "NATIVE_KEY");
+                Some("secret".into())
+            },
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!(r.runtime_model(), "opencode/gpt-5.4");
+    assert_eq!(r.mode, Mode::CloudOnly);
+    assert_eq!(r.sources.mode, Source::Invocation);
+    let reverse = both.replace("local-only", "cloud-only");
+    let local = invocation(&["single", "task", "--mode", "local-only"])
+        .resolve(
+            Config::read(reverse.as_bytes()).unwrap(),
+            |name| {
+                assert_eq!(name, "TEST_KEY");
+                Some("local secret".into())
+            },
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!(local.runtime_model(), "ah-litellm/test-alias");
+    assert!(
+        invocation(&["single", "--prompt-file", "-", "--mode", "cloud-only"])
+            .resolve(
+                config(),
+                |_| panic!("missing route must reject before key lookup"),
+                NeverRead
+            )
+            .is_err()
+    );
+    assert!(
+        invocation(&["single", "--prompt-file", "-"])
+            .resolve(
+                Config::read(NATIVE.as_bytes()).unwrap(),
+                |_| None,
+                NeverRead
+            )
+            .is_err()
+    );
+    assert!(
+        invocation(&["single", "--prompt-file", "-", "--mode", "local-only"])
+            .resolve(
+                Config::read(NATIVE.as_bytes()).unwrap(),
+                |_| panic!("missing route must reject"),
+                NeverRead
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn native_schema_rejects_proxy_targets_credentials_and_inactive_invalid_blocks() {
+    for input in [
+        NATIVE.replace("opencode", "ah-litellm"),
+        NATIVE.replace(
+            "\"target\":\"opencode\"",
+            "\"target\":\"opencode\",\"target\":\"opencode\"",
+        ),
+        NATIVE.replace(
+            "\"target\":\"opencode\"",
+            "\"target\":\"opencode\",\"api_key\":\"SECRET_SENTINEL\"",
+        ),
+        NATIVE.replace(
+            "\"target\":\"opencode\"",
+            "\"target\":\"opencode\",\"api_base\":\"http://proxy/v1\"",
+        ),
+        NATIVE.replace("gpt-5.4", "ah-litellm/model"),
+        NATIVE.replace("NATIVE_KEY", "invalid-name"),
+        NATIVE.replace(
+            "\"native\":{\"target\":\"opencode\",\"model\":\"gpt-5.4\",\"api_key_env\":\"NATIVE_KEY\"}",
+            "\"native\":null",
+        ),
+        NATIVE.replace("\"version\":1", "\"version\":1,\"litellm\":null"),
+        NATIVE.replace(
+            "\"version\":1",
+            "\"version\":1,\"litellm\":{\"api_base\":\"bad\",\"api_key_env\":\"LOCAL_KEY\"}",
+        ),
+        VALID.replace(
+            "\"version\":1",
+            "\"version\":1,\"native\":{\"target\":\"other\",\"api_key_env\":\"NATIVE_KEY\"}",
+        ),
+    ] {
+        assert!(Config::read(input.as_bytes()).is_err());
+    }
 }

@@ -31,8 +31,12 @@ pub enum Permissions {
 pub struct Config {
     version: u8,
     mode: String,
-    model: String,
-    litellm: LiteLlm,
+    #[serde(default, deserialize_with = "present")]
+    model: Option<String>,
+    #[serde(default, deserialize_with = "present")]
+    litellm: Option<LiteLlm>,
+    #[serde(default, deserialize_with = "present")]
+    native: Option<Native>,
     permissions: Option<Permissions>,
     timeout_secs: Option<u64>,
 }
@@ -41,6 +45,21 @@ pub struct Config {
 #[serde(deny_unknown_fields)]
 struct LiteLlm {
     api_base: String,
+    api_key_env: String,
+}
+
+// Optional blocks may be absent but explicit null is not a valid route config.
+fn present<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
+    d: D,
+) -> std::result::Result<Option<T>, D::Error> {
+    T::deserialize(d).map(Some)
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Native {
+    target: String,
+    model: String,
     api_key_env: String,
 }
 
@@ -65,6 +84,7 @@ enum PromptSource {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     LocalOnly,
+    CloudOnly,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,7 +106,7 @@ pub struct Resolved {
     pub sources: Sources,
     pub project: PathBuf,
     pub model: String,
-    pub api_base: String,
+    pub api_base: Option<String>,
     pub api_key_env: String,
     pub permissions: Permissions,
     pub timeout_secs: u64,
@@ -170,39 +190,82 @@ impl Config {
             ));
         }
         validate_mode(&self.mode)?;
-        validate_model(&self.model)?;
+        if let Some(model) = &self.model {
+            validate_model(model)?;
+        }
         validate_timeout(self.timeout_secs.unwrap_or(DEFAULT_TIMEOUT_SECS))?;
-        let endpoint = url::Url::parse(&self.litellm.api_base)
-            .map_err(|_| Invalid("invalid LiteLLM API base"))?;
-        if !matches!(endpoint.scheme(), "http" | "https")
-            || endpoint.host_str().is_none()
-            || !endpoint.username().is_empty()
-            || endpoint.password().is_some()
-            || endpoint.query().is_some()
-            || endpoint.fragment().is_some()
-            || endpoint.path() != "/v1"
-            || endpoint.as_str() != self.litellm.api_base
-            || self.litellm.api_base.trim() != self.litellm.api_base
-            || self.litellm.api_base.chars().any(char::is_control)
-        {
-            return Err(Invalid(
-                "API base requires canonical http(s), a host, /v1 and no credentials/query/fragment",
-            ));
+        if let Some(local) = &self.litellm {
+            validate_local(local)?;
         }
-        let name = self.litellm.api_key_env.as_bytes();
-        if name.is_empty()
-            || !(name[0].is_ascii_alphabetic() || name[0] == b'_')
-            || !name.iter().all(|b| b.is_ascii_alphanumeric() || *b == b'_')
-        {
-            return Err(Invalid("api_key_env must be an environment variable name"));
+        if let Some(native) = &self.native {
+            if native.target != "opencode" {
+                return Err(Invalid(
+                    "native target must be opencode (built-in API-key provider)",
+                ));
+            }
+            validate_model(&native.model)?;
+            validate_key_name(&native.api_key_env)?;
         }
+        self.key_name(&self.mode)?;
         Ok(())
     }
 }
 
+fn validate_local(local: &LiteLlm) -> Result<()> {
+    let endpoint =
+        url::Url::parse(&local.api_base).map_err(|_| Invalid("invalid LiteLLM API base"))?;
+    if !matches!(endpoint.scheme(), "http" | "https")
+        || endpoint.host_str().is_none()
+        || !endpoint.username().is_empty()
+        || endpoint.password().is_some()
+        || endpoint.query().is_some()
+        || endpoint.fragment().is_some()
+        || endpoint.path() != "/v1"
+        || endpoint.as_str() != local.api_base
+        || local.api_base.trim() != local.api_base
+        || local.api_base.chars().any(char::is_control)
+    {
+        return Err(Invalid(
+            "API base requires canonical http(s), a host, /v1 and no credentials/query/fragment",
+        ));
+    }
+    validate_key_name(&local.api_key_env)
+}
+fn validate_key_name(value: &str) -> Result<()> {
+    let name = value.as_bytes();
+    if name.is_empty()
+        || !(name[0].is_ascii_alphabetic() || name[0] == b'_')
+        || !name.iter().all(|b| b.is_ascii_alphanumeric() || *b == b'_')
+    {
+        return Err(Invalid("api_key_env must be an environment variable name"));
+    }
+    Ok(())
+}
+impl Config {
+    fn key_name(&self, mode: &str) -> Result<&str> {
+        match mode {
+            "local-only" if self.model.is_some() => self
+                .litellm
+                .as_ref()
+                .map(|v| v.api_key_env.as_str())
+                .ok_or(Invalid("local-only requires litellm configuration")),
+            "local-only" => Err(Invalid("local-only requires model configuration")),
+            "cloud-only" => self
+                .native
+                .as_ref()
+                .map(|v| v.api_key_env.as_str())
+                .ok_or(Invalid("cloud-only requires native configuration")),
+            _ => Err(Invalid(
+                "only local-only and cloud-only are supported; local-first is unavailable",
+            )),
+        }
+    }
+}
 fn validate_mode(mode: &str) -> Result<()> {
-    if mode != "local-only" {
-        return Err(Invalid("only local-only is supported in the first slice"));
+    if !matches!(mode, "local-only" | "cloud-only") {
+        return Err(Invalid(
+            "only local-only and cloud-only are supported; local-first is unavailable",
+        ));
     }
     Ok(())
 }
@@ -214,7 +277,7 @@ fn validate_model(model: &str) -> Result<()> {
             .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
     {
         return Err(Invalid(
-            "model must be a 1–128 byte LiteLLM alias using letters, digits, dot, underscore or hyphen",
+            "model must be a 1–128 byte identifier using letters, digits, dot, underscore or hyphen",
         ));
     }
     Ok(())
@@ -352,7 +415,21 @@ impl Invocation {
         if !project.is_dir() {
             return Err(Invalid("project must be a directory"));
         }
-        if key_lookup(&config.litellm.api_key_env).is_none_or(|key| key.is_empty()) {
+        let mode = self.mode.as_deref().unwrap_or(&config.mode);
+        let key_name = config.key_name(mode)?.to_owned();
+        let model = self.model.clone().unwrap_or_else(|| {
+            if mode == "cloud-only" {
+                config.native.as_ref().unwrap().model.clone()
+            } else {
+                config.model.as_ref().unwrap().clone()
+            }
+        });
+        let mode = if mode == "cloud-only" {
+            Mode::CloudOnly
+        } else {
+            Mode::LocalOnly
+        };
+        if key_lookup(&key_name).is_none_or(|key| key.is_empty()) {
             return Err(Invalid(MISSING_KEY));
         }
         let prompt = match self.prompt {
@@ -389,12 +466,16 @@ impl Invocation {
             },
         };
         Ok(Resolved {
-            mode: Mode::LocalOnly,
+            mode,
             sources,
             project,
-            model: self.model.unwrap_or(config.model),
-            api_base: config.litellm.api_base,
-            api_key_env: config.litellm.api_key_env,
+            model,
+            api_base: if mode == Mode::LocalOnly {
+                config.litellm.map(|v| v.api_base)
+            } else {
+                None
+            },
+            api_key_env: key_name,
             permissions: self.permissions.or(config.permissions).unwrap_or_default(),
             timeout_secs: self
                 .timeout_secs
@@ -404,5 +485,19 @@ impl Invocation {
             preview: self.preview,
             prompt,
         })
+    }
+}
+
+impl Resolved {
+    pub fn runtime_model(&self) -> String {
+        format!(
+            "{}/{}",
+            if self.mode == Mode::LocalOnly {
+                "ah-litellm"
+            } else {
+                "opencode"
+            },
+            self.model
+        )
     }
 }
