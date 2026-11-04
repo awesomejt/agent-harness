@@ -78,7 +78,7 @@ fn text<'de, D: serde::Deserializer<'de>>(d: D) -> std::result::Result<String, D
     }
     d.deserialize_any(V)
 }
-fn present_text<'de, D: serde::Deserializer<'de>>(
+pub(crate) fn present_text<'de, D: serde::Deserializer<'de>>(
     d: D,
 ) -> std::result::Result<Option<String>, D::Error> {
     text(d).map(Some)
@@ -267,12 +267,12 @@ impl Agent {
     }
 }
 
-fn line(raw: &str) -> &str {
+pub(crate) fn line(raw: &str) -> &str {
     let raw = raw.strip_suffix('\n').unwrap_or(raw);
     raw.strip_suffix('\r').unwrap_or(raw)
 }
 
-fn has_tag(value: &serde_yaml_ng::Value) -> bool {
+pub(crate) fn has_tag(value: &serde_yaml_ng::Value) -> bool {
     use serde_yaml_ng::Value;
     match value {
         Value::Tagged(_) => true,

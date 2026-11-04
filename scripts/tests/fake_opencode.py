@@ -179,6 +179,25 @@ for line in sys.stdin:
             os.remove(json.loads((cwd / 'ah.json').read_text())['checks']['test']['argv'][0])
         if case in ['deadline', 'interrupt','cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission','cancel-term']:
             continue
+        if case == 'sequence':
+            # P5.2: each step's prompt names its behavior; record what arrived.
+            text = ''.join(block.get('text', '') for block in m['params']['prompt'])
+            with open(cwd / 'prompts.jsonl', 'a') as log:
+                log.write(json.dumps(dict(text=text, agent=config.get('default_agent'),
+                                          home=os.environ['HOME'])) + '\n')
+            if 'EDIT-LATER' in text:
+                # An agent edit to a later step file must not change the run.
+                for step in (cwd / 'prompts').glob('3-*.md'):
+                    step.write_text('Edited by step agent.\n')
+            if 'SLEEP' in text:
+                (cwd / 'sleeping').touch()
+                continue
+            if 'FAIL' in text:
+                reply(prompt_id, dict(stopReason='max_tokens'))
+                continue
+            update(sessionUpdate='agent_message_chunk', content=dict(type='text', text='OK'))
+            reply(prompt_id, dict(stopReason='end_turn'))
+            continue
         if case in ['deny-progress', 'deny-completed', 'named-completed-edit', 'named-completed-read', 'named-completed-unknown']:
             # 2.2.5 reports in_progress while parsing arguments, then fails an unavailable tool.
             kind = 'edit' if case == 'named-completed-edit' else 'read'
@@ -253,7 +272,7 @@ for line in sys.stdin:
             reply(prompt_id, dict(stopReason='cancelled' if case == 'backend-cancelled' else 'end_turn'))
     elif method == 'session/cancel':
         (cwd / 'cancelled').touch()
-        if case in ['cancel-ack','cancel-deadline','cancel-success','cancel-term']:
+        if case in ['cancel-ack','cancel-deadline','cancel-success','cancel-term','sequence']:
             reply(prompt_id,dict(stopReason='end_turn' if case=='cancel-success' else 'cancelled'))
         elif case == 'cancel-permission':
             update(sessionUpdate='tool_call',toolCallId='tool-1',title='Tool',kind='read',status='pending',rawInput={})

@@ -30,7 +30,8 @@ pub enum Permissions {
 
 // Neither raw config nor resolved requests implement Serialize or Debug: callers
 // must build an explicitly redacted preview rather than dump input structures.
-#[derive(Deserialize)]
+// Clone lets a sequence resolve every step from one loaded snapshot (D044).
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     version: u8,
@@ -48,7 +49,7 @@ pub struct Config {
     checks: Option<Named<crate::verify::Definition>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct LiteLlm {
     api_base: String,
@@ -60,6 +61,7 @@ struct LiteLlm {
 /// Name -> entry (harness group -> existing proxy model group, or check name
 /// -> definition). Map deserialization would otherwise keep the last
 /// duplicate key silently.
+#[derive(Clone)]
 struct Named<T>(std::collections::BTreeMap<String, T>);
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for Named<T> {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
@@ -93,7 +95,7 @@ fn present<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
     T::deserialize(d).map(Some)
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Native {
     target: String,
@@ -101,6 +103,7 @@ struct Native {
     api_key_env: String,
 }
 
+#[derive(Clone)]
 pub struct Invocation {
     project: PathBuf,
     config: Option<PathBuf>,
@@ -123,6 +126,7 @@ pub fn machine_output(args: &[OsString]) -> bool {
         .any(|pair| pair[0] == "--output" && pair[1] == "jsonl")
 }
 
+#[derive(Clone)]
 enum PromptSource {
     Inline(String),
     File(PathBuf),
@@ -424,6 +428,64 @@ impl Invocation {
         if args.next().as_deref() != Some(std::ffi::OsStr::new("single")) {
             return Err(Invalid("expected single command"));
         }
+        Self::options(args, cwd, false).map(|(request, _)| request)
+    }
+
+    /// Parse `sequence run DIR` (D044): the `single` coding options plus
+    /// `--preview`; steps come only from DIR, so prompt sources reject, and
+    /// `--output jsonl` rejects in Phase 5. DIR is relative to cwd.
+    pub fn parse_sequence(
+        args: impl IntoIterator<Item = OsString>,
+        cwd: &Path,
+    ) -> Result<(Self, PathBuf)> {
+        let mut args = args.into_iter();
+        if args.next().as_deref() != Some(std::ffi::OsStr::new("sequence")) {
+            return Err(Invalid("expected sequence command"));
+        }
+        if args.next().as_deref() != Some(std::ffi::OsStr::new("run")) {
+            return Err(Invalid(
+                "unsupported sequence command; use sequence run DIR",
+            ));
+        }
+        let (request, folder) = Self::options(args, cwd, true)?;
+        if request.machine {
+            return Err(Invalid(
+                "--output jsonl is unsupported for sequence commands; use human output",
+            ));
+        }
+        Ok((request, folder.ok_or(Invalid("provide a prompt folder"))?))
+    }
+
+    /// One step of a sequence (D044): the invocation with the step's prompt
+    /// and metadata. Metadata may name an agent only when it agrees with
+    /// `--agent`, and may substitute a check only under `--verify`.
+    pub fn step(&self, prompt: &str, agent: Option<&str>, verify: Option<&str>) -> Result<Self> {
+        if let (Some(invoked), Some(agent)) = (&self.agent, agent)
+            && invoked != agent
+        {
+            return Err(Invalid("step metadata agent conflicts with --agent"));
+        }
+        if verify.is_some() && self.verify.is_none() {
+            return Err(Invalid("step metadata verify requires --verify"));
+        }
+        Ok(Self {
+            agent: agent.map(str::to_owned).or_else(|| self.agent.clone()),
+            verify: verify.map(str::to_owned).or_else(|| self.verify.clone()),
+            prompt: PromptSource::Inline(prompt.to_owned()),
+            ..self.clone()
+        })
+    }
+
+    pub fn preview(&self) -> bool {
+        self.preview
+    }
+
+    fn options(
+        mut args: impl Iterator<Item = OsString>,
+        cwd: &Path,
+        sequence: bool,
+    ) -> Result<(Self, Option<PathBuf>)> {
+        let mut folder = None;
         let mut request = Self {
             project: cwd.to_owned(),
             config: None,
@@ -512,6 +574,11 @@ impl Invocation {
                             _ => return Err(Invalid("unsupported output format")),
                         }
                     }
+                    "--prompt-file" if sequence => {
+                        return Err(Invalid(
+                            "sequence steps come from the prompt folder; prompt sources reject",
+                        ));
+                    }
                     "--prompt-file" => {
                         if prompt.is_some() {
                             return Err(Invalid("conflicting prompt sources"));
@@ -530,19 +597,33 @@ impl Invocation {
                         "unsupported option; use --prompt-file for leading-dash text",
                     ));
                 }
+                if sequence {
+                    if folder.is_some() {
+                        return Err(Invalid(
+                            "sequence run takes one prompt folder; prompt sources reject",
+                        ));
+                    }
+                    folder = Some(cwd.join(arg));
+                    continue;
+                }
                 if prompt.is_some() {
                     return Err(Invalid("conflicting prompt sources"));
                 }
                 prompt = Some(PromptSource::Inline(arg.to_owned()));
             }
         }
-        request.prompt = prompt.ok_or(Invalid("provide inline prompt or --prompt-file PATH|-"))?;
+        // Each sequence step substitutes its own prompt (`step`).
+        request.prompt = if sequence {
+            PromptSource::Inline(String::new())
+        } else {
+            prompt.ok_or(Invalid("provide inline prompt or --prompt-file PATH|-"))?
+        };
         if request.machine && request.preview {
             return Err(Invalid(
                 "--output jsonl does not support --preview; preview is human-readable only",
             ));
         }
-        Ok(request)
+        Ok((request, folder))
     }
 
     pub fn config_path(&self) -> PathBuf {

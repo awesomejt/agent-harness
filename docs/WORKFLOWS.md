@@ -1,6 +1,6 @@
 # Workflow and state contract
 
-Status: behavioral requirements for Phases 5–6. P5.1 fixes the sequence commands, inputs, failure policy, state and resume ([D044](../DECISIONS.md#2026-11-03--d044-sequence-inputs-fresh-context-steps-stop-on-failure-and-explicit-resume)); P5.2 and P5.3 implement them. The Ralph completion protocol remains open until Phase 6. Single-run semantics live in [EXECUTION.md](EXECUTION.md).
+Status: behavioral requirements for Phases 5–6. P5.1 fixes the sequence commands, inputs, failure policy, state and resume ([D044](../DECISIONS.md#2026-11-03--d044-sequence-inputs-fresh-context-steps-stop-on-failure-and-explicit-resume)); P5.2 implements `sequence run` (inputs, context, failure and preview; [evidence](evidence/p5-2-ordered-execution.md)); P5.3 implements records, locking, `show` and `resume`. The Ralph completion protocol remains open until Phase 6. Single-run semantics live in [EXECUTION.md](EXECUTION.md).
 
 Workflow coordinators call the same Rust application execution service described in [DESIGN.md](DESIGN.md); they cannot call providers directly or bypass capability/policy validation. They enter after core MVP; durable workflow state is not needed for the first usable single run.
 

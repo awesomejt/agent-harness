@@ -19,12 +19,13 @@ pub mod project_config;
 pub mod recovery;
 #[cfg(target_os = "macos")]
 mod runtime;
+pub mod sequence;
 pub mod single;
 mod verify;
 #[cfg(target_os = "macos")]
 mod worktree;
 
-const HELP: &str = "agent-harness (ah)\n\nUsage: ah [--help | --version]\n       ah single PROMPT [OPTIONS]\n       ah single --prompt-file PATH|- [OPTIONS]\n\nOptions:\n  -h, --help     Show this help\n  -V, --version  Show package version\n\nSingle options: --project PATH --config PATH --mode local-only|cloud-only|local-first\n                --model MODEL|group:NAME --agent NAME --permissions deny|trusted\n                --timeout-secs N --no-sync --preview --output human|jsonl --verify CHECK\nTrusted permits file and shell access with host privileges. Default: deny.\n--agent runs PROJECT/agents/NAME.md as the session agent within its ceiling.\n--output jsonl writes version-1 records to stdout ending in one result record;\nhuman diagnostics stay on stderr. Not combinable with --preview.\n--verify runs config checks.CHECK after backend success; its result decides the exit.\nLocal-first falls back once to configured native only if LiteLLM is unreachable before launch.\nCoding runs: macOS with OpenCode 2.2.5. Preview: read-only local plan; no child launch or network checks.\n";
+const HELP: &str = "agent-harness (ah)\n\nUsage: ah [--help | --version]\n       ah single PROMPT [OPTIONS]\n       ah single --prompt-file PATH|- [OPTIONS]\n       ah sequence run DIR [OPTIONS]\n\nOptions:\n  -h, --help     Show this help\n  -V, --version  Show package version\n\nSingle options: --project PATH --config PATH --mode local-only|cloud-only|local-first\n                --model MODEL|group:NAME --agent NAME --permissions deny|trusted\n                --timeout-secs N --no-sync --preview --output human|jsonl --verify CHECK\nTrusted permits file and shell access with host privileges. Default: deny.\n--agent runs PROJECT/agents/NAME.md as the session agent within its ceiling.\n--output jsonl writes version-1 records to stdout ending in one result record;\nhuman diagnostics stay on stderr. Not combinable with --preview.\n--verify runs config checks.CHECK after backend success; its result decides the exit.\nsequence run executes DIR/N-slug.md steps in numeric order, each a fresh single run\nwith the same options (no prompt sources or jsonl); it stops at the first step that\ndoes not complete. Step frontmatter may set agent: NAME and, under --verify, verify: CHECK.\nLocal-first falls back once to configured native only if LiteLLM is unreachable before launch.\nCoding runs: macOS with OpenCode 2.2.5. Preview: read-only local plan; no child launch or network checks.\n";
 
 /// Resolve informational arguments without launching a runtime.
 pub fn response(args: impl IntoIterator<Item = OsString>) -> Result<String, &'static str> {
