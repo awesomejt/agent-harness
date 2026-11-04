@@ -35,6 +35,7 @@ sys.exit(3 if mode == 'fail' else 0)
 
 
 def run(steps, expected, *, args=(), checks=None, extra_files=None, interrupt=False, preview=False,
+        kill=False,
         blocked_stderr=False):
     with tempfile.TemporaryDirectory(prefix='ah-sequence-project-') as p, \
          tempfile.TemporaryDirectory(prefix='ah-sequence-tools-') as t, \
@@ -96,7 +97,7 @@ def run(steps, expected, *, args=(), checks=None, extra_files=None, interrupt=Fa
             while not (project / 'sleeping').exists() and time.monotonic() < until:
                 time.sleep(.02)
             assert (project / 'sleeping').exists(), 'step never started'
-            proc.send_signal(signal.SIGINT)
+            proc.send_signal(signal.SIGKILL if kill else signal.SIGINT)
         out, err = proc.communicate(timeout=120)
         assert proc.returncode == expected, (steps, proc.returncode, err)
         assert 'SECRET_SENTINEL' not in out + err
@@ -116,7 +117,7 @@ s = run({'10-last.md': 'Third.\n', '2-second.md': 'Second.\n', '1-first.md': 'Fi
         extra_files={'.notes': 'ignored'})
 assert s['texts'] == ['First.\n', 'Second.\n', 'Third.\n'], s['texts']
 assert len({p['home'] for p in s['prompts']}) == 3, 'each step has a private runtime'
-assert s['out'] == 'OKOKOK', s['out']
+assert s['out'] == 'OK\nOK\nOK\n', 'each step response ends its own line'
 assert s['err'].count('outcome=Success') == 3 and 'completed all 3 steps' in s['err'], s['err']
 assert 'sequence step 1/3 1-first.md sha256=' in s['err'] and 'sequence step 3/3 10-last.md' in s['err']
 
@@ -160,6 +161,11 @@ s = run({'1-a.md': 'FAIL\n', '2-b.md': 'Two.\n'}, 1, blocked_stderr=True)
 assert s['texts'] == ['FAIL\n'], s['texts']
 s = run({'1-a.md': 'One.\n', '2-b.md': 'Two.\n'}, 0, blocked_stderr=True)
 assert s['texts'] == ['One.\n', 'Two.\n'], s['texts']
+
+# A step's response is flushed before the next step launches, so a crash
+# during step 2 cannot lose step 1's partial last line (P5.4).
+s = run({'1-a.md': 'One.\n', '2-b.md': 'SLEEP\n'}, -signal.SIGKILL, interrupt=True, kill=True)
+assert s['out'] == 'OK\n', s['out']
 
 # A signal during a step cancels it (exit 3); later steps never launch.
 s = run({'1-a.md': 'SLEEP\n', '2-b.md': 'Two.\n'}, 3, interrupt=True)

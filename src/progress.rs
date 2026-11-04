@@ -29,6 +29,9 @@ pub(crate) struct Progress {
     number: u8,
     machine: Option<Arc<Machine>>,
     summary: Arc<Mutex<Summary>>,
+    /// Sequence steps end a human response on its own line, so the next
+    /// step's response cannot join it (P5.4).
+    line_end: bool,
 }
 
 /// Machine records share one ordered stdout writer. Non-terminal records are
@@ -131,6 +134,7 @@ impl Progress {
             number: 0,
             machine: machine.then(self::machine),
             summary: Arc::default(),
+            line_end: false,
             run: format!(
                 "{:x}-{:x}",
                 std::process::id(),
@@ -139,6 +143,14 @@ impl Progress {
                     .unwrap_or_default()
                     .as_nanos()
             ),
+        }
+    }
+    /// Human diagnostics for one sequence step: as `new(false)`, but a response
+    /// without a final newline gets one.
+    pub fn step() -> Self {
+        Self {
+            line_end: true,
+            ..Self::new(false)
         }
     }
     /// Diagnostics scoped to one linked attempt of this run.
@@ -415,15 +427,24 @@ impl Progress {
             self.summary.lock().unwrap().response = Some(text);
             return true;
         }
-        response(text).await
+        response(text, self.line_end).await
     }
 }
 
+/// Writes and flushes the response within the stdout budget; a partial last
+/// line must not wait in the buffer for process exit.
 #[cfg(target_os = "macos")]
-async fn response(text: String) -> bool {
+async fn response(mut text: String, line_end: bool) -> bool {
+    if line_end && !text.is_empty() && !text.ends_with('\n') {
+        text.push('\n');
+    }
     let (send, receive) = tokio::sync::oneshot::channel();
     std::thread::spawn(move || {
-        let result = std::io::stdout().lock().write_all(text.as_bytes()).is_ok();
+        let mut out = std::io::stdout().lock();
+        let result = out
+            .write_all(text.as_bytes())
+            .and_then(|()| out.flush())
+            .is_ok();
         let _ = send.send(result);
     });
     matches!(

@@ -49,7 +49,7 @@ def alive(pid):
 
 
 def run(case, expected, *, mode='pass', verify='test', timeout=30, checks=None, machine=True,
-        extra=(), interrupt=False):
+        extra=(), interrupt=False, kill=False):
     with tempfile.TemporaryDirectory(prefix='ah-verify-project-') as p, \
          tempfile.TemporaryDirectory(prefix='ah-verify-tools-') as t:
         project, tools = Path(p).resolve(), Path(t).resolve()
@@ -77,7 +77,11 @@ def run(case, expected, *, mode='pass', verify='test', timeout=30, checks=None, 
             while not (tools/'check-started').exists() and time.monotonic() < until:
                 time.sleep(.02)
             assert (tools/'check-started').exists(), 'check never started'
-            proc.send_signal(signal.SIGINT)
+            proc.send_signal(signal.SIGKILL if kill else signal.SIGINT)
+            if kill:
+                # Nothing is left to clean up the orphaned check, which holds stderr.
+                proc.wait(timeout=15)
+                os.killpg(json.loads((tools/'check-ran.json').read_text())['pgid'], signal.SIGKILL)
         out, err = proc.communicate(timeout=60)
         assert proc.returncode == expected, (case, mode, proc.returncode, err)
         assert 'SECRET_SENTINEL' not in out + err
@@ -178,6 +182,11 @@ assert s['out'] == 'OK', s['out']
 final = s['err'].strip().splitlines()[-1]
 assert 'outcome=Failed; verification="test" "failed"' in final, final
 assert 'verification check test started' in s['err'] and 'verification check test failed (exit 3)' in s['err']
+
+# The response is flushed before the check runs: a harness crash during the
+# check cannot lose its unterminated last line (P5.4).
+s = run('text', -signal.SIGKILL, mode='sleep', machine=False, interrupt=True, kill=True)
+assert s['out'] == 'OK', s['out']
 
 # Preview reports the pinned check without running it.
 s = run('text', 0, machine=False, extra=['--preview'])
