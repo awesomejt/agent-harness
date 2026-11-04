@@ -19,6 +19,7 @@ import socket
 import subprocess
 import tempfile
 import threading
+import time
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -116,11 +117,12 @@ def run(args, cwd, name, prompt, mode, agent, permissions, secrets, config=None)
     return p, records, result
 
 
-def summary(name, p, result, wire, cwd, extra=''):
+def summary(name, p, result, wire, cwd, extra='', elapsed=None):
     a = result['attempts'][-1] if result['attempts'] else {}
     usage = a.get('usage') or {}
     cost = usage.get('session_cost')
-    row = dict(case=name, exit=p.returncode, outcome=result['outcome'], route=a.get('route'), model=a.get('model'),
+    row = dict(case=name, exit=p.returncode, elapsed_secs=round(elapsed, 1) if elapsed is not None else None,
+               outcome=result['outcome'], route=a.get('route'), model=a.get('model'),
                agent=a.get('agent'), requests=len(wire), perm_requests=a.get('permission_requests'),
                grants=a.get('grants'), tool_events=a.get('tool_events'), backend_stop=a.get('backend_stop'),
                context_tokens=usage.get('context_used_tokens'), cost=cost and f"{cost['amount']} {cost['currency']}",
@@ -174,12 +176,14 @@ def main():
             reset(cwd)
             fw.records.clear(); fw.failed = None; fw.role_text = role_body[agent]
             before = snapshot(cwd)
+            t0 = time.monotonic()
             p, records, result = run(args, cwd, name, prompt, mode, agent, permissions, secrets, config)
+            elapsed = time.monotonic() - t0
             assert fw.failed is None, (name, fw.failed)
             wire = list(fw.records)
             rows.append(summary(name, p, result, wire, cwd, extra='wire=' + json.dumps(
                 dict(tools=sorted({t for r in wire for t in r['tools']}), marker=[r['marker'] for r in wire],
-                     role=[r['role'] for r in wire]))))
+                     role=[r['role'] for r in wire])), elapsed=elapsed))
             return p, records, result, wire, changed(before, snapshot(cwd))
 
         def started(records, route, agent, capacity):
