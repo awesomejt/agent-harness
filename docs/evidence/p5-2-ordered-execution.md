@@ -82,7 +82,10 @@ already in the release collector's reviewed map, so no new exception is
 needed. `typenum` declares Rust 1.41; the others declare no MSRV. The locked
 build, Clippy and tests pass on the pinned Rust 1.88.0. The 0.11 line was not
 evaluated: 0.10.9 is the established release and covers the need. This is
-compatibility and attribution evidence, not a vulnerability audit.
+compatibility and attribution evidence, not a vulnerability audit. A locked
+`scripts/release/package.py` run on the task commit bundled each new crate's
+license files and source archive; the packaged binary rejects a missing
+folder with exit 2. No release is published by this task.
 
 ## Test evidence
 
