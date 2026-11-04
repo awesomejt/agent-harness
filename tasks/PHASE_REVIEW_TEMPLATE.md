@@ -26,4 +26,4 @@ List exact checks/results, tested versions/targets and required live scenarios. 
 
 ## Gate outcome
 
-State pending, changes required, blocked or pass for this exact reviewed scope. Pass requires all mandatory evidence, no unresolved findings, verified corrections and required PR review/merge. Link the report and accepted PR in PROJECT.md. A pass proposed in an open PR becomes effective only on merge; dependent work waits for the accepted gate.
+State pending, changes required, blocked or pass for this exact reviewed scope. Pass requires all mandatory evidence, no unresolved findings, verified corrections and required PR review/merge. Link the report and accepted PR in PROJECT.md. A review PR may merge with "changes required" once every finding has a recorded disposition and plan (D042); the patch PR resolving the last finding proposes the pass. A pass proposed in an open PR becomes effective only on merge; dependent work waits for the accepted gate.

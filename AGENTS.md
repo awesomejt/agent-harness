@@ -21,7 +21,7 @@ All agents must follow the multi-agent Git workflow documented in [docs/GIT_WORK
 
 - No direct commits to `main`. Use `feature/<phase>/<task>-description` for normal tasks, `review/<phase>-description` for holistic phase reviews, and `patch/<task>` for standalone fixes outside the feature/task process.
 - Open a PR to `main` when the task is complete. Feature PRs trigger automatic Grok review; patch PRs require an explicit `/grok review` comment; `review/` branches bypass that process while retaining the holistic phase-review gate.
-- On feature/patch PRs, address critical/high Grok findings and request re-review with `/grok review` if needed. Resolve and verify all holistic phase-review findings before phase acceptance.
+- On feature/patch PRs, address critical/high Grok findings and request re-review with `/grok review` if needed. A phase-review PR may merge once every finding is recorded with a remediation plan; fix findings in `patch/` PRs with `/grok review`, keep one PR open at a time, and resolve/verify all findings before phase acceptance (D042).
 - Minor/nitpick findings do not require re-review.
 - Maximum 3 Grok reviews per PR; after that, hand off to a human.
 - On clean approval: merge, delete remote branch, then locally `git checkout main && git pull --prune && git branch -d <branch>`.

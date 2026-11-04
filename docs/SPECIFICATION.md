@@ -52,7 +52,7 @@ Cloud subscription credentials remain owned by official tools. No credential scr
 
 The working project is explicit or defaults visibly to the current directory. Coding runs retain changes in that project and respect applicable project instructions and backend permissions. Do not inherit ai-queue's temporary-directory, tools-disabled behavior as the coding default.
 
-Show useful progress and a final outcome, including route, runtime, model, exit/failure information, and fallback attempts. Keep credentials out of arguments, logs, and persisted results. Define stable, distinct success, failed/rejected, known-cancelled, and uncertain exit statuses in Phase 2. Report uncertainty on stderr immediately; versioned machine-readable results/events arrive in Phase 4.
+Show useful progress and a final outcome, including route, runtime, model, exit/failure information, and fallback attempts. Keep credentials out of arguments, logs, and persisted results. Define stable, distinct success, failed/rejected, known-cancelled, and uncertain exit statuses in Phase 2. Report uncertainty on stderr immediately. Phase 4 added opt-in versioned machine-readable results/events (`--output jsonl`, [D039](../DECISIONS.md#2026-11-03--d039-opt-in-version-1-machine-records-with-unchanged-exits)).
 
 Primary and specialized execution must enforce supported constraints. Unsupported restrictions must be reported and the run refused rather than silently broadened. Do not promise identical capabilities across providers.
 
@@ -66,7 +66,7 @@ Synced project configuration must never contain a literal LiteLLM key: retain an
 
 Project OpenCode sync must preserve unrelated settings, leave global config untouched, avoid partial writes, and detect conflicting generated output. `--no-sync` skips writes; it does not waive routing validation. Native cloud routes must neither write the OpenCode provider block nor accidentally inherit the managed LiteLLM route.
 
-Canonical agents have a name, description, role (`primary`, `subagent`, or `all`), optional model alias, tool/permission constraints, and a Markdown system-prompt body. Validate the exact schema and backend destinations in Phase 4. Provider-specific filenames and permissions are verified when each adapter is implemented.
+Canonical agents have a name, a description, a capacity (`primary`, `specialized` or `both`), a permission ceiling (`deny`, `read-only` or `trusted`), a tool list, optional route-specific models (`models.local`, `models.native`), an optional effort requirement, and a Markdown system-prompt body. Phase 4 fixed the schema and the OpenCode destinations ([D036](../DECISIONS.md#2026-11-03--d036-canonical-agent-schema-and-opencode-destinations)–[D038](../DECISIONS.md#2026-11-03--d038-directly-invoked-named-roles-with-intersected-runtime-rules)). [CONFIGURATION](CONFIGURATION.md#canonical-agents) owns the grammar. Backend modes such as OpenCode's `primary`/`subagent`/`all` are mapping details. Only default effort runs on OpenCode 2.2.5. Provider-specific filenames and permissions are verified when each later adapter is implemented.
 
 ## Workflow requirements
 

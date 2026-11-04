@@ -50,9 +50,28 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
             crate::opencode::VERSION
         ),
     };
+    // A named role can narrow a trusted invocation (D038); report the
+    // effective scope from the same mapping the runtime enforces.
+    let kinds = crate::opencode::grantable(r);
     let scope = match r.permissions {
-        Permissions::Deny => "deny: no file/shell grants",
-        Permissions::Trusted => "trusted: read/write/shell with host privileges; no OS sandbox",
+        Permissions::Deny => "deny: no file/shell grants".to_owned(),
+        Permissions::Trusted
+            if crate::opencode::effective(r) == crate::opencode::profile(r.permissions) =>
+        {
+            "trusted: read/write/shell with host privileges; no OS sandbox".to_owned()
+        }
+        Permissions::Trusted if kinds.is_empty() => {
+            "trusted narrowed by agent to no file/shell grants".to_owned()
+        }
+        Permissions::Trusted => format!(
+            "trusted narrowed by agent to {} grants{}",
+            kinds.join(", "),
+            if kinds.contains(&"execute") {
+                "; shell with host privileges; no OS sandbox"
+            } else {
+                ""
+            }
+        ),
     };
     let changes = plan.map(Plan::preview_changes).unwrap_or_default();
     let changes = if changes.is_empty() {
@@ -107,8 +126,13 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
     };
     let fallback = match &r.fallback {
         Some(native) => format!(
-            "configured native {} (native.model; key reference present), at most once and only when execution's TCP reachability check finds LiteLLM unreachable before launch; no fallback after the local attempt starts",
-            native.runtime_model()
+            "configured native {} ({}; key reference present), at most once and only when execution's TCP reachability check finds LiteLLM unreachable before launch; no fallback after the local attempt starts",
+            native.runtime_model(),
+            // D037 precedence: the agent's native model, else native.model.
+            match native.sources.model {
+                Source::Agent => "agent models.native",
+                _ => "native.model",
+            }
         ),
         None => "disabled".to_owned(),
     };

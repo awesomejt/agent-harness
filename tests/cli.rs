@@ -116,14 +116,35 @@ fn named_agent_preview_reports_mapping_and_unsupported_effort_refuses_without_wr
         stdout
             .contains("runtime: default agent with effective permissions [\"read\", \"search\"]\n")
     );
+    // The permissions line reports the role's narrowing, not the wider
+    // invocation scope (R04-05).
+    assert!(
+        stdout.contains(
+            "permissions: trusted narrowed by agent to read, search grants (invocation);"
+        )
+    );
+    assert!(!stdout.contains("read/write/shell"));
     assert!(!stdout.contains("Inspect the change") && !stdout.contains("secret-value"));
     assert_eq!(listing(), before);
     let output = run("reviewer", &["--preview"]);
-    assert!(
-        String::from_utf8(output.stdout)
-            .unwrap()
-            .contains("effective permissions deny (invocation)\n")
-    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("effective permissions deny (invocation)\n"));
+    assert!(stdout.contains("permissions: deny: no file/shell grants ("));
+    let output = Command::new(env!("CARGO_BIN_EXE_ah"))
+        .args([
+            "single",
+            "review it",
+            "--preview",
+            "--permissions",
+            "trusted",
+        ])
+        .current_dir(&project)
+        .env("AH_CLI_AGENT_KEY", "secret-value")
+        .output()
+        .unwrap();
+    assert!(String::from_utf8(output.stdout).unwrap().contains(
+        "permissions: trusted: read/write/shell with host privileges; no OS sandbox (invocation);"
+    ));
 
     let output = run("thinker", &["--preview"]);
     assert_eq!(output.status.code(), Some(0));
@@ -140,6 +161,60 @@ fn named_agent_preview_reports_mapping_and_unsupported_effort_refuses_without_wr
             .contains("agent effort is unsupported by OpenCode 2.2.5; only default effort runs")
     );
     assert_eq!(listing(), before);
+    std::fs::remove_dir_all(project).unwrap();
+}
+
+/// R04-06: the fallback line names the source D037 precedence selected; a
+/// primary `--model` override never changes the fallback model.
+#[cfg(unix)]
+#[test]
+fn preview_reports_fallback_model_provenance() {
+    let project = std::env::temp_dir().join(format!("ah-cli-fallback-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&project);
+    std::fs::create_dir_all(project.join("agents")).unwrap();
+    std::fs::write(
+        project.join("agents/reviewer.md"),
+        include_str!("../agents/reviewer.md")
+            .replace("\n---\n", "\nmodels:\n  native: agent-native\n---\n"),
+    )
+    .unwrap();
+    std::fs::write(
+        project.join("ah.json"),
+        r#"{"version":1,"mode":"local-first","model":"local-config","litellm":{"api_base":"http://127.0.0.1:9/v1","api_key_env":"AH_CLI_FALLBACK_KEY"},"native":{"target":"opencode","model":"config-native","api_key_env":"AH_CLI_FALLBACK_KEY"}}"#,
+    )
+    .unwrap();
+    let fallback = |extra: &[&str]| {
+        let output = Command::new(env!("CARGO_BIN_EXE_ah"))
+            .args(["single", "review it", "--preview"])
+            .args(extra)
+            .current_dir(&project)
+            .env("AH_CLI_FALLBACK_KEY", "secret-value")
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(0));
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let line = stdout.lines().find(|l| l.starts_with("mode: ")).unwrap();
+        line.split("fallback: configured native ")
+            .nth(1)
+            .unwrap()
+            .split("; key reference present")
+            .next()
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(
+        fallback(&["--agent", "reviewer"]),
+        "opencode/agent-native (agent models.native"
+    );
+    assert_eq!(
+        fallback(&["--agent", "reviewer", "--model", "other"]),
+        "opencode/agent-native (agent models.native"
+    );
+    assert_eq!(fallback(&[]), "opencode/config-native (native.model");
+    assert_eq!(
+        fallback(&["--model", "other"]),
+        "opencode/config-native (native.model"
+    );
     std::fs::remove_dir_all(project).unwrap();
 }
 

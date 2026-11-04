@@ -282,7 +282,7 @@ case $status in
 esac
 ```
 
-Do not retry automatically on exit 1, 3 or 4: the harness never replays a submitted prompt, and a manual rerun is a new run that may repeat effects. Refuse records whose `v` is not 1. A missing result line (abrupt termination or blocked stdout) leaves only the exit code. `trusted` grants host file/shell access; reserve it for disposable CI checkouts.
+Do not retry automatically on exit 1, 3 or 4: the harness never replays a submitted prompt, and a manual rerun is a new run that may repeat effects. Refuse records whose `v` is not 1. A `succeeded` result for an edit task whose attempts report `tool_events: 0` deserves scrutiny: the backend ended its turn without visible tool work (P4.6 R1). Treat it as a reason to check the project, not as a harness failure; never use it to justify a retry. A missing result line (abrupt termination or blocked stdout) leaves only the exit code. `trusted` grants host file/shell access; reserve it for disposable CI checkouts.
 
 ## Project and data handling
 
