@@ -107,6 +107,8 @@ struct Header {
 pub struct Agent {
     header: Header,
     body: String,
+    /// SHA-256 of the definition's bytes, for sequence records (D044).
+    sha256: String,
 }
 
 impl Agent {
@@ -160,6 +162,7 @@ impl Agent {
         Ok(Self {
             header,
             body: body.to_owned(),
+            sha256: crate::state::sha256(text.as_bytes()),
         })
     }
 
@@ -223,6 +226,9 @@ impl Agent {
     }
     pub fn body(&self) -> &str {
         &self.body
+    }
+    pub fn sha256(&self) -> &str {
+        &self.sha256
     }
 
     /// Relative project destination for the conflict-aware transaction.
