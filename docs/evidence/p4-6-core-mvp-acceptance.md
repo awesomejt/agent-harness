@@ -1,7 +1,7 @@
 # P4.6 — Core MVP acceptance evidence
 
 Date: 2026-11-03. Entry baseline: `1f7463d` (merged P4.5 PR #40; `v0.1.0-alpha.2`
-packaged from it). Task branch: `feature/04/p4-6-mvp-acceptance`.
+packaged from it). Task branch: `feature/04/p4-6-mvp-acceptance`, [PR #41](https://github.com/awesomejt/agent-harness/pull/41).
 [Card](../../tasks/04-core-mvp.md#p4-6). Platform: Apple Silicon macOS 27.0.1 (26A434),
 installed OpenCode 2.2.5 (Homebrew), Rust/Cargo 1.88.0 (fixtures only).
 This record prepares acceptance; the P4.9 holistic review remains the Phase 4 exit
