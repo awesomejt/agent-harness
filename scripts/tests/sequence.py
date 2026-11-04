@@ -33,7 +33,8 @@ sys.exit(3 if mode == 'fail' else 0)
 '''
 
 
-def run(steps, expected, *, args=(), checks=None, extra_files=None, interrupt=False, preview=False):
+def run(steps, expected, *, args=(), checks=None, extra_files=None, interrupt=False, preview=False,
+        blocked_stderr=False):
     with tempfile.TemporaryDirectory(prefix='ah-sequence-project-') as p, \
          tempfile.TemporaryDirectory(prefix='ah-sequence-tools-') as t:
         project, tools = Path(p).resolve(), Path(t).resolve()
@@ -65,8 +66,29 @@ def run(steps, expected, *, args=(), checks=None, extra_files=None, interrupt=Fa
             argv.append('--preview')
         env = {**os.environ, 'PATH': f'{project}:{tools}:' + os.environ['PATH'],
                'TEST_KEY': 'SECRET_SENTINEL'}
+        stderr = subprocess.PIPE
+        if blocked_stderr:
+            # Fill the pipe before launch and never read it until exit.
+            pipe_read, stderr = os.pipe()
+            os.set_blocking(stderr, False)
+            try:
+                while True:
+                    os.write(stderr, b'F' * 4096)
+            except BlockingIOError:
+                pass
+            os.set_blocking(stderr, True)
+        started = time.monotonic()
         proc = subprocess.Popen(argv, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE, text=True)
+                                stderr=stderr, text=True)
+        if blocked_stderr:
+            os.close(stderr)
+            try:
+                proc.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                raise AssertionError('sequence hung on an unread stderr')
+            assert time.monotonic() - started < 20, 'sequence exit was not bounded'
+            proc.stderr = os.fdopen(pipe_read, 'r', errors='replace')
         if interrupt:
             until = time.monotonic() + 15
             while not (project / 'sleeping').exists() and time.monotonic() < until:
@@ -129,6 +151,13 @@ assert 'verification="test" "failed"' in s['err'] and 'stopped at step 1/2' in s
 # Without --verify nothing is gated, and no step is labeled verified.
 s = run({'1-a.md': 'One.\n'}, 0)
 assert s['checks'] == [] and 'verification=' not in s['err']
+
+# PR #46 review: an unread, full stderr must not stall the stop note or exit;
+# the failed step still stops step 2.
+s = run({'1-a.md': 'FAIL\n', '2-b.md': 'Two.\n'}, 1, blocked_stderr=True)
+assert s['texts'] == ['FAIL\n'], s['texts']
+s = run({'1-a.md': 'One.\n', '2-b.md': 'Two.\n'}, 0, blocked_stderr=True)
+assert s['texts'] == ['One.\n', 'Two.\n'], s['texts']
 
 # A signal during a step cancels it (exit 3); later steps never launch.
 s = run({'1-a.md': 'SLEEP\n', '2-b.md': 'Two.\n'}, 3, interrupt=True)

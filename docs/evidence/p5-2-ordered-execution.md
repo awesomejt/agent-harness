@@ -116,7 +116,7 @@ changed files, metadata conflicts and stopping dependent steps after failure.
   - **Loop.** Each non-success exit (1–4) at step 2 stops step 3. A
     cancellation after step 1 completes stops before step 2 launches; a signal
     already seen launches nothing.
-- `scripts/tests/sequence.py`, using fake OpenCode 2.2.5 and a fake check (29
+- `scripts/tests/sequence.py`, using fake OpenCode 2.2.5 and a fake check (31
   runs):
   - **Order and context.** `1`, `2`, `10` arrive in that order, each in its
     own private runtime home. Responses go to stdout; each step has its own
@@ -141,6 +141,9 @@ changed files, metadata conflicts and stopping dependent steps after failure.
     agent conflict, verify without `--verify`, undefined check, undefined
     agent, unsupported effort, slash command, `--prompt-file` and jsonl.
   - **Entries.** A directory or symlink step rejects.
+  - **Unread stderr.** With stderr pre-filled and never read, a failing step 1
+    still exits 1 within the bound without launching step 2, and a passing
+    sequence exits 0 (PR #46 review fix; hangs on the unfixed build).
   - **Preview.** Per-step identity, agent, check and refusal are shown. Prompt
     text is omitted, nothing launches and no project file is written.
 - `scripts/tests/sequence_runtime.py` uses installed OpenCode 2.2.5 with a
@@ -166,7 +169,9 @@ changed files, metadata conflicts and stopping dependent steps after failure.
   adds D044's record, lock and explicit resume choices.
 - A concurrent `ah single` or second `ah sequence run` in the same project is
   unsupported and is not yet detected; the P5.3 lock covers sequences.
-- Sequence-level lines go to stderr with synchronous writes, and only between
-  steps; step diagnostics keep the bounded `Progress` writer.
+- Sequence-level lines go to stderr only between steps, through a dedicated
+  writer thread with a one-second bounded wait, so an unread stderr cannot
+  stall the signal watcher or exit; step diagnostics keep the bounded
+  `Progress` writer. Under that backpressure, sequence lines may be lost.
 - No live LiteLLM run was made. P5.4 is the live, interrupted multi-step use
   gate.

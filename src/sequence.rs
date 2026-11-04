@@ -230,11 +230,19 @@ fn reject(message: impl std::fmt::Display) -> Exit {
     Exit::Invalid
 }
 
-/// Sequence-level lines on stderr. Written only between steps, when no
-/// runtime is supervised; each step's own diagnostics go through `Progress`.
+/// Sequence-level lines on stderr, written only between steps; each step's own
+/// diagnostics go through `Progress`. A dedicated thread writes, and the wait is
+/// bounded: an unread stderr, or a previous step's writer still holding the
+/// stderr lock, must not stall the signal watcher or process exit.
 fn note(message: impl std::fmt::Display) {
     use std::io::Write;
-    let _ = writeln!(std::io::stderr().lock(), "ah: sequence {message}");
+    let line = format!("ah: sequence {message}\n");
+    let (done, written) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = std::io::stderr().lock().write_all(line.as_bytes());
+        let _ = done.send(());
+    });
+    let _ = written.recv_timeout(std::time::Duration::from_secs(1));
 }
 
 pub fn run(args: Vec<OsString>) -> Exit {
