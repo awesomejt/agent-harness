@@ -5,7 +5,7 @@ Last updated: 2026-11-03. Status is maintained here; phase contracts are in [doc
 ## Current state
 
 - Active phase: 5 — sequences, effective on [P4.9 PR #43](https://github.com/awesomejt/agent-harness/pull/43) merge. The Phase 4 P4.9 pass, with all six Low findings resolved, is in the [report](docs/reviews/phase-04.md). Earlier acceptance remains in the [Phase 3](docs/reviews/phase-03.md), [Phase 2](docs/reviews/phase-02.md) and [Phase 1](docs/reviews/phase-01.md) reports.
-- Active implementation task/PR: P5.5 trusted verification gates (`feature/05/p5-5-verification-gates`). D043 schedules P5.5 before P5.1, as the Phase 4 review planned for R1. Next: P5.1 sequence and durable-state decisions. Default work-in-progress limit: one focused task/PR.
+- Active implementation task/PR: P5.5 trusted verification gates, [PR #44](https://github.com/awesomejt/agent-harness/pull/44) (`feature/05/p5-5-verification-gates`). D043 schedules P5.5 before P5.1, as the Phase 4 review planned for R1. Next: P5.1 sequence and durable-state decisions. Default work-in-progress limit: one focused task/PR.
 - Phase 0 holistic review P0.13: pass recorded in [review report](docs/reviews/phase-00.md), effective on PR #5 merge. P1.5 selects ACP protocol 1, the tested SDK/Tokio stack and Rust 1.88 baseline ([D023](DECISIONS.md#2026-11-02--d023-select-acp-and-the-tested-rust-integration-boundaries)); [acceptance preparation](docs/evidence/p1-5-integration-acceptance.md) and [dependency inventory](docs/evidence/p1-5-dependencies.md) feed P1.7. Production adapter dependencies enter with Phase 2 consumers.
 - External prerequisites (2026-11-01): corrected API base `http://litellm:4000/v1`, supplied by the user, supports authenticated discovery and a live ACP prompt using the existing `macmini-qwen3-coder-30b` alias. The prior localhost blocker described a different endpoint. Credential source is `.zshrc`; values are not recorded. Remote server version remains unreported. See [live P1.2 evidence](docs/evidence/p1-2-live-acp.md).
 - Remaining implementation/review backlog after P5.5: 27 tasks across Phases 5–9; Phase 9 increments remain demand-gated.
@@ -92,7 +92,7 @@ Detailed scope, dependencies and evidence: [Phase 4 cards](tasks/04-core-mvp.md)
 
 Detailed scope, dependencies and evidence: [Phase 5 cards](tasks/05-sequences.md).
 
-- [x] P5.5 Define explicit trusted verification commands/gates and record agent success separately from verified success ([card](tasks/05-sequences.md#p5-5)); completion effective on this PR's merge (`feature/05/p5-5-verification-gates`); [evidence](docs/evidence/p5-5-verification-gates.md), D043.
+- [x] P5.5 Define explicit trusted verification commands/gates and record agent success separately from verified success ([card](tasks/05-sequences.md#p5-5)); completion effective on [PR #44](https://github.com/awesomejt/agent-harness/pull/44) merge; [evidence](docs/evidence/p5-5-verification-gates.md), D043.
 - [ ] P5.1 Decide ordering, context, failure policy, metadata precedence, state schema, and resume interface ([card](tasks/05-sequences.md#p5-1)).
 - [ ] P5.2 Execute an ordered prompt folder through existing single-run policy ([card](tasks/05-sequences.md#p5-2)).
 - [ ] P5.3 Persist step outcomes and handle cancellation/restart without silent replay ([card](tasks/05-sequences.md#p5-3)).
