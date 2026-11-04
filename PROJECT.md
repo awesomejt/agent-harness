@@ -4,11 +4,11 @@ Last updated: 2026-11-03. Status is maintained here; phase contracts are in [doc
 
 ## Current state
 
-- Active phase: 4 — named agents and core MVP, effective on [P3.6 PR #32](https://github.com/awesomejt/agent-harness/pull/32) merge. Phase 3 P3.6 records a pass with all seven findings resolved/verified in the [report](docs/reviews/phase-03.md), including two from the supplemental Codex review fixed in documentation patch PR #33. Earlier acceptance remains in the [Phase 2](docs/reviews/phase-02.md) and [Phase 1](docs/reviews/phase-01.md) reports.
-- Active implementation task/PR: P4.9 remediation, [PR #43](https://github.com/awesomejt/agent-harness/pull/43) (`patch/p4-9-review-fixes`). Review [PR #42](https://github.com/awesomejt/agent-harness/pull/42) merged with three independent reviews and the plan in the [Phase 4 report](docs/reviews/phase-04.md) (six Low findings R04-01–R04-06). This patch resolves all six, adds D042 (review PRs merge once findings are recorded; fixes go in Grok-reviewed patch PRs, one open PR at a time) and proposes the P4.9 pass, effective on its merge after Grok review. Phase 5 then starts with P5.5. Default work-in-progress limit: one focused task/PR.
+- Active phase: 5 — sequences, effective on [P4.9 PR #43](https://github.com/awesomejt/agent-harness/pull/43) merge. The Phase 4 P4.9 pass, with all six Low findings resolved, is in the [report](docs/reviews/phase-04.md). Earlier acceptance remains in the [Phase 3](docs/reviews/phase-03.md), [Phase 2](docs/reviews/phase-02.md) and [Phase 1](docs/reviews/phase-01.md) reports.
+- Active implementation task/PR: P5.5 trusted verification gates, [PR #44](https://github.com/awesomejt/agent-harness/pull/44) (`feature/05/p5-5-verification-gates`). D043 schedules P5.5 before P5.1, as the Phase 4 review planned for R1. Next: P5.1 sequence and durable-state decisions. Default work-in-progress limit: one focused task/PR.
 - Phase 0 holistic review P0.13: pass recorded in [review report](docs/reviews/phase-00.md), effective on PR #5 merge. P1.5 selects ACP protocol 1, the tested SDK/Tokio stack and Rust 1.88 baseline ([D023](DECISIONS.md#2026-11-02--d023-select-acp-and-the-tested-rust-integration-boundaries)); [acceptance preparation](docs/evidence/p1-5-integration-acceptance.md) and [dependency inventory](docs/evidence/p1-5-dependencies.md) feed P1.7. Production adapter dependencies enter with Phase 2 consumers.
 - External prerequisites (2026-11-01): corrected API base `http://litellm:4000/v1`, supplied by the user, supports authenticated discovery and a live ACP prompt using the existing `macmini-qwen3-coder-30b` alias. The prior localhost blocker described a different endpoint. Credential source is `.zshrc`; values are not recorded. Remote server version remains unreported. See [live P1.2 evidence](docs/evidence/p1-2-live-acp.md).
-- Remaining implementation/review backlog after P4.9 acceptance: 28 tasks across Phases 5–9; Phase 9 increments remain demand-gated.
+- Remaining implementation/review backlog after P5.5: 27 tasks across Phases 5–9; Phase 9 increments remain demand-gated.
 - Phase 0 PR #1 review: received 0 blockers, 2 concerns, and 2 nits; all four addressed. No critical/high findings; no re-review required under docs/GIT_WORKFLOW.md.
 - Implementation: Rust package with strict config/input validation, `ah single` local-only and isolated native cloud-only ACP coding paths with shared permission policy, plus a local-first coordinator with one pre-submission native fallback (D034). Production uses the selected SDK/Tokio stack on Rust 1.88, with isolated effective routing, exact allow-once grants and bounded macOS process-group cleanup. Managed project transactions, progress/usage reporting, bounded cooperative cancellation and output supervision are verified; read-only diagnostics/preview are verified in P2.7; dirty-project reporting and preservation fixtures are implemented in P2.8; P2.5 adds the initial Apple Silicon macOS pre-release, locked packaging, notices and installation smoke; P4.5 declares the single supported MVP platform and packages current source with samples, upgrade/rollback smoke and setup diagnostics (D041). P2.4 records a live uncertain terminal after observed edit/test effects, with no replay/fallback.
 - Direction: Rust CLI with prebuilt binaries; OpenCode first, LiteLLM route plus native route.
@@ -92,8 +92,8 @@ Detailed scope, dependencies and evidence: [Phase 4 cards](tasks/04-core-mvp.md)
 
 Detailed scope, dependencies and evidence: [Phase 5 cards](tasks/05-sequences.md).
 
+- [x] P5.5 Define explicit trusted verification commands/gates and record agent success separately from verified success ([card](tasks/05-sequences.md#p5-5)); completion effective on [PR #44](https://github.com/awesomejt/agent-harness/pull/44) merge; [evidence](docs/evidence/p5-5-verification-gates.md), D043.
 - [ ] P5.1 Decide ordering, context, failure policy, metadata precedence, state schema, and resume interface ([card](tasks/05-sequences.md#p5-1)).
-- [ ] P5.5 Define explicit trusted verification commands/gates and record agent success separately from verified success ([card](tasks/05-sequences.md#p5-5)).
 - [ ] P5.2 Execute an ordered prompt folder through existing single-run policy ([card](tasks/05-sequences.md#p5-2)).
 - [ ] P5.3 Persist step outcomes and handle cancellation/restart without silent replay ([card](tasks/05-sequences.md#p5-3)).
 - [ ] P5.4 Validate on a real multi-step task and test recovery cases ([card](tasks/05-sequences.md#p5-4)).
@@ -235,3 +235,16 @@ P2.2 review closeout — PR #17 completed three Grok reviews. Initial concern/th
 D042 records the owner's review-PR policy: a review PR merges once findings are recorded with a plan; every fix goes through a Grok-reviewed patch PR; one open PR at a time; the last patch proposes the pass.
 
 Checks: 83 root tests (new fallback-provenance test; both fixes mutation-checked), fmt, locked Clippy, and the preview, agents_exec, local_first, modes (165) and machine suites pass. Runtime behavior is unchanged, so the installed-runtime and live records stand. Grok review of PR #43: 0 Blockers, 1 Concern (DESIGN still called machine output/agents gated), 0 Nits. The Concern was fixed without mandatory re-review. The P4.9 pass is effective on this PR's merge; next is P5.5.
+
+2026-11-03 — P5.5 trusted verification gates (`feature/05/p5-5-verification-gates`, D043). P5.5 runs first in Phase 5 as the R1 remedy; its card now depends on P4.9, and P5.1 on P5.5.
+- Config `checks.NAME = {argv, timeout_secs?}` declares checks. Only `ah single ... --verify NAME` runs one, after backend success and confirmed runtime cleanup.
+- The program is pinned before launch, outside the project, including every symlink hop. Undeclared or in-project programs exit 2 before launch.
+- The check runs without a shell, in its own process group, with closed stdin, output on stderr, scrubbed route keys, its own timeout and confirmed group cleanup.
+- Verification status is separate from `agent_outcome`. Exits: passed 0; failed/timed_out/error 1; cancelled 3; unconfirmed cleanup 4; unchanged without `--verify`.
+- Machine v1 adds `verification.*` records and a result `verification` object (additive). No repair, retry or model-suggested commands.
+
+Checks: 85 root tests, fmt, locked Clippy, release build. The new `verify.py` (17 fake-command runs, including an `error` case added after Grok review) and every existing non-live and installed-runtime suite pass, including `single_runtime.py --verify` and `--verify --cancel`. Three mutation checks were caught. The first suite run found a gap: an in-project symlink to an outside program; the hop-by-hop check fixed it.
+
+Live: `single_runtime.py --live --verify` on LiteLLM `macmini-qwen3-coder-30b` with OpenCode 2.2.5. The model fixed the code and the pinned check passed (exit 0, cleanup confirmed). See the [evidence](docs/evidence/p5-5-verification-gates.md). R04-REC1 (tool kind in progress) remains a P5.1 planning candidate.
+
+Grok review of PR #44: 0 Blockers, 2 Concerns, 1 Nit. Both Concerns are fixed: the select is biased toward the check exit, and the symlink walk fails closed. The Nit is addressed by the `error` case; exit 4 relies on the shared cleanup path. No mandatory re-review.

@@ -48,6 +48,19 @@ struct Summary {
     response: Option<String>,
     reason: Option<&'static str>,
     fallback: bool,
+    /// `null` unless `--verify` resolved a check (D043).
+    verification: Option<Map<String, Value>>,
+}
+
+/// An explicit public mapping of exits, not serialization of the Rust enum.
+pub(crate) fn outcome(exit: Exit) -> &'static str {
+    match exit {
+        Exit::Success => "succeeded",
+        Exit::Failed => "failed",
+        Exit::Invalid => "rejected",
+        Exit::Cancelled => "cancelled",
+        Exit::Uncertain => "uncertain",
+    }
 }
 
 /// Unknown metrics are `null`, never zero.
@@ -239,6 +252,18 @@ impl Progress {
     pub fn reason(&self, reason: &'static str) {
         self.summary.lock().unwrap().reason.get_or_insert(reason);
     }
+    /// Merge verification facts into the result record (D043).
+    pub fn verification(&self, data: Value) {
+        let Value::Object(fields) = data else {
+            unreachable!("verification data is an object")
+        };
+        self.summary
+            .lock()
+            .unwrap()
+            .verification
+            .get_or_insert_default()
+            .extend(fields);
+    }
     pub fn fallback(&self) {
         self.summary.lock().unwrap().fallback = true;
         self.emit(
@@ -305,21 +330,14 @@ impl Progress {
     }
     fn result(&self, exit: Exit) -> Value {
         let summary = self.summary.lock().unwrap();
-        // An explicit public mapping, not serialization of the Rust enum.
-        let outcome = match exit {
-            Exit::Success => "succeeded",
-            Exit::Failed => "failed",
-            Exit::Invalid => "rejected",
-            Exit::Cancelled => "cancelled",
-            Exit::Uncertain => "uncertain",
-        };
         json!({
-            "outcome": outcome,
+            "outcome": outcome(exit),
             "exit": exit as u8,
             "reason": summary.reason,
             "response": summary.response,
             "attempts": summary.attempts,
             "fallback": summary.fallback,
+            "verification": summary.verification,
             "recovery": *self.recovery.lock().unwrap(),
             "diagnostics_omitted": self.dropped.load(Ordering::Relaxed),
             "records_dropped": self.machine.as_ref().map_or(0, |m| m.dropped.load(Ordering::Relaxed)),
@@ -344,8 +362,16 @@ impl Progress {
                 }
             }
         }
+        let verification = self
+            .summary
+            .lock()
+            .unwrap()
+            .verification
+            .as_ref()
+            .map(|v| format!("; verification={} {}", v["check"], v["status"]))
+            .unwrap_or_default();
         *self.terminal.lock().unwrap() = Some(format!(
-            "ah: run={} elapsed={:.1}s outcome={exit:?}; usage={}; {}; diagnostics_omitted={}{}",
+            "ah: run={} elapsed={:.1}s outcome={exit:?}{verification}; usage={}; {}; diagnostics_omitted={}{}",
             self.run,
             self.start.elapsed().as_secs_f64(),
             self.usage

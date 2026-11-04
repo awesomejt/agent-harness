@@ -282,6 +282,12 @@ case $status in
 esac
 ```
 
+Prefer a harness gate over the generic exit 0 branch. Declare the project check in `ah.json` `checks` and add `--verify NAME` (D043). Exit 0 then means the backend turn succeeded *and* the check passed. Exit 1 with `.verification.status` `failed`, `timed_out` or `error` means the agent finished but the check did not pass. `.verification.agent_outcome` keeps the two apart. The check's own output is on stderr. It runs with host privileges in the checkout, so declare only commands you would run there yourself.
+
+```bash
+jq -e 'select(.type == "result") | .verification.status == "passed"' ah-records.jsonl
+```
+
 Do not retry automatically on exit 1, 3 or 4: the harness never replays a submitted prompt, and a manual rerun is a new run that may repeat effects. Refuse records whose `v` is not 1. A `succeeded` result for an edit task whose attempts report `tool_events: 0` deserves scrutiny: the backend ended its turn without visible tool work (P4.6 R1). Treat it as a reason to check the project, not as a harness failure; never use it to justify a retry. A missing result line (abrupt termination or blocked stdout) leaves only the exit code. `trusted` grants host file/shell access; reserve it for disposable CI checkouts.
 
 ## Project and data handling

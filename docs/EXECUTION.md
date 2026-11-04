@@ -144,9 +144,11 @@ stdout then carries only UTF-8 JSON Lines, one object per `\n`-terminated line, 
 | `attempt.backend_stop` | `backend_stop`: `end_turn`, `cancelled` or `other` (other known terminal reasons). |
 | `attempt.cleanup` | `cleanup_confirmed`, `permission_requests`, `grants`, `tool_events`, `protocol_violation`. |
 | `fallback` | `from_attempt` 1, `to_attempt` 2, `reason` `litellm_unreachable_before_submission`. |
+| `verification.started` | `check`, `timeout_secs`. Only with `--verify`, after a successful backend outcome (D043). |
+| `verification.finished` | `check`, `status`, `exit_code`, `signal`, `duration_ms`, `cleanup_confirmed`. |
 | `result` | Terminal record below. Always last; exactly one. |
 
-The `result` record contains `outcome`, `exit`, `reason`, `response`, `attempts`, `fallback`, `recovery`, `diagnostics_omitted` and `records_dropped`. `outcome` is a closed v1 mapping of the D024 exits: 0 `succeeded`, 1 `failed`, 2 `rejected`, 3 `cancelled`, 4 `uncertain`. `reason` is the first static harness rejection text (every harness-detected exit 2 sets one, including missing runtime/key and preflight mismatch), otherwise `null`; it is for people, not a stable code. `response` is the final assistant text only after backend `end_turn` and confirmed process cleanup. It can accompany `uncertain` if later private-state removal fails. Otherwise it is `null`. It is untrusted backend data. `attempts` is empty when the request never reached an attempt. Each entry has `attempt`, the `attempt.started` fields, `launched` (coding ACP child spawned), `session`, `prompt_submitted`, `backend_stop`, `cleanup_confirmed`, `permission_requests`, `grants`, `tool_events`, `protocol_violation`, `runtime_state_removed` and `usage`. `launched` and `prompt_submitted` are harness-owned booleans, `false` until crossed; other fields not yet observed are `null`. Counters are harness observations of protocol events, not proof that no tool ran.
+The `result` record contains `outcome`, `exit`, `reason`, `response`, `attempts`, `fallback`, `verification` (P5.5, below), `recovery`, `diagnostics_omitted` and `records_dropped`. `outcome` is a closed v1 mapping of the D024 exits: 0 `succeeded`, 1 `failed`, 2 `rejected`, 3 `cancelled`, 4 `uncertain`. `reason` is the first static harness rejection text (every harness-detected exit 2 sets one, including missing runtime/key and preflight mismatch), otherwise `null`; it is for people, not a stable code. `response` is the final assistant text only after backend `end_turn` and confirmed process cleanup. It can accompany `uncertain` if later private-state removal fails. Otherwise it is `null`. It is untrusted backend data. `attempts` is empty when the request never reached an attempt. Each entry has `attempt`, the `attempt.started` fields, `launched` (coding ACP child spawned), `session`, `prompt_submitted`, `backend_stop`, `cleanup_confirmed`, `permission_requests`, `grants`, `tool_events`, `protocol_violation`, `runtime_state_removed` and `usage`. `launched` and `prompt_submitted` are harness-owned booleans, `false` until crossed; other fields not yet observed are `null`. Counters are harness observations of protocol events, not proof that no tool ran.
 
 The usage object is `source` (`opencode-acp-usage-update` or `null`), `context_used_tokens`, `context_capacity_tokens`, `turn_tokens` and `session_cost` (`{amount, currency}` with an ISO-style uppercase three-letter code, or `null`). Every unreported or invalid metric is `null`, never zero. With OpenCode 2.2.5, `turn_tokens` is always `null`; context and cost are backend reports, not measured billing.
 
@@ -164,3 +166,22 @@ The [P4.8 capability matrix](evidence/p4-8-inherited-capabilities.md) is version
 - **Runtime commands:** a prompt whose first word is `/NAME` is refused with exit 2 before launch. ACP would run it as a runtime command, which can end the turn with `end_turn` and no model work.
 - **Not loaded or denied:** skills, MCP servers (the document's `mcp` and the ACP `mcpServers` are empty), plugins, custom tools, project commands, subagent delegation and web tools. Each is not loaded, not offered or denied by the effective rules, on both routes and for every role.
 - **Runtime-owned and unverified:** context selection, compaction and caching.
+
+## P5.5 verification gates (D043)
+
+Agent success and verified success are separate. Without `--verify`, exits and output are unchanged, and a run is never labeled verified: result `verification` is `null`. With `--verify NAME`, the declared check ([CONFIGURATION](CONFIGURATION.md#verification-checks-p55--d043)) is resolved and pinned with the request. It runs once, after the final backend outcome and confirmed runtime cleanup, only when that outcome is success. In local-first, that is whichever attempt produced the outcome. The human response is already on stdout by then. Machine mode keeps it in the result.
+
+| Backend outcome | Verification `status` | Exit |
+|---|---|---|
+| Not success (exit 1–4), or rejected before an attempt | `not_run` | Backend exit, unchanged |
+| Success, signal already received | `not_run` | 3 |
+| Success | `passed` (exit 0) | 0 |
+| Success | `failed` (nonzero exit or terminating signal) | 1 |
+| Success | `timed_out` (check `timeout_secs` elapsed; group terminated) | 1 |
+| Success | `error` (spawn or wait failed) | 1 |
+| Success | `cancelled` (SIGINT/SIGTERM during the check) | 3 |
+| Any check outcome with unconfirmed process-group cleanup | as observed | 4 |
+
+The result `verification` object has `check`, `status`, `agent_outcome` (the backend outcome name, or `null` when the run was rejected before an attempt), `exit_code`, `signal`, `timeout_secs`, `duration_ms` and `cleanup_confirmed`; unobserved values are `null`. It never contains argv, paths or check output. A failed gate sets `recovery` to `no automatic retry, repair or fallback after verification`. Human stderr reports the start and finish and appends `verification="NAME" "STATUS"` to the final line. Check output appears on stderr between those lines; it is the operator's command output, not harness diagnostics, and is not captured or persisted.
+
+The check runs without a shell, in the canonical project directory, in its own process group. It has closed stdin and an inherited environment minus the configured route key names and `AH_RUNTIME_API_KEY`/`OPENCODE_API_KEY`. Timeout or cancellation sends SIGTERM to the group, then SIGKILL after two seconds. After every exit, including a pass, lingering members are terminated and group absence is confirmed. The harness never repairs, retries or re-prompts after a failed gate, and never runs model-suggested commands. The check executes current project content with host privileges; it is not containment.

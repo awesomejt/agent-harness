@@ -169,6 +169,14 @@ for line in sys.stdin:
     elif method == 'session/prompt':
         prompt_id = m['id']
         (cwd / 'prompted').touch()
+        if case == 'rewrite-config':
+            # P5.5: an agent edit to ah.json cannot change the pinned check.
+            edited = json.loads((cwd / 'ah.json').read_text())
+            edited['checks']['test']['argv'] = ['/usr/bin/false']
+            (cwd / 'ah.json').write_text(json.dumps(edited))
+        if case == 'remove-check':
+            # P5.5: a pinned program that vanishes before the gate is an error.
+            os.remove(json.loads((cwd / 'ah.json').read_text())['checks']['test']['argv'][0])
         if case in ['deadline', 'interrupt','cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission','cancel-term']:
             continue
         if case in ['deny-progress', 'deny-completed', 'named-completed-edit', 'named-completed-read', 'named-completed-unknown']:

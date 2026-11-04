@@ -1,6 +1,6 @@
 # Validation and acceptance plan
 
-Status: the local-only Rust CLI, strict config/input validation, project routing transactions, ACP coding adapter, bounded progress/cancellation, read-only preview, dirty-project reporting and Apple Silicon release checks are implemented. The standalone ACP lifecycle experiment remains regression tooling. P3.2 adds isolated native OpenCode cloud-only execution, P3.3 the local-first coordinator with one pre-submission native fallback, P3.4 the three-mode boundary matrix and P3.7 the OpenCode 2.2.5 runtime baseline (D035). Phase 4 adds named-agent parsing, emission and enforcement (D036–D038), version-1 machine output (D039) and the inherited-capability matrix (D040); sequence and Ralph workflows remain gated. Phase exit criteria in [IMPLEMENTATION.md](IMPLEMENTATION.md) remain authoritative; a passing mock suite does not prove live compatibility.
+Status: the local-only Rust CLI, strict config/input validation, project routing transactions, ACP coding adapter, bounded progress/cancellation, read-only preview, dirty-project reporting and Apple Silicon release checks are implemented. The standalone ACP lifecycle experiment remains regression tooling. P3.2 adds isolated native OpenCode cloud-only execution, P3.3 the local-first coordinator with one pre-submission native fallback, P3.4 the three-mode boundary matrix and P3.7 the OpenCode 2.2.5 runtime baseline (D035). Phase 4 adds named-agent parsing, emission and enforcement (D036–D038), version-1 machine output (D039) and the inherited-capability matrix (D040). P5.5 adds trusted verification gates for single runs (D043); sequence and Ralph workflows remain gated. Phase exit criteria in [IMPLEMENTATION.md](IMPLEMENTATION.md) remain authoritative; a passing mock suite does not prove live compatibility.
 
 ## Layers
 
@@ -55,6 +55,8 @@ python3 scripts/tests/local_first.py
 python3 scripts/tests/modes.py
 python3 scripts/tests/agents_exec.py
 python3 scripts/tests/machine.py
+python3 scripts/tests/verify.py
+python3 scripts/tests/single_runtime.py --verify
 cargo build --locked --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml
 cargo fmt --check --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml
 cargo clippy --locked --manifest-path scripts/experiments/acp_lifecycle/Cargo.toml -- -D warnings

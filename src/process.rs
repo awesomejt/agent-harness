@@ -11,22 +11,19 @@ pub(crate) struct OwnedChild {
     group: i32,
     escalated: bool,
     stderr_bytes: Arc<AtomicUsize>,
-    stderr_drain: tokio::task::JoinHandle<()>,
+    stderr_drain: Option<tokio::task::JoinHandle<()>>,
 }
 impl OwnedChild {
     pub fn spawn(command: &mut Command) -> io::Result<Self> {
-        let mut child = command
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true)
-            .process_group(0)
-            .spawn()?;
-        let group = child.id().ok_or_else(|| io::Error::other("missing pid"))? as i32;
-        let mut stderr = child.stderr.take().unwrap();
-        let stderr_bytes = Arc::new(AtomicUsize::new(0));
-        let count = stderr_bytes.clone();
-        let stderr_drain = tokio::spawn(async move {
+        let mut owned = Self::start(
+            command
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped()),
+        )?;
+        let mut stderr = owned.child.stderr.take().unwrap();
+        let count = owned.stderr_bytes.clone();
+        owned.stderr_drain = Some(tokio::spawn(async move {
             use tokio::io::AsyncReadExt;
             let mut buf = [0u8; 8192];
             while let Ok(n) = stderr.read(&mut buf).await {
@@ -38,13 +35,22 @@ impl OwnedChild {
                     Some(v.saturating_add(n).min(1_048_577))
                 });
             }
-        });
+        }));
+        Ok(owned)
+    }
+    /// A verification check (D043): no stdin; output goes to the given handles.
+    pub fn spawn_output(command: &mut Command, stdout: Stdio, stderr: Stdio) -> io::Result<Self> {
+        Self::start(command.stdin(Stdio::null()).stdout(stdout).stderr(stderr))
+    }
+    fn start(command: &mut Command) -> io::Result<Self> {
+        let child = command.kill_on_drop(true).process_group(0).spawn()?;
+        let group = child.id().ok_or_else(|| io::Error::other("missing pid"))? as i32;
         Ok(Self {
             child,
             group,
             escalated: false,
-            stderr_bytes,
-            stderr_drain,
+            stderr_bytes: Arc::default(),
+            stderr_drain: None,
         })
     }
     fn signal(&self, signal: i32) {
@@ -71,11 +77,12 @@ impl OwnedChild {
         ) {
             return false;
         }
-        if tokio::time::timeout(Duration::from_millis(500), &mut self.stderr_drain)
-            .await
-            .is_err()
+        if let Some(drain) = &mut self.stderr_drain
+            && tokio::time::timeout(Duration::from_millis(500), &mut *drain)
+                .await
+                .is_err()
         {
-            self.stderr_drain.abort();
+            drain.abort();
         }
         // A reaped leader alone says nothing about descendants. ps is bounded,
         // invoked without a shell, and zombies count as terminated.
@@ -135,7 +142,9 @@ impl OwnedChild {
 }
 impl Drop for OwnedChild {
     fn drop(&mut self) {
-        self.stderr_drain.abort();
+        if let Some(drain) = &self.stderr_drain {
+            drain.abort();
+        }
         if !self.escalated {
             self.signal(libc::SIGKILL);
         }
