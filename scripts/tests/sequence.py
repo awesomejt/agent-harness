@@ -4,6 +4,7 @@
 Covers numeric order, fresh per-step runtimes, the in-memory snapshot, per-step
 agent and check metadata, stopping dependent steps after a failed step or gate,
 signals during and between steps, and validation of every step before launch.
+Durable records go to a temporary XDG_STATE_HOME; sequence_state.py covers them.
 Build target/debug/ah first.
 """
 import json
@@ -36,7 +37,8 @@ sys.exit(3 if mode == 'fail' else 0)
 def run(steps, expected, *, args=(), checks=None, extra_files=None, interrupt=False, preview=False,
         blocked_stderr=False):
     with tempfile.TemporaryDirectory(prefix='ah-sequence-project-') as p, \
-         tempfile.TemporaryDirectory(prefix='ah-sequence-tools-') as t:
+         tempfile.TemporaryDirectory(prefix='ah-sequence-tools-') as t, \
+         tempfile.TemporaryDirectory(prefix='ah-sequence-state-') as state_home:
         project, tools = Path(p).resolve(), Path(t).resolve()
         (project / 'opencode').symlink_to(FAKE)
         (project / 'case').write_text('sequence')
@@ -65,7 +67,7 @@ def run(steps, expected, *, args=(), checks=None, extra_files=None, interrupt=Fa
         if preview:
             argv.append('--preview')
         env = {**os.environ, 'PATH': f'{project}:{tools}:' + os.environ['PATH'],
-               'TEST_KEY': 'SECRET_SENTINEL'}
+               'TEST_KEY': 'SECRET_SENTINEL', 'XDG_STATE_HOME': state_home}
         stderr = subprocess.PIPE
         if blocked_stderr:
             # Fill the pipe before launch and never read it until exit.

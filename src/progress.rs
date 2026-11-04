@@ -12,6 +12,8 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+pub(crate) type Fields = Map<String, Value>;
+
 #[derive(Clone)]
 pub(crate) struct Progress {
     sender: mpsc::SyncSender<String>,
@@ -263,6 +265,12 @@ impl Progress {
             .verification
             .get_or_insert_default()
             .extend(fields);
+    }
+    /// Per-backend attempt entries and verification fields gathered so far,
+    /// for the durable sequence record (D044).
+    pub fn snapshot(&self) -> (Vec<Fields>, Option<Fields>) {
+        let summary = self.summary.lock().unwrap();
+        (summary.attempts.clone(), summary.verification.clone())
     }
     pub fn fallback(&self) {
         self.summary.lock().unwrap().fallback = true;

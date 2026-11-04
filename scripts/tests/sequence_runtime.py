@@ -82,7 +82,9 @@ def server():
 def main():
     binary = ROOT / 'target/debug/ah'
     with server() as (s, endpoint), tempfile.TemporaryDirectory(prefix='ah-sequence-runtime-') as d:
-        cwd = Path(d).resolve()
+        # The state directory must lie outside the project (D044).
+        cwd = Path(d).resolve() / 'project'
+        state = Path(d).resolve() / 'state'
         subprocess.run(['git', 'init', '-q', str(cwd)], check=True)
         test = shutil.which('test')
         checks = {name: dict(argv=[test, '-f', f'{name}.txt'], timeout_secs=30) for name in ['one', 'two', 'three']}
@@ -96,7 +98,7 @@ def main():
         (prompts / '4-four.md').write_text('STEP-FOUR: must never run.\n')
         p = subprocess.run([str(binary), 'sequence', 'run', str(prompts), '--project', str(cwd),
                             '--permissions', 'trusted', '--verify', 'one', '--timeout-secs', '120'],
-                           env={**os.environ, 'TEST_KEY': 'unused'}, capture_output=True, text=True, timeout=600)
+                           env={**os.environ, 'TEST_KEY': 'unused', 'XDG_STATE_HOME': str(state)}, capture_output=True, text=True, timeout=600)
         print('CLI exit:', p.returncode, flush=True)
         print('stderr:', p.stderr.strip(), flush=True)
         print('Model turns by step:', s.markers, flush=True)
@@ -108,8 +110,18 @@ def main():
         assert 'verification="three" "failed"' in err
         assert 'stopped at step 3/4 3-three.md (outcome failed); 1 later steps pending and not launched' in err
         assert err.count('runtime_state_removed') == 0 and err.count('outcome=') == 3
+        # P5.3: the durable record shows the same stop, with no prompt text.
+        record = next((state / 'agent-harness/sequences').glob('s*.json'))
+        text = record.read_text()
+        assert 'STEP-' not in text and 'unused' not in text
+        r = json.loads(text)
+        assert r['status'] == 'stopped', r['status']
+        assert [s['status'] for s in r['steps']] == ['succeeded', 'succeeded', 'failed', 'pending']
+        three = r['steps'][2]['attempts'][0]
+        assert three['agent_outcome'] == 'succeeded' and three['verification']['status'] == 'failed'
+        assert three['backends'][0]['prompt_submitted'] is True
         print('PASS installed OpenCode 2.2.5 sequence: ordered gated steps, filesystem continuity, '
-              'failed gate stopped step 4 before launch; local deterministic model stub', flush=True)
+              'failed gate stopped step 4 before launch; durable record matches; local deterministic model stub', flush=True)
 
 
 if __name__ == '__main__':

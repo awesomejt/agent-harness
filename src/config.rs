@@ -456,6 +456,49 @@ impl Invocation {
         Ok((request, folder.ok_or(Invalid("provide a prompt folder"))?))
     }
 
+    /// Parse `sequence resume RUN_ID` (D044) after the caller removes
+    /// `--retry`/`--accept`: the coding options except `--project`,
+    /// `--config` and `--preview`, which come from the record or do not
+    /// apply. Returns the raw run ID; its grammar is checked by the caller.
+    pub fn parse_resume(
+        args: impl IntoIterator<Item = OsString>,
+        cwd: &Path,
+    ) -> Result<(Self, String)> {
+        let args: Vec<OsString> = args.into_iter().collect();
+        if args.len() < 2 || args[0] != "sequence" || args[1] != "resume" {
+            return Err(Invalid("expected sequence resume"));
+        }
+        if args[2..]
+            .iter()
+            .any(|a| a == "--project" || a == "--config" || a == "--preview")
+        {
+            return Err(Invalid(
+                "sequence resume takes project and config from the record; --project, --config and --preview reject",
+            ));
+        }
+        let (request, run) = Self::options(args.into_iter().skip(2), cwd, true)?;
+        if request.machine {
+            return Err(Invalid(
+                "--output jsonl is unsupported for sequence commands; use human output",
+            ));
+        }
+        let run = run.ok_or(Invalid("provide a run ID"))?;
+        // The positional was joined to cwd; recover the raw argument.
+        let run = run
+            .strip_prefix(cwd)
+            .ok()
+            .and_then(Path::to_str)
+            .ok_or(Invalid("run ID must be sYYYYMMDDTHHMMSSZ-xxxxxxxx"))?
+            .to_owned();
+        Ok((request, run))
+    }
+
+    /// Point a resumed invocation at its recorded project and config.
+    pub fn rebase(&mut self, project: PathBuf, config: PathBuf) {
+        self.project = project;
+        self.config = Some(config);
+    }
+
     /// One step of a sequence (D044): the invocation with the step's prompt
     /// and metadata. Metadata may name an agent only when it agrees with
     /// `--agent`, and may substitute a check only under `--verify`.
