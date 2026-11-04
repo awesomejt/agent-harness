@@ -152,6 +152,12 @@ assert 'verification.started' not in s['result']['types']
 s = run('version', 2)
 assert s['result']['verification']['agent_outcome'] == 'rejected' and s['ran'] is None
 
+# Error: the pinned program vanished before the gate (spawn failure) → exit 1.
+s = run('remove-check', 1)
+v = s['result']['verification']
+assert v['status'] == 'error' and v['agent_outcome'] == 'succeeded' and s['ran'] is None, v
+assert v['exit_code'] is None and v['cleanup_confirmed'] is None, v
+
 # Untrusted: undeclared names and in-project programs reject before launch.
 s = run('text', 2, verify='lint')
 assert s['result']['reason'] == 'verification check is not defined in config checks', s['result']

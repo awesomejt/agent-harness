@@ -243,6 +243,8 @@ Checks: 83 root tests (new fallback-provenance test; both fixes mutation-checked
 - Verification status is separate from `agent_outcome`. Exits: passed 0; failed/timed_out/error 1; cancelled 3; unconfirmed cleanup 4; unchanged without `--verify`.
 - Machine v1 adds `verification.*` records and a result `verification` object (additive). No repair, retry or model-suggested commands.
 
-Checks: 85 root tests, fmt, locked Clippy, release build. The new `verify.py` (16 fake-command runs) and every existing non-live and installed-runtime suite pass, including `single_runtime.py --verify` and `--verify --cancel`. Three mutation checks were caught. The first suite run found a gap: an in-project symlink to an outside program; the hop-by-hop check fixed it.
+Checks: 85 root tests, fmt, locked Clippy, release build. The new `verify.py` (17 fake-command runs, including an `error` case added after Grok review) and every existing non-live and installed-runtime suite pass, including `single_runtime.py --verify` and `--verify --cancel`. Three mutation checks were caught. The first suite run found a gap: an in-project symlink to an outside program; the hop-by-hop check fixed it.
 
 Live: `single_runtime.py --live --verify` on LiteLLM `macmini-qwen3-coder-30b` with OpenCode 2.2.5. The model fixed the code and the pinned check passed (exit 0, cleanup confirmed). See the [evidence](docs/evidence/p5-5-verification-gates.md). R04-REC1 (tool kind in progress) remains a P5.1 planning candidate.
+
+Grok review of PR #44: 0 Blockers, 2 Concerns, 1 Nit. Both Concerns are fixed: the select is biased toward the check exit, and the symlink walk fails closed. The Nit is addressed by the `error` case; exit 4 relies on the shared cleanup path. No mandatory re-review.

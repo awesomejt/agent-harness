@@ -84,7 +84,7 @@ rejection.
     missing program rejects. An outside alias is executed by its found name. No
     `--verify` means no check.
 - `scripts/tests/verify.py` drives fake OpenCode 2.2.5 plus a fake check
-  program outside the project (16 runs):
+  program outside the project (17 runs):
   - **Passed.** Exit 0. Record order is `attempt.cleanup` <
     `verification.started` < `verification.finished` < `result`. Cwd is the
     project, stdin is empty, own process group. `TEST_KEY`,
@@ -101,6 +101,8 @@ rejection.
   - **SIGINT during the check.** Exit 3, `cancelled`, descendant gone.
   - **Agent did not succeed.** Known failure → exit 1 `not_run`, check never
     ran. Preflight rejection → exit 2, `agent_outcome: rejected`.
+  - **Error.** The fake runtime deletes the pinned program mid-turn; the spawn
+    fails → `error`, exit 1, `agent_outcome: succeeded`.
   - **Untrusted.** Undeclared name, an in-project program (a project-local
     symlink on PATH) and a relative path: exit 2, no runtime launch, no prompt.
   - **Pinning.** A fake runtime case rewrites `ah.json` to `/usr/bin/false`
@@ -137,6 +139,27 @@ do `single`, `preview`, `worktree`, `single_runtime` (plain, `--cancel`,
   confirmed. Final line: `outcome=Success; verification="test" "passed"`. The
   model's own `touch verified` step and the independent rerun also passed. One
   run; no retry. Context 3172/200000 tokens, reported cost 0 USD.
+
+## Review closeout
+
+[Grok review of PR #44](https://github.com/awesomejt/agent-harness/pull/44): 0 Blockers, 2 Concerns, 1 Nit.
+
+- **Concern: unfair `select!`.** A check that exited as the timeout or a
+  signal fired could be labeled `timed_out`/`cancelled`. Fixed: the select is
+  biased toward the exit, and a `None` arm first checks `try_wait()` for an
+  already-reaped status.
+- **Concern: fail-open symlink walk.** Any `read_link` error ended the walk and
+  accepted the program. Fixed: only a confirmed non-symlink (`symlink_metadata`)
+  ends the walk; every metadata or `read_link` error rejects as unavailable.
+- **Nit: `error` and exit-4 coverage.** Added the `remove-check` `error` case.
+  Exit 4 (unconfirmed check-group cleanup) is not fixture-tested: no
+  unprivileged group member survives SIGKILL within the bounded `ps` poll. The
+  branch reuses the same `OwnedChild::cleanup` result that the runtime's
+  existing exit-4 path already covers.
+
+No re-review is required for Concern/Nit findings under the Git workflow.
+After the fixes, 85 root tests, fmt, locked Clippy, `verify.py` (17 runs),
+`machine.py` and `single_runtime.py --verify` pass.
 
 ## Boundaries
 

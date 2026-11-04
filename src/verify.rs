@@ -132,10 +132,13 @@ fn outside(found: &Path, project: &Path) -> Result<(), Invalid> {
         if entry.starts_with(project) {
             return Err(INSIDE);
         }
-        match std::fs::read_link(&entry) {
-            Ok(target) => hop = entry.parent().unwrap_or(Path::new("/")).join(target),
-            Err(_) => return Ok(()),
+        // Fail closed: only a confirmed non-symlink ends the walk.
+        let metadata = std::fs::symlink_metadata(&entry).map_err(|_| UNAVAILABLE)?;
+        if !metadata.file_type().is_symlink() {
+            return Ok(());
         }
+        let target = std::fs::read_link(&entry).map_err(|_| UNAVAILABLE)?;
+        hop = entry.parent().unwrap_or(Path::new("/")).join(target);
     }
     Err(UNAVAILABLE)
 }
@@ -293,11 +296,19 @@ async fn run(
     else {
         return (Status::Error, None, None, None);
     };
-    let waited = tokio::select! {
+    // Biased toward the exit: a check that finished as the bound expired keeps
+    // its real status.
+    let mut waited = tokio::select! {
+        biased;
         status = child.child.wait() => Some(status),
         () = tokio::time::sleep(std::time::Duration::from_secs(check.timeout_secs)) => None,
         () = cancelled.cancelled() => None,
     };
+    if waited.is_none()
+        && let Ok(Some(status)) = child.child.try_wait()
+    {
+        waited = Some(Ok(status));
+    }
     let stopped_by_signal = cancelled.is_cancelled();
     // Lingering descendants are terminated even after a normal exit.
     let confirmed = child.cleanup().await;
