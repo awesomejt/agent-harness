@@ -2,28 +2,28 @@
 
 Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify dependencies and evidence; their order is the recommended work order, not a second status board. See [task conventions](README.md).
 
-<a id="p5-1"></a>
-## P5.1 — Sequence and durable-state decisions
-
-- **Depends on:** [P4.9](04-core-mvp.md#p4-9)
-- **Deliverable and boundary:** Choose folder ordering/filtering, context policy, failure behavior, metadata precedence, state version/location/retention, concurrency and resume syntax.
-- **Acceptance evidence:** Decision entry and WORKFLOWS contract define changed-input handling, uncertain attempts, locking and schema compatibility before persistence ships.
-- **Decision/readiness gate:** No generic scheduler/database is required; explicit invocation mode remains authoritative.
-- **Contract:** [docs/WORKFLOWS.md](../docs/WORKFLOWS.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
-
 <a id="p5-5"></a>
 ## P5.5 — Trusted verification gates
 
-- **Depends on:** [P5.1](05-sequences.md#p5-1)
+- **Depends on:** [P4.9](04-core-mvp.md#p4-9) (scheduled first by the Phase 4 review and D043)
 - **Deliverable and boundary:** Define command trust/permissions, identity, execution directory, bounds and separate verification outcomes. Decide stop/repair behavior without executing model-suggested commands automatically.
 - **Acceptance evidence:** Fake-command tests distinguish agent success, no verification, passed/failed/timed-out verification and untrusted command rejection.
 - **Decision/readiness gate:** Gate semantics must be fixed before sequence dependent-step behavior ships.
 - **Contract:** [docs/WORKFLOWS.md](../docs/WORKFLOWS.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
+<a id="p5-1"></a>
+## P5.1 — Sequence and durable-state decisions
+
+- **Depends on:** [P5.5](05-sequences.md#p5-5)
+- **Deliverable and boundary:** Choose folder ordering/filtering, context policy, failure behavior, metadata precedence, state version/location/retention, concurrency and resume syntax.
+- **Acceptance evidence:** Decision entry and WORKFLOWS contract define changed-input handling, uncertain attempts, locking and schema compatibility before persistence ships.
+- **Decision/readiness gate:** No generic scheduler/database is required; explicit invocation mode remains authoritative.
+- **Contract:** [docs/WORKFLOWS.md](../docs/WORKFLOWS.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
+
 <a id="p5-2"></a>
 ## P5.2 — Ordered prompt execution
 
-- **Depends on:** [P5.5](05-sequences.md#p5-5)
+- **Depends on:** [P5.1](05-sequences.md#p5-1), [P5.5](05-sequences.md#p5-5)
 - **Deliverable and boundary:** Resolve a deterministic folder snapshot and execute steps through the same single-run service, agent resolution and route policy. Use the chosen context/failure rules.
 - **Acceptance evidence:** Ordering/input/constraint tests cover empty folders, changed files, metadata conflicts and stopping dependent steps after failure.
 - **Decision/readiness gate:** No scheduling/queue machinery as a substitute for sequence semantics.

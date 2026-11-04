@@ -1013,3 +1013,199 @@ fn packaged_example_configs_validate() {
         assert_eq!(value.get("native").is_some(), native, "{file}");
     }
 }
+
+fn with_checks(checks: &str) -> String {
+    VALID.replacen('}', &format!("}},\"checks\":{checks}"), 1)
+}
+
+#[test]
+fn check_schema_requires_named_argv_definitions() {
+    let valid = with_checks(r#"{"test":{"argv":["/bin/echo","ok"],"timeout_secs":5}}"#);
+    assert!(Config::read(valid.as_bytes()).is_ok(), "{valid}");
+    let schema = "invalid config: expected strict version-1 JSON schema";
+    for (checks, expected) in [
+        ("{}", "checks requires 1–64 entries"),
+        ("null", schema),
+        (r#"{"test":"cargo test"}"#, schema),
+        (r#"{"test":{"argv":["true"],"shell":true}}"#, schema),
+        (
+            r#"{"test":{"argv":["true"]},"test":{"argv":["false"]}}"#,
+            schema,
+        ),
+        (
+            r#"{"Test":{"argv":["true"]}}"#,
+            "check name requires 1–64 lowercase letters/digits with single hyphens",
+        ),
+        (
+            r#"{"test":{"argv":[]}}"#,
+            "check argv requires 1–64 arguments",
+        ),
+        (
+            r#"{"test":{"argv":["true","a\u0000b"]}}"#,
+            "check argv requires 1–64 arguments of at most 4096 bytes without NUL",
+        ),
+        (
+            r#"{"test":{"argv":["./scripts/check.sh"]}}"#,
+            "check program must be an absolute path or a bare name resolved on PATH",
+        ),
+        (
+            r#"{"test":{"argv":[""]}}"#,
+            "check program must be an absolute path or a bare name resolved on PATH",
+        ),
+        (
+            r#"{"test":{"argv":["true"],"timeout_secs":0}}"#,
+            "check timeout must be 1–86400 seconds",
+        ),
+    ] {
+        let input = with_checks(checks);
+        assert_eq!(
+            Config::read(input.as_bytes()).err(),
+            Some(Invalid(expected)),
+            "{checks}"
+        );
+    }
+    let many: Vec<_> = (0..65)
+        .map(|i| format!(r#""c{i}":{{"argv":["true"]}}"#))
+        .collect();
+    let input = with_checks(&format!("{{{}}}", many.join(",")));
+    assert_eq!(
+        Config::read(input.as_bytes()).err(),
+        Some(Invalid("checks requires 1–64 entries"))
+    );
+    let args: Vec<_> = (0..65).map(|_| "\"a\"").collect();
+    let input = with_checks(&format!(
+        r#"{{"test":{{"argv":["true",{}]}}}}"#,
+        args.join(",")
+    ));
+    assert!(Config::read(input.as_bytes()).is_err());
+    // Declaring a check never runs it; an invalid --verify name rejects at parse.
+    assert_eq!(
+        Invocation::parse(
+            ["single", "x", "--verify", "Bad"].map(OsString::from),
+            Path::new("/")
+        )
+        .err(),
+        Some(Invalid(
+            "check name requires 1–64 lowercase letters/digits with single hyphens"
+        ))
+    );
+}
+
+#[test]
+fn verify_resolves_a_declared_check_and_pins_its_program_outside_the_project() {
+    use std::os::unix::fs::PermissionsExt;
+    let base = std::env::temp_dir().join(format!("ah-p5-5-verify-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    let project = base.join("project");
+    let bin = base.join("bin");
+    std::fs::create_dir_all(project.join("bin")).unwrap();
+    std::fs::create_dir_all(&bin).unwrap();
+    for path in [bin.join("checker"), project.join("bin/checker")] {
+        std::fs::write(&path, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    std::fs::write(bin.join("plain"), "").unwrap();
+    let resolve = |checks: &str, name: &str, path: &str| {
+        let config = Config::read(with_checks(checks).as_bytes()).unwrap();
+        let args = ["single", "x", "--verify", name, "--project"].map(OsString::from);
+        let path = path.to_owned();
+        Invocation::parse(args.into_iter().chain([project.clone().into()]), &base)
+            .unwrap()
+            .resolve(
+                config,
+                move |n| {
+                    Some(
+                        if n == "PATH" {
+                            path.clone()
+                        } else {
+                            "key".into()
+                        }
+                        .into(),
+                    )
+                },
+                NeverRead,
+            )
+    };
+    let checks = r#"{"test":{"argv":["checker","--quick"]}}"#;
+    // First absolute PATH entry wins; relative entries are skipped.
+    let path = format!("bin:{}:/usr/bin", bin.display());
+    let check = resolve(checks, "test", &path).unwrap().verify.unwrap();
+    assert_eq!(check.name, "test");
+    assert_eq!(check.program, bin.join("checker"));
+    assert_eq!(check.args, ["--quick"]);
+    assert_eq!(check.timeout_secs, 600);
+    // An undeclared name is untrusted; nothing runs.
+    assert_eq!(
+        resolve(checks, "lint", &path).err(),
+        Some(Invalid(
+            "verification check is not defined in config checks"
+        ))
+    );
+    // A program the agent could edit is rejected, through PATH or absolutely,
+    // including a symlink outside the project that points into it.
+    std::os::unix::fs::symlink(project.join("bin/checker"), bin.join("linked")).unwrap();
+    let inside =
+        "check program must resolve outside the project; agent-editable programs are untrusted";
+    let in_project = format!("{}:{}", project.join("bin").display(), bin.display());
+    assert_eq!(
+        resolve(checks, "test", &in_project).err(),
+        Some(Invalid(inside))
+    );
+    let absolute = format!(
+        r#"{{"test":{{"argv":["{}"]}}}}"#,
+        project.join("bin/checker").display()
+    );
+    assert_eq!(
+        resolve(&absolute, "test", "/usr/bin").err(),
+        Some(Invalid(inside))
+    );
+    let linked = r#"{"test":{"argv":["linked"]}}"#;
+    assert_eq!(resolve(linked, "test", &path).err(), Some(Invalid(inside)));
+    // Any in-project hop is retargetable: an in-project link to an outside
+    // program, and an outside chain passing through the project, both reject.
+    std::os::unix::fs::symlink(bin.join("checker"), project.join("bin/out")).unwrap();
+    std::os::unix::fs::symlink(project.join("bin/out"), bin.join("chain")).unwrap();
+    for program in ["out", "chain"] {
+        let checks = format!(r#"{{"test":{{"argv":["{program}"]}}}}"#);
+        assert_eq!(
+            resolve(&checks, "test", &in_project).err(),
+            Some(Invalid(inside))
+        );
+    }
+    // An outside link to an outside program is executed by its found name.
+    std::os::unix::fs::symlink(bin.join("checker"), bin.join("alias")).unwrap();
+    let alias = r#"{"test":{"argv":["alias"]}}"#;
+    assert_eq!(
+        resolve(alias, "test", &path)
+            .unwrap()
+            .verify
+            .unwrap()
+            .program,
+        bin.join("alias")
+    );
+    let missing =
+        "check program is not an executable file (bare names use absolute PATH entries only)";
+    for (checks, path) in [
+        (r#"{"test":{"argv":["plain"]}}"#, path.as_str()),
+        (r#"{"test":{"argv":["checker"]}}"#, "bin"),
+        (
+            r#"{"test":{"argv":["/nonexistent/checker"]}}"#,
+            path.as_str(),
+        ),
+    ] {
+        assert_eq!(
+            resolve(checks, "test", path).err(),
+            Some(Invalid(missing)),
+            "{checks}"
+        );
+    }
+    // No --verify: no check, even when one is declared.
+    let config = Config::read(with_checks(checks).as_bytes()).unwrap();
+    let args = ["single", "x", "--project"].map(OsString::from);
+    let resolved = Invocation::parse(args.into_iter().chain([project.clone().into()]), &base)
+        .unwrap()
+        .resolve(config, |_| Some("key".into()), NeverRead)
+        .unwrap();
+    assert!(resolved.verify.is_none());
+    std::fs::remove_dir_all(base).unwrap();
+}

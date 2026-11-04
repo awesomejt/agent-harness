@@ -47,6 +47,9 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
             return Exit::Invalid;
         }
     };
+    if let Some(check) = &request.verify {
+        progress.verification(crate::verify::pending(check));
+    }
     // Refuse a required capability the runtime cannot enforce (D038) before
     // any runtime, network check or project write; both attempts share it.
     if let Some(agent) = &request.agent
@@ -113,15 +116,44 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
         runtime.block_on(async {
             let signals = crate::runtime::Signals::watch();
             let cancelled = signals.token();
-            let Some(native) = request.fallback.as_deref() else {
-                let label = if request.mode == Mode::LocalOnly {
-                    "local-only"
-                } else {
-                    "cloud-only"
-                };
-                return attempt(&request, plan, 1, label, deadline, cancelled, progress).await;
+            let exit = match request.fallback.as_deref() {
+                None => {
+                    let label = if request.mode == Mode::LocalOnly {
+                        "local-only"
+                    } else {
+                        "cloud-only"
+                    };
+                    attempt(
+                        &request,
+                        plan,
+                        1,
+                        label,
+                        deadline,
+                        cancelled.clone(),
+                        progress,
+                    )
+                    .await
+                }
+                Some(native) => {
+                    coordinate(
+                        &request,
+                        native,
+                        plan,
+                        deadline,
+                        cancelled.clone(),
+                        progress,
+                    )
+                    .await
+                }
             };
-            coordinate(&request, native, plan, deadline, cancelled, progress).await
+            // D043: the check follows the final backend outcome, whichever
+            // attempt produced it, with its own bound.
+            match &request.verify {
+                Some(check) => {
+                    crate::verify::gate(check, &request.project, exit, &cancelled, progress).await
+                }
+                None => exit,
+            }
         })
     }
 }

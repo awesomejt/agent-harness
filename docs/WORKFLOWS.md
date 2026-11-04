@@ -20,9 +20,12 @@ Resume preserves prior completed results; retry creates a new attempt with a rec
 
 ## Verification gates
 
-Use explicitly configured project checks to determine verified success where requested. Record command identity, project directory, exit outcome, timeout and relevant output reference. Do not execute arbitrary verification commands taken only from model output or untrusted workflow files without the phase's trust/permission policy.
+P5.5 fixes the gate ([D043](../DECISIONS.md#2026-11-03--d043-trusted-verification-gates-for-single-runs-scheduled-before-sequence-decisions)); [EXECUTION](EXECUTION.md#p55-verification-gates-d043) owns its outcomes and exits.
 
-Agent success and verification success are distinct. A failed check stops dependent work or feeds a bounded repair iteration according to a policy chosen before release. Do not label a task verified when no check ran. The first local slice can rely on a recorded backend test action and manual inspection; general harness-driven gates arrive in Phases 5–6.
+- **Trust:** only harness-config `checks` define commands (argv, no shell). The invocation authorizes one by name with `--verify NAME`. Prompts, agent definitions, model output and prompt metadata cannot define a command. P5.1 decides whether sequence metadata may reference a declared name. A program found inside the project, or reached through an in-project symlink, is untrusted and rejects before launch.
+- **Identity and execution:** the program is pinned before launch and run in the canonical project directory, in its own process group, with closed stdin, scrubbed route keys and its own timeout. Records keep the check name, status, exit code/signal, timeout, duration and cleanup. Output is not yet captured; P5.3 decides a durable output reference.
+- **Outcomes:** agent outcome and verification status are recorded separately. A check runs only after backend success; without a check, a task is never labeled verified.
+- **Stop/repair:** the harness never repairs, retries or re-prompts after a failed gate, and never executes model-suggested commands. In sequences, a step whose gate is not `passed` stops dependent steps; any continue-on-failure option must be an explicit P5.1 choice. Bounded repair iterations belong to Ralph (P6.1).
 
 ## Ralph loop
 

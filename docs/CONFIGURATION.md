@@ -20,7 +20,7 @@ The selected project directory contains `ah.json`. Read exactly that file, or th
 }
 ```
 
-Strict JSON, no comments. Version and mode are required. Local-only requires top-level `model` and both `litellm` fields. Cloud-only requires the `native` block below. Local-first requires top-level `model` and both blocks. Present route blocks must validate even when inactive; absent blocks are allowed for the other route, but explicit null blocks reject. Unknown and duplicate fields reject, including literal `api_key`, arbitrary tool policies, agents and fallback configuration. `permissions` defaults to `deny` (absence or JSON null), and project config accepts only `deny`; host-level `trusted` requires an explicit invocation flag. `timeout_secs` defaults to 1800 (absence or JSON null). All other null values reject. Config is UTF-8, at most 1 MiB. Application file loading uses `Config::open`, sharing the prompt-file nonblocking Unix open and opened-handle regular-file check; FIFOs/devices/directories reject before reads. The raw-reader API is for caller-owned readers such as fixtures. Errors never echo raw parse errors, input values, prompt contents or secret-bearing paths.
+Strict JSON, no comments. Version and mode are required. Local-only requires top-level `model` and both `litellm` fields. Cloud-only requires the `native` block below. Local-first requires top-level `model` and both blocks. Present route blocks must validate even when inactive; absent blocks are allowed for the other route, but explicit null blocks reject. Unknown and duplicate fields reject, including literal `api_key`, arbitrary tool policies, agents and fallback configuration. The optional `checks` block (below) declares verification commands but never runs them. `permissions` defaults to `deny` (absence or JSON null), and project config accepts only `deny`; host-level `trusted` requires an explicit invocation flag. `timeout_secs` defaults to 1800 (absence or JSON null). All other null values reject. Config is UTF-8, at most 1 MiB. Application file loading uses `Config::open`, sharing the prompt-file nonblocking Unix open and opened-handle regular-file check; FIFOs/devices/directories reject before reads. The raw-reader API is for caller-owned readers such as fixtures. Errors never echo raw parse errors, input values, prompt contents or secret-bearing paths.
 
 The model is an existing LiteLLM alias (proxy model group), 1–128 ASCII letters/digits/dot/underscore/hyphen, or an explicit `group:NAME` reference to a harness model group (below). Provider-prefixed models and inline proxy routing are unsupported. `api_base` is an absolute HTTP(S) URL with host and exactly `/v1`, without trailing slash, credentials, query, fragment, surrounding whitespace or controls. Require canonical URL spelling equal to the structured parser output: reject dot segments, empty userinfo, uppercase scheme/host and explicit default ports instead of retaining an unvalidated raw spelling. URL validation does not establish proxy availability or provider policy. HTTP permits the existing private-network deployment; credential transport security is the operator's responsibility. `api_key_env` is an ASCII environment name (`[A-Za-z_][A-Za-z0-9_]*`). Its value must exist and be nonempty in the launch environment; no interpolation or key lookup fallback. Keep the resolved value out of config, request records, diagnostics and logs. The environment lookup value is checked for nonempty content and immediately dropped; only its name is retained in the resolved request.
 
@@ -102,6 +102,21 @@ Before constructing the local runtime, creating private state, running preflight
 
 Reachability is not model availability, and a mistyped host resolves as unreachable and falls back. Preview stays network-free and reports the configured fallback target; local-only and cloud-only perform no reachability check.
 
+### Verification checks (P5.5 / D043)
+
+```json
+{
+  "checks": {
+    "test": { "argv": ["cargo", "test", "--locked"], "timeout_secs": 900 },
+    "lint": { "argv": ["/usr/bin/make", "lint"] }
+  }
+}
+```
+
+`checks` is optional; when present it holds 1–64 named entries (agent-name grammar; duplicate names reject). Each entry has `argv`: 1–64 strings of at most 4096 bytes, no NUL, executed without a shell. Its program is an absolute path or a bare name looked up on absolute PATH entries; relative paths such as `./scripts/check.sh` reject. Run a project script through an interpreter outside the project instead, for example `["/bin/sh", "scripts/check.sh"]`. `timeout_secs` is 1–86400 seconds, default 600. Unknown fields reject.
+
+Declaring a check never runs it. `--verify NAME` selects one declared check for this run; an undeclared name exits 2 before any runtime, network check or write. Resolution pins the program before launch. The found entry and every symlink hop must lie outside the canonical project, so a program the agent could replace exits 2 as untrusted. The check runs only after a successful backend turn and confirmed runtime cleanup. It runs in the project directory with host privileges, closed stdin, both output streams on the harness stderr, configured route key names removed from its environment and its own timeout. Outcomes and exits are in [EXECUTION](EXECUTION.md#p55-verification-gates-d043).
+
 ### Selected invocation and preview syntax
 
 ```bash
@@ -112,6 +127,7 @@ ah single --prompt-file task.txt --project ./repo --config ./repo/ah.json
 cat task.txt | ah single --prompt-file -
 ah single "Review this project" --preview --no-sync
 ah single --prompt-file task.txt --output jsonl </dev/null   # P4.7 machine records
+ah single "Fix the failing test" --permissions trusted --verify test   # P5.5 gate
 ```
 
 `--output human|jsonl` (default `human`) selects the [machine record contract](EXECUTION.md#p47-machine-output-d039) for coding runs; it changes stdout only.
@@ -120,7 +136,7 @@ Exactly one inline positional prompt or `--prompt-file PATH|-` is mandatory. Std
 
 `--timeout-secs N` is an integer from 1 through 86400, covering preflight and the active attempt after prompt acquisition. An expired bound enters cleanup; cleanup has separate finite budgets fixed/tested in P2.4. Input acquisition can be interrupted without launching work. No hidden retry or timeout extension. `--no-sync` skips managed writes, never effective-routing or permission validation.
 
-`--preview` resolves the same input and managed-change planner, prints a human-readable redacted plan, and exits before writes or child launch. It performs no network checks, remote registry updates, runtime discovery subprocesses or model requests. Show config path, choice sources, route/runtime/model, environment reference presence, project `AGENTS.md` presence (D040), permission scope, timeout and required managed changes; omit key values and prompt contents. Availability and capabilities that require runtime/service inspection must be marked unverified. Read-only local binary/version-file discovery is permitted. Preview success means a valid local plan, not readiness to execute. Preview stays human-only; `--output jsonl --preview` rejects ([D039](../DECISIONS.md#2026-11-03--d039-opt-in-version-1-machine-records-with-unchanged-exits)).
+`--preview` resolves the same input and managed-change planner, prints a human-readable redacted plan, and exits before writes or child launch. It performs no network checks, remote registry updates, runtime discovery subprocesses or model requests. Show config path, choice sources, route/runtime/model, environment reference presence, project `AGENTS.md` presence (D040), permission scope, timeout, the selected verification check (pinned program path and argument count, never run; D043) and required managed changes; omit key values and prompt contents. Availability and capabilities that require runtime/service inspection must be marked unverified. Read-only local binary/version-file discovery is permitted. Preview success means a valid local plan, not readiness to execute. Preview stays human-only; `--output jsonl --preview` rejects ([D039](../DECISIONS.md#2026-11-03--d039-opt-in-version-1-machine-records-with-unchanged-exits)).
 
 ### Headless permission profiles
 

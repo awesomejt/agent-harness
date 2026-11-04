@@ -201,6 +201,17 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
     } else {
         "none (no project AGENTS.md)"
     };
+    // D043: arguments omitted; the program path is the pinned identity.
+    let verification = match &r.verify {
+        None => "none (no --verify)".to_owned(),
+        Some(check) => format!(
+            "check \"{}\": program {:?} pinned outside the project; {} arguments omitted; timeout {} seconds; runs after backend success only, never by preview; host privileges in the project directory",
+            check.name,
+            check.program,
+            check.args.len(),
+            check.timeout_secs
+        ),
+    };
     let health = if local {
         "LiteLLM reachability, alias availability"
     } else {
@@ -221,6 +232,7 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
          timeout: {} seconds ({})\n\
          sync: {} ({}); planned changes: {changes}\n\
          prompt: validated; contents omitted{prompt}\n\
+         verification: {verification}\n\
          health checks: none; {health}, runtime version and effective capabilities unverified\n\
          before execution: {before}; execution preflight verifies runtime routing/permissions\n",
         env!("CARGO_PKG_VERSION"),

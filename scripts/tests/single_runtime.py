@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import signal
 import tempfile
 import threading
@@ -112,12 +113,14 @@ def main():
     parser.add_argument('--timeout-secs',type=int,default=300)
     parser.add_argument('--group',help='select the proxy model group through this harness litellm.groups name (P3.3)')
     parser.add_argument('--jsonl',action='store_true',help='use --output jsonl and check the version-1 result record (P4.7)')
+    parser.add_argument('--verify',action='store_true',help='configure checks.test and pass --verify test; requires a passed gate (P5.5, implies --jsonl)')
     args=parser.parse_args()
     args.binary=args.binary.expanduser().resolve()
     if not args.binary.is_file() or not os.access(args.binary,os.X_OK):
         parser.error(f'not an executable ah binary: {args.binary}')
     assert not (args.live and (args.cancel or args.refuse)),"cancellation/refusal fixtures use the local deterministic model only"
     assert not (args.cancel and args.refuse)
+    args.jsonl = args.jsonl or args.verify
     with server(args) as (s,endpoint),tempfile.TemporaryDirectory(prefix='ah-single-runtime-') as d, tempfile.TemporaryDirectory(prefix='ah-outside-') as outside:
         cwd=Path(d).resolve();s.cwd=cwd;s.outside=Path(outside).resolve()
         (s.outside/'outside.txt').write_text('OUTSIDE_READ_OK')
@@ -126,12 +129,15 @@ def main():
         if args.group:
             # The wire model must stay the proxy group; the harness name never leaves ah.
             litellm['groups']={args.group:s.alias,'unselected-group':'unselected-proxy-group'}
-        (cwd/'ah.json').write_text(json.dumps(dict(version=1,mode='local-only',
-            model='group:'+args.group if args.group else s.alias,litellm=litellm)))
+        config=dict(version=1,mode='local-only',model='group:'+args.group if args.group else s.alias,litellm=litellm)
+        if args.verify:
+            # D043: an operator-declared argv, pinned outside the project before launch.
+            config['checks']={'test':dict(argv=[shutil.which('python3'),'test_calc.py'],timeout_secs=60)}
+        (cwd/'ah.json').write_text(json.dumps(config))
         (cwd/'calc.py').write_text('def add(a, b):\n    return a - b\n')
         (cwd/'test_calc.py').write_text('from calc import add\nassert add(2, 3) == 5\nprint("PASS arithmetic")\n')
         prompt='Fix add in calc.py so it adds correctly. Read calc.py, edit it with the edit tool, then use the shell tool to run python3 test_calc.py and touch verified only if it passes. Do not change test_calc.py. Do not use subagents. Reply briefly.'
-        p=subprocess.Popen([str(args.binary),'single',prompt,'--project',str(cwd),'--permissions','trusted','--timeout-secs',str(args.timeout_secs)]+(['--output','jsonl'] if args.jsonl else []),
+        p=subprocess.Popen([str(args.binary),'single',prompt,'--project',str(cwd),'--permissions','trusted','--timeout-secs',str(args.timeout_secs)]+(['--output','jsonl'] if args.jsonl else [])+(['--verify','test'] if args.verify else []),
             env={**os.environ,'TEST_KEY':s.key},stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
         if args.cancel:
             assert s.waiting.wait(60),'runtime did not reach post-edit/test cancellation point'
@@ -150,6 +156,13 @@ def main():
                   '; attempt:',json.dumps({k:attempt[k] for k in ['backend_stop','permission_requests','grants','tool_events','usage']}),flush=True)
             if not args.refuse and not args.cancel:
                 assert result['outcome']=='succeeded' and isinstance(result['response'],str) and attempt['grants']>=3, result
+            if args.verify:
+                v=result['verification']
+                print('Verification:',json.dumps(v),flush=True)
+                if args.cancel:
+                    assert v['status']=='not_run' and v['agent_outcome']=='cancelled', v
+                else:
+                    assert v['status']=='passed' and v['agent_outcome']=='succeeded' and v['exit_code']==0 and v['cleanup_confirmed'], v
         print('Observed project effects:',json.dumps(dict(edited='return a + b' in (cwd/'calc.py').read_text(), verified=(cwd/'verified').exists())),flush=True)
         if args.refuse:
             # 2.2.5 ends the turn with stopReason=cancelled after a rejected permission.
@@ -165,7 +178,7 @@ def main():
         assert (cwd/'verified').exists()
         verify=subprocess.run(['python3','test_calc.py'],cwd=cwd,capture_output=True,text=True)
         assert verify.returncode == 0
-        print(('PASS confirmed cancellation after ' if args.cancel else 'PASS ')+ 'actual project edit and independent arithmetic test; '+('live LiteLLM' if args.live else 'local deterministic model stub')+(f'; harness group {args.group}' if args.group else ''),flush=True)
+        print(('PASS confirmed cancellation after ' if args.cancel else 'PASS ')+ 'actual project edit and independent arithmetic test; '+('live LiteLLM' if args.live else 'local deterministic model stub')+(f'; harness group {args.group}' if args.group else '')+('; harness verification gate passed' if args.verify and not args.cancel else ''),flush=True)
 
 
 if __name__=='__main__':

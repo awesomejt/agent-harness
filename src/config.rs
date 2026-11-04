@@ -43,6 +43,9 @@ pub struct Config {
     native: Option<Native>,
     permissions: Option<Permissions>,
     timeout_secs: Option<u64>,
+    /// Declared verification checks (D043); only `--verify NAME` runs one.
+    #[serde(default, deserialize_with = "present")]
+    checks: Option<Named<crate::verify::Definition>>,
 }
 
 #[derive(Deserialize)]
@@ -51,34 +54,35 @@ struct LiteLlm {
     api_base: String,
     api_key_env: String,
     #[serde(default, deserialize_with = "present")]
-    groups: Option<Groups>,
+    groups: Option<Named<String>>,
 }
 
-/// Harness group name -> existing proxy model group. Map deserialization would
-/// otherwise keep the last duplicate key silently.
-struct Groups(std::collections::BTreeMap<String, String>);
-impl<'de> Deserialize<'de> for Groups {
+/// Name -> entry (harness group -> existing proxy model group, or check name
+/// -> definition). Map deserialization would otherwise keep the last
+/// duplicate key silently.
+struct Named<T>(std::collections::BTreeMap<String, T>);
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Named<T> {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
-        struct V;
-        impl<'de> serde::de::Visitor<'de> for V {
-            type Value = Groups;
+        struct V<T>(std::marker::PhantomData<T>);
+        impl<'de, T: Deserialize<'de>> serde::de::Visitor<'de> for V<T> {
+            type Value = Named<T>;
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                f.write_str("a group object")
+                f.write_str("a named-entry object")
             }
             fn visit_map<A: serde::de::MapAccess<'de>>(
                 self,
                 mut a: A,
-            ) -> std::result::Result<Groups, A::Error> {
-                let mut groups = std::collections::BTreeMap::new();
-                while let Some((name, target)) = a.next_entry::<String, String>()? {
-                    if groups.insert(name, target).is_some() {
-                        return Err(serde::de::Error::custom("duplicate group"));
+            ) -> std::result::Result<Named<T>, A::Error> {
+                let mut entries = std::collections::BTreeMap::new();
+                while let Some((name, entry)) = a.next_entry::<String, T>()? {
+                    if entries.insert(name, entry).is_some() {
+                        return Err(serde::de::Error::custom("duplicate name"));
                     }
                 }
-                Ok(Groups(groups))
+                Ok(Named(entries))
             }
         }
-        d.deserialize_map(V)
+        d.deserialize_map(V(std::marker::PhantomData))
     }
 }
 
@@ -108,6 +112,7 @@ pub struct Invocation {
     no_sync: bool,
     preview: bool,
     machine: bool,
+    verify: Option<String>,
     prompt: PromptSource,
 }
 
@@ -175,6 +180,9 @@ pub struct Resolved {
     /// Local-first only: the configured native target, resolved with identical
     /// project, permissions, timeout and prompt. Never nested.
     pub fallback: Option<Box<Resolved>>,
+    /// Check named by `--verify`, run once after the final backend outcome
+    /// (D043). The fallback request never carries one.
+    pub verify: Option<crate::verify::Check>,
 }
 
 /// Numeric shell contract; runtime mapping is implemented by P2.2/P2.4.
@@ -283,6 +291,15 @@ impl Config {
         }
         if let Some(group) = self.model.as_deref().and_then(group_name) {
             self.group(group)?;
+        }
+        if let Some(checks) = &self.checks {
+            if checks.0.is_empty() || checks.0.len() > crate::verify::MAX_CHECKS {
+                return Err(Invalid("checks requires 1–64 entries"));
+            }
+            for (name, check) in &checks.0 {
+                crate::verify::validate_name(name)?;
+                check.validate()?;
+            }
         }
         if let Some(native) = &self.native {
             if native.target != "opencode" {
@@ -418,6 +435,7 @@ impl Invocation {
             no_sync: false,
             preview: false,
             machine: false,
+            verify: None,
             prompt: PromptSource::Stdin,
         };
         let mut prompt = None;
@@ -447,6 +465,7 @@ impl Invocation {
                         | "--timeout-secs"
                         | "--prompt-file"
                         | "--output"
+                        | "--verify"
                 ) {
                     return Err(Invalid("unsupported option"));
                 }
@@ -481,6 +500,10 @@ impl Invocation {
                         let seconds = value.parse().map_err(|_| Invalid("invalid timeout"))?;
                         validate_timeout(seconds)?;
                         request.timeout_secs = Some(seconds);
+                    }
+                    "--verify" => {
+                        crate::verify::validate_name(value)?;
+                        request.verify = Some(value.to_owned());
                     }
                     "--output" => {
                         request.machine = match value {
@@ -532,6 +555,7 @@ impl Invocation {
     /// stdin. The lookup result is checked for nonempty content and immediately
     /// dropped; the resolved request stores only the environment name. Local-first
     /// checks both route keys: its fallback target must be usable before launch.
+    /// A `--verify` check also uses the lookup for `PATH` to pin its program.
     pub fn resolve(
         self,
         config: Config,
@@ -554,6 +578,26 @@ impl Invocation {
             .as_deref()
             .map(|name| Agent::select(&project, name))
             .transpose()?;
+        let verify = match &self.verify {
+            None => None,
+            Some(name) => {
+                let definition = config
+                    .checks
+                    .as_ref()
+                    .and_then(|checks| checks.0.get(name))
+                    .ok_or(Invalid(
+                        "verification check is not defined in config checks",
+                    ))?;
+                let scrub = [
+                    config.litellm.as_ref().map(|l| l.api_key_env.clone()),
+                    config.native.as_ref().map(|n| n.api_key_env.clone()),
+                ]
+                .into_iter()
+                .flatten()
+                .collect();
+                Some(definition.resolve(name, &project, key_lookup("PATH"), scrub)?)
+            }
+        };
         let agent_model = |native: bool| {
             let models = agent.as_ref().and_then(Agent::models)?;
             if native {
@@ -690,6 +734,7 @@ impl Invocation {
             instructions,
             agent,
             fallback: None,
+            verify,
         };
         if let Some((model, api_key_env, model_source)) = fallback {
             resolved.fallback = Some(Box::new(Resolved {
@@ -712,6 +757,7 @@ impl Invocation {
                 instructions: resolved.instructions.clone(),
                 agent: resolved.agent.clone(),
                 fallback: None,
+                verify: None,
             }));
         }
         Ok(resolved)
