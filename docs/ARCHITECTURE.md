@@ -149,7 +149,7 @@ flowchart LR
     Installed --> NativeService[Configured native service]
 ```
 
-D029 selects a native locked Apple Silicon macOS archive and GitHub pre-release in Phase 2; [the release runbook](OPERATIONS.md#maintainer-release-procedure) describes the manual build/smoke/publication process. The diagram shows the eventual release pipeline; current packaging is not automated CI. Expanded supported platforms are declared in Phase 4 after tests. A binary build does not prove process-tree cleanup on every platform. Native CLIs retain their own installation/runtime prerequisites. No mandatory daemon, hosted control plane, Python bridge or ai-queue runtime dependency is introduced.
+D029 selects a native locked Apple Silicon macOS archive and GitHub pre-release in Phase 2; [the release runbook](OPERATIONS.md#maintainer-release-procedure) describes the manual build/smoke/publication process. The diagram shows the eventual release pipeline; current packaging is not automated CI. [D041](../DECISIONS.md#2026-11-03--d041-core-mvp-platform-matrix-and-010-alpha2-artifact) declares the core MVP's single supported target, `aarch64-apple-darwin` on macOS 27.0.1; further targets need their own artifact and run evidence. A binary build does not prove process-tree cleanup on every platform. Native CLIs retain their own installation/runtime prerequisites. No mandatory daemon, hosted control plane, Python bridge or ai-queue runtime dependency is introduced.
 
 ## Ownership and persistence
 

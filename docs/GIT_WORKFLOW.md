@@ -9,6 +9,7 @@ Grok acts as the automated Pull Request reviewer. The existing Grok bot uses the
 - **No direct commits to `main`.** All work happens on a task branch using the naming patterns below.
 - **One task per branch / PR** when practical.
 - **Grok reviews feature PRs automatically on open.** `patch/` PRs require an explicit `/grok review` comment after opening. `review/` branches bypass the normal PR review process; the holistic phase-review requirements still apply.
+- **One open PR at a time.** Sequence work, including phase-review remediation, so that open PRs cannot conflict.
 - **Maximum 3 Grok reviews per PR.** After the third review, further automated review stops and a human must take over.
 - On feature and patch PRs, agents must wait for Grok review to finish before addressing its findings.
 
@@ -63,7 +64,7 @@ For Grok findings on feature and patch PRs:
 | Minor or nitpick | Fix if straightforward; **no re-review required**. |
 | No findings of note | Proceed to merge approval. |
 
-Fix findings within an active feature/task PR on the **same branch**. Standalone remediation outside that process uses `patch/<task>` and its own PR, with links to the originating finding. Keep report/documentation corrections in the phase-review PR. Put code fixes found during a phase review in linked `patch/<task>` PRs and explicitly request Grok review there. All required fixes must be verified and merged before phase acceptance.
+Fix findings within an active feature/task PR on the **same branch**. Standalone remediation outside that process uses `patch/<task>` and its own PR, with links to the originating finding. A phase-review PR records findings and the remediation plan; it does not carry the fixes (D042). Put every correction found during a phase review, documentation or code, in a linked `patch/<task>` PR and explicitly request Grok review there. All required fixes must be verified and merged before phase acceptance.
 
 ### 5. Re-review limits
 
@@ -76,7 +77,7 @@ Fix findings within an active feature/task PR on the **same branch**. Standalone
 
 ### 6. Approval, merge, and cleanup
 
-For feature and patch PRs, proceed when the latest Grok review has no critical/high findings (or only minor/nitpicks that do not require re-review). For phase-review PRs, proceed when the holistic report passes with all findings resolved/verified and required patch PRs merged; normal Grok PR review is bypassed.
+For feature and patch PRs, proceed when the latest Grok review has no critical/high findings (or only minor/nitpicks that do not require re-review). For phase-review PRs, proceed when every finding has been considered and recorded in the canonical report with a disposition and remediation plan (D042); normal Grok PR review is bypassed. Merging a review PR with open findings does not pass the phase: the patch PR that resolves the last finding records verification and proposes the pass.
 
 1. Merge the PR into `main` (squash or merge commit — follow any repo preference; default is fine).
 2. Delete the remote task branch.
@@ -117,7 +118,7 @@ When the 3-review limit is reached and further review is still needed:
 - [ ] Work committed only on the correctly named task branch
 - [ ] PR opened to `main` (feature: automatic Grok review; patch: request `/grok review`; review: holistic phase-review process)
 - [ ] Required review completed (Grok for feature/patch; holistic report for review)
-- [ ] Critical/high Grok findings fixed and re-review requested (if any, and under limit); holistic phase-review findings resolved and verified
+- [ ] Critical/high Grok findings fixed and re-review requested (if any, and under limit); holistic phase-review findings recorded with a plan (review PR) and resolved/verified through patch PRs before phase acceptance
 - [ ] Minor/nitpick findings handled without mandatory re-review
 - [ ] ≤ 3 Grok reviews total
 - [ ] If limit reached with remaining issues → human handoff comment + session note
