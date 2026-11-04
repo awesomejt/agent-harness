@@ -177,7 +177,13 @@ def main():
             fw.records.clear(); fw.failed = None; fw.role_text = role_body[agent]
             before = snapshot(cwd)
             t0 = time.monotonic()
-            p, records, result = run(args, cwd, name, prompt, mode, agent, permissions, secrets, config)
+            try:
+                p, records, result = run(args, cwd, name, prompt, mode, agent, permissions, secrets, config)
+            except subprocess.TimeoutExpired:
+                # The harness overran its own deadline; keep the timing before failing.
+                print('ROW', json.dumps(dict(case=name, exit=None, elapsed_secs=round(time.monotonic() - t0, 1),
+                                             outcome='driver timeout')), flush=True)
+                raise
             elapsed = time.monotonic() - t0
             assert fw.failed is None, (name, fw.failed)
             wire = list(fw.records)

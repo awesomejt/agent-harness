@@ -50,8 +50,8 @@ shadows the name of the `started()` helper defined later in `main()`. It is harm
 today because the variable is local to `live()`, but it is a trap for later edits. The
 reviewer recommended `t0`, which is what clone B already used. Finding 3 is also valid:
 a driver-side `subprocess.TimeoutExpired` aborts before a row prints. That path covers
-only a harness that overruns its own deadline by the driver's margin, so it is recorded
-here rather than fixed. Findings 2 and 4 are style and labeling points. Clone B's diff
+only a harness that overruns its own deadline by the driver's margin; it is fixed in
+the PR review follow-up below. Findings 2 and 4 are style and labeling points. Clone B's diff
 was integrated unchanged on this branch after inspection. Then pass 5 below ran it live.
 
 All four runs used `--output jsonl` except the first, which used human output. Every
@@ -162,7 +162,8 @@ target, OpenCode 2.2.5 exactly, default effort only.
 
 `scripts/tests/roles_live.py` prints `elapsed_secs` for each live row, produced by the
 published binary's `coder` on the LiteLLM route and reviewed by its `reviewer`
-(above). No harness source, CLI, configuration or release artifact changed.
+(above). After PR review, a driver-side timeout also prints a timed row before failing.
+No harness source, CLI, configuration or release artifact changed.
 
 ## Repeatable verification
 
@@ -179,3 +180,14 @@ python3 scripts/tests/single_runtime.py --binary "$B" --jsonl --refuse
 
 The real-repository runs were manual trials with the prompts and configuration
 described above. Repeat them only in a fresh clone with no Git remote.
+
+## PR review follow-up
+
+[Grok PR #41 review](https://github.com/awesomejt/agent-harness/pull/41): 0 blockers,
+0 concerns, 1 nit. The nit matched the reviewer role's finding 3: a driver-side
+`subprocess.TimeoutExpired` still aborted before any timed row. `live()` now catches it,
+prints `ROW` with `elapsed_secs` and `outcome: "driver timeout"`, and re-raises, so the
+suite still fails. With a stand-in executable that sleeps, `--timeout-secs 1` printed
+`elapsed_secs: 31.0` and then the original traceback. A sixth live pass from the
+published executable passed (7 live runs, 3 refusals). Assertions are unchanged. No
+critical/high finding, so no re-review is required.
