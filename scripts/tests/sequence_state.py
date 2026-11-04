@@ -183,7 +183,15 @@ assert prompts == [] and 'step 1-a.md: a completed step changed' in err, err
 _, err, prompts = f.ah('resume', run, '--retry', expect=2)
 assert prompts == [] and 'step 2-b.md: the step with recorded attempts must remain the next step' in err, err
 assert f.record(run) == before, 'refusals do not rewrite the record'
-(f.folder / '4-b.md').rename(f.folder / '2-b.md')
+# Truncating the folder to the completed prefix does not settle it either.
+(f.folder / '4-b.md').rename(f.project / 'held-b.md')
+(f.folder / '3-c.md').rename(f.project / 'held-c.md')
+for choice in ([], ['--retry'], ['--accept']):
+    _, err, prompts = f.ah('resume', run, *choice, expect=2)
+    assert prompts == [] and 'step 2-b.md: the step with recorded attempts must remain the next step' in err, err
+assert f.record(run) == before
+(f.project / 'held-b.md').rename(f.folder / '2-b.md')
+(f.project / 'held-c.md').rename(f.folder / '3-c.md')
 (f.folder / '2-b.md').write_text('Two.\n')
 (f.folder / '3-c.md').unlink()
 (f.folder / '5-e.md').write_text('Five.\n')
@@ -279,10 +287,46 @@ assert accept['status'] == 'accepted' and accept['agent_outcome'] is None
 assert accept['verification']['status'] == 'passed' and accept['verification']['agent_outcome'] is None
 assert r['steps'][1]['attempts'][0]['verification']['status'] == 'passed'
 
+# A failed gate on an agent success is not settled by removing its step.
+f = Fixture({'1-a.md': 'One.\n', '2-b.md': '---\nverify: build\n---\nTwo.\n'}, checks=dict(test=['pass'], build=['fail']))
+_, err, _ = f.ah('run', str(f.folder), '--verify', 'test', expect=1)
+run = f.run_id(err)
+before = f.record(run)
+assert before['steps'][1]['attempts'][0]['verification']['status'] == 'failed', before
+(f.folder / '2-b.md').unlink()
+_, err, prompts = f.ah('resume', run, expect=2)
+assert prompts == [] and 'step 2-b.md: the step with recorded attempts must remain the next step' in err, err
+assert f.record(run) == before and f.checks() == ['test', 'build']
+
+# Reused harness-owned directories and lock files must be private; a
+# permissive one is refused (exit 2) before any launch and left as found.
+f = Fixture({'1-a.md': 'One.\n'})
+_, err, _ = f.ah('run', str(f.folder), expect=0)
+run = f.run_id(err)
+owned = f.state / 'agent-harness'
+for path, loose in [(owned, 0o777), (owned / 'sequences', 0o755), (owned / 'locks', 0o770)]:
+    path.chmod(loose)
+    # A completed run's resume and show never reach locks/.
+    for args in (('run', str(f.folder)), ('resume', run), ('show', run)):
+        if args[0] != 'run' and path.name == 'locks':
+            continue
+        _, err, prompts = f.ah(*args, expect=2)
+        assert prompts == [] and 'must be owned by the current user and private' in err, (args, err)
+    assert stat.S_IMODE(path.stat().st_mode) == loose
+    path.chmod(0o700)
+lock = next((owned / 'locks').iterdir())
+lock.chmod(0o666)
+_, err, prompts = f.ah('run', str(f.folder), expect=2)
+assert prompts == [] and 'must be owned by the current user and private' in err, err
+assert stat.S_IMODE(lock.stat().st_mode) == 0o666 and len(f.runs()) == 1
+lock.chmod(0o600)
+f.ah('run', str(f.folder), expect=0)
+
 # Write failures: before launch exits 1 with nothing launched; after an
 # attempt exits 4 and stops later steps; the record then shows the uncertainty.
 f = Fixture({'1-a.md': 'One.\n'})
-(f.state / 'agent-harness/sequences').mkdir(parents=True, mode=0o700)
+(f.state / 'agent-harness').mkdir(parents=True, mode=0o700)
+(f.state / 'agent-harness/sequences').mkdir(mode=0o700)
 (f.state / 'agent-harness/sequences').chmod(0o500)
 _, err, prompts = f.ah('run', str(f.folder), expect=1)
 assert prompts == [] and 'cannot stage sequence record; nothing launched' in err, err

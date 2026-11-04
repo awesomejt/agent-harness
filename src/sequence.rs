@@ -906,10 +906,25 @@ pub fn plan(
             }
         }
     }
+    // An attempted stopping step must remain next, even when the folder now
+    // ends at the completed prefix: removing it never settles its effects.
+    let stopping = record.steps.get(done).filter(|s| !s.attempts.is_empty());
+    if let Some(stopping) = stopping
+        && steps
+            .get(done)
+            .is_none_or(|step| step.name != stopping.name)
+    {
+        return Err((
+            stopping.name.clone(),
+            Invalid(
+                "the step with recorded attempts must remain the next step; restore it or start a new run",
+            ),
+        ));
+    }
     if steps.len() == done {
         return Ok(None);
     }
-    let Some(stopping) = record.steps.get(done).filter(|s| !s.attempts.is_empty()) else {
+    let Some(stopping) = stopping else {
         // Never attempted: run it with no choice needed.
         return Ok(Some((
             done,
@@ -920,14 +935,6 @@ pub fn plan(
             },
         )));
     };
-    if steps[done].name != stopping.name {
-        return Err((
-            stopping.name.clone(),
-            Invalid(
-                "the step with recorded attempts must remain the next step; restore it or start a new run",
-            ),
-        ));
-    }
     if stopping.attempts.len() >= crate::state::MAX_ATTEMPTS {
         return Err((
             stopping.name.clone(),

@@ -318,10 +318,32 @@ fn outside(root: &Path, project: &Path) -> Result<()> {
     Ok(())
 }
 
-/// A harness-owned directory must be a real directory, never a symlink.
+/// A reused harness-owned directory or lock file must belong to the current
+/// user and grant no group or other access; creation modes cannot protect
+/// objects that already exist. Refused, never repaired: a permissive store
+/// may already hold replaced records or locks.
+#[cfg(unix)]
+fn private(meta: &std::fs::Metadata) -> Result<()> {
+    use std::os::unix::fs::MetadataExt;
+    if meta.uid() != unsafe { libc::geteuid() } || meta.mode() & 0o077 != 0 {
+        return Err(Invalid(
+            "sequence state must be owned by the current user and private (directories 0700, files 0600)",
+        )
+        .into());
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn private(_: &std::fs::Metadata) -> Result<()> {
+    Ok(())
+}
+
+/// A harness-owned directory must be a real, private directory, never a
+/// symlink.
 fn real_dir(path: &Path) -> Result<bool> {
     match std::fs::symlink_metadata(path) {
-        Ok(m) if m.is_dir() => Ok(true),
+        Ok(m) if m.is_dir() => private(&m).map(|()| true),
         Ok(_) => Err(Invalid(
             "sequence state directories must be real directories, not symlinks or files",
         )
@@ -405,8 +427,9 @@ impl Store {
             .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
             .open(self.lock_path(project))
             .map_err(|_| io("cannot open sequence project lock"))?;
-        if !file.metadata().is_ok_and(|m| m.is_file()) {
-            return Err(Invalid("invalid sequence project lock").into());
+        match file.metadata() {
+            Ok(m) if m.is_file() => private(&m)?,
+            _ => return Err(Invalid("invalid sequence project lock").into()),
         }
         if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
             return Err(

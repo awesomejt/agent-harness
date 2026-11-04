@@ -67,7 +67,7 @@ Card acceptance: crash-window, competing-writer, changed-input/schema and
 cancellation tests prove completed steps are not silently repeated and
 uncertain effects are surfaced.
 
-- `tests/state.rs` (5 tests) and a `state` unit test; 101 root tests in
+- `tests/state.rs` (6 tests) and a `state` unit test; 103 root tests in
   total:
   - **Plan.** Rejected, failed or cancelled with no prompt submitted resumes
     without a choice. Submitted, uncertain, interrupted, failed-retry or
@@ -75,13 +75,17 @@ uncertain effects are surfaced.
     never-attempted step runs. All complete gives nothing to do, unless steps
     were appended.
   - **Changed inputs.** A completed step that is edited, renamed or missing
-    refuses and names it. A moved stopping step refuses; an edited one is
-    allowed. 32 attempts is the bound. Attempts after the first incomplete
+    refuses and names it. A moved stopping step refuses, as does one removed by
+    truncating the folder to the completed prefix (for any choice, submitted
+    or not); an edited one is allowed, and a never-attempted one may be
+    dropped. 32 attempts is the bound. Attempts after the first incomplete
     step are inconsistent.
   - **Store.** 0700 directories and 0600 files; round trip; no temporary
     file left behind; `v` 2 or `"1"`, an unknown field, a mismatched run ID
     and bad JSON refuse; an invalid run ID never forms a path; a symlinked
-    record is refused.
+    record is refused. Reused owned directories with any group or other
+    bit, and a reused lock file at 0666, 0640 or 0604, exit 2 and keep
+    their modes.
   - **Lock.** Exclusive per project; independent across projects; released
     on drop; the holder probe is true only for the named live holder.
   - **Location.** XDG versus HOME fallback; relative or missing values exit
@@ -90,7 +94,7 @@ uncertain effects are surfaced.
     `agent-harness` directory is refused for writes and reads.
   - **Dates.** Run ID grammar and UTC dates, including 2000-02-29 and 2100.
 - `scripts/tests/sequence_state.py`, against fake OpenCode 2.2.5 and fake
-  checks (64 invocations):
+  checks (77 invocations):
   - **Record.** Completed two-step run: v1 content, modes, identities, the
     per-backend summary, and no prompt text, key value, key name or argument
     sentinel. `show` lists and details it; `resume` on it exits 0 and
@@ -100,8 +104,16 @@ uncertain effects are surfaced.
     `--retry` reports the changed input hash and runs steps 2 and 3. Step 1
     is not repeated.
   - **Changed inputs.** An edited completed step and a moved stopping step
-    both exit 2 and leave the record byte-identical. Removing step 3 and
-    adding step 5 is accepted.
+    both exit 2 and leave the record byte-identical. Truncating the folder to
+    step 1 exits 2 with no choice, `--retry` or `--accept`, and leaves the
+    record byte-identical. Removing step 3 and adding step 5 is accepted.
+  - **Removed gated step.** Step 2's agent succeeds but its `build` gate
+    fails; with `2-b.md` deleted, `resume` exits 2 naming it, runs no
+    prompt or check, and leaves the record unchanged.
+  - **Private state.** After a completed run, `agent-harness/` at 0777 or
+    `sequences/` at 0755 makes `run`, `resume` and `show` exit 2;
+    `locks/` at 0770 and a lock file at 0666 make `run` exit 2. Nothing
+    launches, no record is created and the modes are left as found.
   - **Never submitted.** A preflight rejection at step 1 (no prompt) resumes
     without a choice once the runtime is fixed.
   - **Crash window.** SIGKILL during step 1 leaves an `active` attempt. `show`
@@ -142,6 +154,19 @@ uncertain effects are surfaced.
   `agents_exec`, `machine`, `verify`, `modes` (165 cases) and installed
   `single_runtime.py --verify` pass unchanged. fmt, locked Clippy with
   `-D warnings` and the locked build pass.
+
+## Review remediation
+
+The stand-in review of `6959883` (in place of Grok) raised two P2 findings,
+both fixed with the tests above:
+
+1. **Removed stopping step resumed as complete.** `plan` returned "no
+   remaining steps" before checking that an attempted stopping step was
+   still present, so deleting it after a failed gate or submitted failure
+   made `resume` exit 0. The presence check now precedes that return.
+2. **Permissive reused state.** Existing owned directories and the lock file
+   were accepted at any mode. They must now belong to the current user with
+   no group or other access, or the command exits 2 and leaves them as found.
 
 ## Limitations and handoff
 

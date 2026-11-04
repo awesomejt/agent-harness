@@ -177,6 +177,28 @@ fn resume_plan_refuses_changed_completed_steps_and_a_lost_next_step() {
     let (step, error) = plan(&r, &moved, Choice::Retry).unwrap_err();
     assert_eq!(step, "2-b.md");
     assert!(error.0.contains("must remain the next step"));
+    // Truncating the folder to the completed prefix does not settle it,
+    // whatever the choice, and an unsubmitted failure is no exception.
+    let unsubmitted = record(
+        &snapshot,
+        &[
+            done.clone(),
+            (
+                Status::Failed,
+                vec![attempt(Reason::Initial, Status::Failed, false)],
+            ),
+        ],
+    );
+    for r in [&r, &unsubmitted] {
+        for choice in [Choice::None, Choice::Retry, Choice::Accept] {
+            let (step, error) = plan(r, &snapshot[..1], choice).unwrap_err();
+            assert_eq!(step, "2-b.md");
+            assert!(error.0.contains("must remain the next step"));
+        }
+    }
+    // A step never attempted may still be dropped.
+    let pending = record(&snapshot, &[done.clone(), (Status::Pending, vec![])]);
+    assert_eq!(plan(&pending, &snapshot[..1], Choice::None), Ok(None));
     let edited = steps(&[
         ("1-a.md", "One.\n"),
         ("2-b.md", "Fixed.\n"),
@@ -295,6 +317,53 @@ fn the_project_lock_is_exclusive_and_names_its_holder() {
     let lock = store.lock(&project, "s20261104T120000Z-ffffffff").unwrap();
     assert!(!store.holds(&project, RUN));
     drop(lock);
+    std::fs::remove_dir_all(&base).unwrap();
+}
+
+#[test]
+fn reused_state_must_be_private_and_is_never_repaired() {
+    let mode = |path: &Path| std::fs::metadata(path).unwrap().permissions().mode() & 0o777;
+    let chmod = |path: &Path, mode| {
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap()
+    };
+    let base = temp("private");
+    let project = base.join("project");
+    std::fs::create_dir(&project).unwrap();
+    let state = base.join("state");
+    Store::create(state.clone(), &project).unwrap();
+    // Any group or other access on an owned directory refuses create and
+    // read-only use alike, and leaves the mode as found.
+    for dir in ["", "sequences", "locks"] {
+        for loose in [0o777, 0o750, 0o701] {
+            chmod(&state.join(dir), loose);
+            let error = Store::create(state.clone(), &project).err().unwrap();
+            assert_eq!(error.exit, Exit::Invalid, "{dir}");
+            assert!(error.reason.contains("private"), "{}", error.reason);
+            if dir != "locks" {
+                assert!(Store::existing(state.clone()).is_err(), "{dir}");
+            }
+            assert_eq!(mode(&state.join(dir)), loose, "{dir}");
+        }
+        chmod(&state.join(dir), 0o700);
+    }
+    // A reused permissive lock file is refused and not taken.
+    let store = Store::create(state.clone(), &project).unwrap();
+    drop(store.lock(&project, RUN).unwrap());
+    let lock = std::fs::read_dir(state.join("locks"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    for loose in [0o666, 0o640, 0o604] {
+        chmod(&lock, loose);
+        let error = store.lock(&project, RUN).err().unwrap();
+        assert_eq!(error.exit, Exit::Invalid);
+        assert!(error.reason.contains("private"), "{}", error.reason);
+        assert_eq!(mode(&lock), loose);
+    }
+    chmod(&lock, 0o600);
+    drop(store.lock(&project, RUN).unwrap());
     std::fs::remove_dir_all(&base).unwrap();
 }
 
