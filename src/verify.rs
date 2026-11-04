@@ -15,7 +15,7 @@ pub const MAX_ARG_BYTES: usize = 4096;
 const RESERVED_KEYS: [&str; 2] = ["AH_RUNTIME_API_KEY", "OPENCODE_API_KEY"];
 
 /// Config entry `checks.NAME`: an argv vector, never a shell string.
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Definition {
     argv: Vec<String>,

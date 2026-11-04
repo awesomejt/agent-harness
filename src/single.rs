@@ -50,17 +50,8 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
     if let Some(check) = &request.verify {
         progress.verification(crate::verify::pending(check));
     }
-    // Refuse a required capability the runtime cannot enforce (D038) before
-    // any runtime, network check or project write; both attempts share it.
-    if let Some(agent) = &request.agent
-        && !request.preview
-        && let Err(error) = crate::opencode::supports(agent)
-    {
-        progress.reject(error.0);
-        return Exit::Invalid;
-    }
     if !request.preview
-        && let Err(error) = crate::opencode::prompt_supported(&request.prompt)
+        && let Err(error) = supported(&request)
     {
         progress.reject(error.0);
         return Exit::Invalid;
@@ -94,18 +85,6 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
     }
     #[cfg(target_os = "macos")]
     {
-        let deadline =
-            tokio::time::Instant::now() + std::time::Duration::from_secs(request.timeout_secs);
-        let plan = match prepare_plan(&request) {
-            Ok(plan) => plan,
-            Err(error) => {
-                progress.reject(error.0);
-                return Exit::Invalid;
-            }
-        };
-        if tokio::time::Instant::now() >= deadline {
-            return Exit::Cancelled;
-        }
         let runtime = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -115,46 +94,70 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
         };
         runtime.block_on(async {
             let signals = crate::runtime::Signals::watch();
-            let cancelled = signals.token();
-            let exit = match request.fallback.as_deref() {
-                None => {
-                    let label = if request.mode == Mode::LocalOnly {
-                        "local-only"
-                    } else {
-                        "cloud-only"
-                    };
-                    attempt(
-                        &request,
-                        plan,
-                        1,
-                        label,
-                        deadline,
-                        cancelled.clone(),
-                        progress,
-                    )
-                    .await
-                }
-                Some(native) => {
-                    coordinate(
-                        &request,
-                        native,
-                        plan,
-                        deadline,
-                        cancelled.clone(),
-                        progress,
-                    )
-                    .await
-                }
-            };
-            // D043: the check follows the final backend outcome, whichever
-            // attempt produced it, with its own bound.
-            match &request.verify {
-                Some(check) => {
-                    crate::verify::gate(check, &request.project, exit, &cancelled, progress).await
-                }
-                None => exit,
-            }
+            launch(&request, signals.token(), progress).await
         })
+    }
+}
+
+/// Refuse a required capability the runtime cannot enforce (D038) or a
+/// command prompt (D040) before any runtime, network check or project write;
+/// both attempts share them. Sequences apply it to every step before step 1.
+pub(crate) fn supported(request: &crate::config::Resolved) -> Result<(), crate::config::Invalid> {
+    if let Some(agent) = &request.agent {
+        crate::opencode::supports(agent)?;
+    }
+    crate::opencode::prompt_supported(&request.prompt)
+}
+
+/// One validated request through route policy, the D034 fallback and the D043
+/// gate, under its own deadline. A sequence step is exactly one such call.
+#[cfg(target_os = "macos")]
+pub(crate) async fn launch(
+    request: &crate::config::Resolved,
+    cancelled: tokio_util::sync::CancellationToken,
+    progress: &crate::progress::Progress,
+) -> Exit {
+    let deadline =
+        tokio::time::Instant::now() + std::time::Duration::from_secs(request.timeout_secs);
+    let plan = match prepare_plan(request) {
+        Ok(plan) => plan,
+        Err(error) => {
+            progress.reject(error.0);
+            return Exit::Invalid;
+        }
+    };
+    if tokio::time::Instant::now() >= deadline {
+        return Exit::Cancelled;
+    }
+    let exit = match request.fallback.as_deref() {
+        None => {
+            let label = if request.mode == Mode::LocalOnly {
+                "local-only"
+            } else {
+                "cloud-only"
+            };
+            attempt(
+                request,
+                plan,
+                1,
+                label,
+                deadline,
+                cancelled.clone(),
+                progress,
+            )
+            .await
+        }
+        Some(native) => {
+            coordinate(request, native, plan, deadline, cancelled.clone(), progress).await
+        }
+    };
+    // D043: the check follows the final backend outcome, whichever attempt
+    // produced it, with its own bound.
+    match &request.verify {
+        Some(check) => {
+            crate::verify::gate(check, &request.project, exit, &cancelled, progress).await
+        }
+        None => exit,
     }
 }
 
@@ -381,7 +384,9 @@ fn describe(request: &crate::config::Resolved, label: &str) -> serde_json::Value
     })
 }
 
-fn prepare_plan(request: &crate::config::Resolved) -> Result<Option<Plan>, crate::config::Invalid> {
+pub(crate) fn prepare_plan(
+    request: &crate::config::Resolved,
+) -> Result<Option<Plan>, crate::config::Invalid> {
     match request.mode {
         Mode::LocalOnly => Plan::prepare(request).map(Some),
         Mode::CloudOnly => Ok(None),

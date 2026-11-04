@@ -290,6 +290,10 @@ jq -e 'select(.type == "result") | .verification.status == "passed"' ah-records.
 
 Do not retry automatically on exit 1, 3 or 4: the harness never replays a submitted prompt, and a manual rerun is a new run that may repeat effects. Refuse records whose `v` is not 1. A `succeeded` result for an edit task whose attempts report `tool_events: 0` deserves scrutiny: the backend ended its turn without visible tool work (P4.6 R1). Treat it as a reason to check the project, not as a harness failure; never use it to justify a retry. A missing result line (abrupt termination or blocked stdout) leaves only the exit code. `trusted` grants host file/shell access; reserve it for disposable CI checkouts.
 
+### Ordered sequences (P5.2)
+
+`ah sequence run prompts/ --permissions trusted --verify test` runs `prompts/N-slug.md` files in numeric order. Each step is a fresh `ah single` run with the same options, so the project files are the only thing that carries over between steps. The run stops at the first step whose agent does not succeed or whose check does not pass, and exits with that step's code. A step file may begin with a `---` block that sets `agent: NAME` or, when `--verify` is given, `verify: CHECK`. Run `--preview` first: it lists each step's hash, agent, route and check, and launches nothing. There are no run records or `resume` until P5.3. After a stop, fix the cause and rerun from step 1, or move completed steps out of the folder. Do not run two sequences, or a sequence and a single run, in the same project at the same time. See [WORKFLOWS](WORKFLOWS.md#sequence-inputs-and-context).
+
 ## Project and data handling
 
 The harness works in the selected project, including normal dirty worktrees. It does not automatically stash, reset, clean, commit or roll back user changes. Backend tools may change files as allowed by explicit permissions; preserve that distinction in user docs.

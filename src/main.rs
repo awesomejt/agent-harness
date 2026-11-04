@@ -7,6 +7,10 @@ fn main() -> ExitCode {
         let exit = awesomejt_agent_harness::single::run(args);
         return ExitCode::from(exit as u8);
     }
+    if args.first().is_some_and(|arg| arg == "sequence") {
+        let exit = awesomejt_agent_harness::sequence::run(args);
+        return ExitCode::from(exit as u8);
+    }
     match awesomejt_agent_harness::response(args) {
         Ok(output) => match io::stdout().lock().write_all(output.as_bytes()) {
             Ok(()) => ExitCode::SUCCESS,
