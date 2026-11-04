@@ -82,6 +82,7 @@ Remediation verification on `patch/p4-9-review-fixes`, same environment:
 - Both mutation checks fail as intended: restoring the hardcoded `native.model` label, and forcing the unnarrowed trusted line.
 - `preview.py`, `agents_exec.py`, `local_first.py`, `modes.py` (165 cases) and `machine.py` pass on the patched build. `git diff --check` passes.
 - Integrated recheck: the fix changes only `preview::render` text, so runtime documents, grants, routing, emission and machine records are unchanged. The installed-runtime and live records above therefore still apply to the patched head. The corrected documents were re-read against each other, D036–D042 and the source.
+- Grok review of [PR #43](https://github.com/awesomejt/agent-harness/pull/43): 0 Blockers, 1 Concern, 0 Nits. The Concern (provisionally Medium; its actual impact is Low documentation consistency) was that DESIGN's next paragraph still called machine output and canonical agents gated, contradicting R04-03/R04-04. Corrected: only durable workflow state (Phase 5+) remains gated, and a sweep found no other stale "gated" Phase 4 claim. Not critical or high, so no re-review is required. The first `/grok review` request produced no review (the bot's allocation was exhausted) and is not counted.
 
 ## Gate outcome
 

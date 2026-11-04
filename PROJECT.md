@@ -234,4 +234,4 @@ P2.2 review closeout — PR #17 completed three Grok reviews. Initial concern/th
 
 D042 records the owner's review-PR policy: a review PR merges once findings are recorded with a plan; every fix goes through a Grok-reviewed patch PR; one open PR at a time; the last patch proposes the pass.
 
-Checks: 83 root tests (new fallback-provenance test; both fixes mutation-checked), fmt, locked Clippy, and the preview, agents_exec, local_first, modes (165) and machine suites pass. Runtime behavior is unchanged, so the installed-runtime and live records stand. The P4.9 pass is effective on this PR's merge; next is P5.5.
+Checks: 83 root tests (new fallback-provenance test; both fixes mutation-checked), fmt, locked Clippy, and the preview, agents_exec, local_first, modes (165) and machine suites pass. Runtime behavior is unchanged, so the installed-runtime and live records stand. Grok review of PR #43: 0 Blockers, 1 Concern (DESIGN still called machine output/agents gated), 0 Nits. The Concern was fixed without mandatory re-review. The P4.9 pass is effective on this PR's merge; next is P5.5.
