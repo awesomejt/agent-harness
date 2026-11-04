@@ -257,3 +257,5 @@ Grok review of PR #44: 0 Blockers, 2 Concerns, 1 Nit. Both Concerns are fixed: t
 - State: v1 JSON outside the project under the XDG state directory, 0600, atomic replace, no prompts/responses/output/keys. A nonblocking per-project lock covers `run`/`resume`.
 - Resume: never implicit. The completed prefix must be unchanged; later steps are re-snapshotted and changes reported. A step whose prompt may have been submitted needs `--retry` or `--accept` (a gated accept reruns its check). Unknown schema versions refuse without rewriting.
 - R04-REC1 (tool kind on activity lines) is not needed for sequence semantics; P5.4 re-evaluates it. SHA-256 needs a pinned `sha2` dependency, evaluated in P5.2.
+
+Grok review of PR #45: 0 Blockers, 2 Concerns, 2 Nits, all fixed without mandatory re-review. `--accept` gating now comes from the record (it requires `--verify` and the same check name; the check is re-pinned and changes are reported). A failed accept check sets the step result, keeps the run stopped and exits per D043. `HOME` is required only for the XDG fallback. WORKFLOWS repeats the every-backend-attempt submission test, and `--retry` with `--accept` exits 2.
