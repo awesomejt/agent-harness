@@ -123,7 +123,7 @@ def attempt_reasons(record, index):
 f = Fixture({'1-a.md': 'One.\n', '2-b.md': '---\nverify: test\n---\nTwo.\n'})
 out, err, prompts = f.ah('run', str(f.folder), '--verify', 'test', expect=0)
 run = f.run_id(err)
-assert prompts == ['One.\n', 'Two.\n'] and out == 'OKOK'
+assert prompts == ['One.\n', 'Two.\n'] and out == 'OK\nOK\n'
 r = f.record(run)
 assert r['v'] == 1 and r['run'] == run and r['status'] == 'completed', r
 assert r['project'] == str(f.project) and r['folder'] == str(f.folder) and r['config'] == str(f.project / 'ah.json')
@@ -235,6 +235,9 @@ r = f.record(run)
 assert attempt_reasons(r, 0) == [('initial', 'interrupted'), ('accept', 'accepted')], r
 accept = r['steps'][0]['attempts'][1]
 assert accept['agent_outcome'] is None and accept['verification'] is None and accept['backends'] == []
+# Once stored as `interrupted`, the crashed attempt stays uncertain (P5.4).
+out, _, _ = f.ah('show', run, expect=0)
+assert 'attempt 1 initial: interrupted; exit none; agent outcome none; verification none; prompt submitted unknown' in out, out
 
 # Competing writers and cancellation: the lock refuses a second run or a
 # resume before launch; show reports the holder active; SIGINT stops it.

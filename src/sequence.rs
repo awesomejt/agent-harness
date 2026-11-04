@@ -847,7 +847,7 @@ where
             ));
             return Exit::Cancelled;
         }
-        let progress = crate::progress::Progress::new(false);
+        let progress = crate::progress::Progress::step();
         // The launcher's clone drops with its future, before `finish` drains.
         let exit = launch(index, progress.clone()).await;
         let exit = progress.finish(exit);
@@ -1297,7 +1297,9 @@ fn detail(store: &crate::state::Store, record: &Record) -> String {
                 attempt.agent_outcome.as_deref().unwrap_or("none"),
                 if attempt.backends.iter().any(|b| b.prompt_submitted) {
                     "yes"
-                } else if attempt.status == Status::Active {
+                } else if matches!(attempt.status, Status::Active | Status::Interrupted) {
+                    // Its result was never written; a stored `interrupted` is
+                    // as uncertain as a stale `active` (P5.4).
                     "unknown"
                 } else {
                     "no"
