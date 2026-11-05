@@ -273,6 +273,13 @@ run = f.run_id(err)
 assert f.record(run)['steps'][0]['attempts'][0]['verification']['status'] == 'failed'
 _, err, _ = f.ah('resume', run, '--accept', expect=2)
 assert 'gated by check "test"; --accept requires --verify and the same check' in err, err
+# R05-01: later-step verify metadata must not obscure the stopping step gate.
+f2 = Fixture({'1-a.md': 'One.\n', '2-b.md': '---\nverify: build\n---\nTwo.\n'}, checks=dict(test=['fail'], build=['pass']))
+_, err, _ = f2.ah('run', str(f2.folder), '--verify', 'test', expect=1)
+run2 = f2.run_id(err)
+_, err, _ = f2.ah('resume', run2, '--accept', expect=2)
+assert '1-a.md' in err and 'gated by check "test"; --accept requires --verify' in err, err
+assert 'step metadata verify requires --verify' not in err, err
 _, err, _ = f.ah('resume', run, '--accept', '--verify', 'build', expect=2)
 assert 'gated by check "test"' in err
 _, err, prompts = f.ah('resume', run, '--accept', '--verify', 'test', expect=1)

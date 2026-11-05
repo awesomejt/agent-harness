@@ -317,7 +317,7 @@ D025 Git policy: version managed `opencode.json` and its ownership receipt toget
 - **Compatibility**: consumers refuse any `v` other than 1. Within v1, new record types, new optional fields and new `backend_stop`/`route` values may appear and must be ignored or treated as unknown; removal, renaming, retyping, meaning changes or a new `outcome` value require v2.
 - **R03-REC1 (declined)**: a post-submission failure without a trustworthy terminal response remains exit 4, even with zero grants and zero completed tool calls. Absent tool events do not prove no tool ran (D031), and the adapter still cannot classify provider rejections. The result instead exposes `prompt_submitted`, `backend_stop: null`, `grants` and `tool_events`, so a consumer can apply its own policy. No fallback or replay follows from either reading.
 - **Headless**: unchanged: stdin is read only for `--prompt-file -`, permission requests are answered by the noninteractive policy, and no TTY prompt exists. Machine mode adds no wait on stdin or stdout beyond the bounded delivery budget.
-- **Evidence/boundary**: [P4.7 evidence](docs/evidence/p4-7-machine-output.md). The machine contract covers `single` only; sequence/workflow records and durable state remain Phase 5.
+- **Evidence/boundary**: [P4.7 evidence](docs/evidence/p4-7-machine-output.md). The machine contract covers `single` only; sequence records and durable workflow state are implemented in Phase 5 (D044).
 
 ## 2026-11-03 — D040: Explicit project instructions and refused runtime commands
 
