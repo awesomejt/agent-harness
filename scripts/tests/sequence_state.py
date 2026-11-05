@@ -245,12 +245,12 @@ f = Fixture({'1-a.md': 'SLEEP\n', '2-b.md': 'Two.\n'})
 proc = f.start('run', str(f.folder))
 f.wait_sleeping()
 _, err, prompts = f.ah('run', str(f.folder), expect=2)
-assert prompts == [] and "another sequence holds this project's lock" in err, err
+assert prompts == [] and "another sequence or Ralph run holds this project's lock" in err, err
 runs = f.runs()
 assert len(runs) == 1, runs
 run = runs[0]
 _, err, prompts = f.ah('resume', run, '--retry', expect=2)
-assert prompts == [] and "another sequence holds this project's lock" in err, err
+assert prompts == [] and "another sequence or Ralph run holds this project's lock" in err, err
 out, _, _ = f.ah('show', run, expect=0)
 assert f'run {run}: active' in out and 'next: running' in out, out
 proc.send_signal(signal.SIGINT)

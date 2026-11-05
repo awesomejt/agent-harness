@@ -383,7 +383,7 @@ fn start(args: Vec<OsString>) -> Exit {
 /// A new `run` never resumes implicitly; it lists this project's unfinished
 /// runs (under the held lock, an `active` one is interrupted).
 fn unfinished(store: &crate::state::Store, project: &Path) {
-    let Ok(runs) = store.list() else {
+    let Ok(runs) = store.list::<Record>() else {
         return;
     };
     let unfinished: Vec<_> = runs
@@ -413,13 +413,13 @@ fn unfinished(store: &crate::state::Store, project: &Path) {
     }
 }
 
-fn utf8(path: &Path) -> std::result::Result<String, Invalid> {
+pub(crate) fn utf8(path: &Path) -> std::result::Result<String, Invalid> {
     path.to_str()
         .map(str::to_owned)
-        .ok_or(Invalid("sequence records require UTF-8 paths"))
+        .ok_or(Invalid("workflow records require UTF-8 paths"))
 }
 
-fn route(request: &Resolved) -> &'static str {
+pub(crate) fn route(request: &Resolved) -> &'static str {
     match (request.mode, &request.fallback) {
         (crate::config::Mode::LocalOnly, Some(_)) => "local-first",
         (crate::config::Mode::LocalOnly, None) => "local-only",
@@ -445,19 +445,7 @@ fn attempt(
     number: u32,
     reason: Reason,
 ) -> std::result::Result<Attempt, Invalid> {
-    use crate::state::{CheckIdentity, sha256};
-    let check = match &request.verify {
-        None => None,
-        Some(check) => Some(CheckIdentity {
-            name: check.name.clone(),
-            program: utf8(&check.program)?,
-            argv_sha256: sha256(
-                serde_json::to_string(&check.args)
-                    .unwrap_or_default()
-                    .as_bytes(),
-            ),
-        }),
-    };
+    let check = request.verify.as_ref().map(identity).transpose()?;
     Ok(Attempt {
         number,
         reason,
@@ -470,17 +458,37 @@ fn attempt(
         route: route(request).to_owned(),
         model: request.runtime_model(),
         fallback: request.fallback.as_ref().map(|f| f.runtime_model()),
-        permissions: match request.permissions {
-            crate::config::Permissions::Deny => "deny",
-            crate::config::Permissions::Trusted => "trusted",
-        }
-        .to_owned(),
+        permissions: permissions(request).to_owned(),
         timeout_secs: request.timeout_secs,
         agent_outcome: None,
         exit: None,
         verification: None,
         backends: Vec::new(),
     })
+}
+
+/// The pinned check: program path as found and the SHA-256 of its argument
+/// array, never the arguments themselves.
+pub(crate) fn identity(
+    check: &crate::verify::Check,
+) -> std::result::Result<crate::state::CheckIdentity, Invalid> {
+    Ok(crate::state::CheckIdentity {
+        name: check.name.clone(),
+        program: utf8(&check.program)?,
+        argv_sha256: crate::state::sha256(
+            serde_json::to_string(&check.args)
+                .unwrap_or_default()
+                .as_bytes(),
+        ),
+    })
+}
+
+/// The recorded permission policy name.
+pub(crate) fn permissions(request: &Resolved) -> &'static str {
+    match request.permissions {
+        crate::config::Permissions::Deny => "deny",
+        crate::config::Permissions::Trusted => "trusted",
+    }
 }
 
 /// Identity fields that differ from the step's previous attempt.
@@ -1041,7 +1049,7 @@ fn resume(args: Vec<OsString>) -> Exit {
         Ok(root) => root,
         Err(failure) => return fail(failure),
     };
-    let original = match crate::state::Store::existing(root.clone()) {
+    let original: Record = match crate::state::Store::existing(root.clone()) {
         Ok(Some(store)) => match store.read(&run) {
             Ok(record) => record,
             Err(failure) => return fail(failure),
@@ -1136,7 +1144,7 @@ fn resume(args: Vec<OsString>) -> Exit {
         Ok(lock) => lock,
         Err(failure) => return fail(failure),
     };
-    match store.read(&run) {
+    match store.read::<Record>(&run) {
         Ok(current) if current == original => {}
         Ok(_) => return reject("sequence record changed while resuming; nothing launched"),
         Err(failure) => return fail(failure),

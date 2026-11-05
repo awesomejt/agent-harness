@@ -37,6 +37,7 @@ SUITES = [
     ['scripts/tests/sequence.py'],
     ['scripts/tests/sequence_state.py'],
     ['scripts/tests/sequence_runtime.py'],
+    ['scripts/tests/ralph.py'],
     ['scripts/tests/agent_exec_runtime.py'],
     ['scripts/tests/capabilities_runtime.py'],
 ]

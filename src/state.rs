@@ -1,9 +1,10 @@
-//! Durable sequence records (D044): versioned JSON under the XDG state
+//! Durable workflow records (D044, D045): versioned JSON under the XDG state
 //! directory, outside the project, replaced atomically, with a per-project
-//! nonblocking lock. Records hold identities and outcomes only: never prompt
-//! text, responses, check output, argv text, environment names or keys.
+//! nonblocking lock that sequences and Ralph loops share. Records hold
+//! identities and outcomes only: never prompt text, responses, check output,
+//! argv text, environment names or keys.
 use crate::config::{Exit, Invalid};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::ffi::OsString;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
@@ -12,6 +13,61 @@ use std::path::{Path, PathBuf};
 pub const VERSION: u32 = 1;
 pub const MAX_RECORD_BYTES: usize = 4 * 1_048_576;
 pub const MAX_ATTEMPTS: usize = 32;
+pub const MAX_ITERATIONS: usize = 100;
+
+/// The workflow a store serves. Each keeps records in its own directory
+/// under one root; both share `locks/`, so at most one sequence or Ralph run
+/// acts on a project at a time (D045).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    Sequence,
+    Ralph,
+}
+
+impl Kind {
+    fn dir(self) -> &'static str {
+        match self {
+            Kind::Sequence => "sequences",
+            Kind::Ralph => "ralph",
+        }
+    }
+    /// The sequence or Ralph wording of one message.
+    fn say(self, sequence: &'static str, ralph: &'static str) -> &'static str {
+        match self {
+            Kind::Sequence => sequence,
+            Kind::Ralph => ralph,
+        }
+    }
+    /// `s` or `r`, then `YYYYMMDDTHHMMSSZ-` and 8 lowercase hex characters,
+    /// checked before any path is formed from it.
+    pub fn valid(self, id: &str) -> bool {
+        let b = id.as_bytes();
+        b.len() == 26
+            && b[0] == self.say("s", "r").as_bytes()[0]
+            && b[1..9].iter().all(u8::is_ascii_digit)
+            && b[9] == b'T'
+            && b[10..16].iter().all(u8::is_ascii_digit)
+            && b[16] == b'Z'
+            && b[17] == b'-'
+            && b[18..]
+                .iter()
+                .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(c))
+    }
+    fn invalid_id(self) -> &'static str {
+        self.say(
+            "run ID must be sYYYYMMDDTHHMMSSZ-xxxxxxxx",
+            "run ID must be rYYYYMMDDTHHMMSSZ-xxxxxxxx",
+        )
+    }
+}
+
+/// A versioned record kept in a `Store` of its kind.
+pub trait Stored: Serialize + DeserializeOwned {
+    const KIND: Kind;
+    fn run(&self) -> &str;
+    /// Structural rules the schema alone cannot express.
+    fn consistent(&self) -> bool;
+}
 
 /// A state failure and the exit it maps to: policy and input problems exit 2;
 /// an unwritable store before any launch exits 1.
@@ -218,20 +274,175 @@ impl Record {
     }
 }
 
-/// `sYYYYMMDDTHHMMSSZ-` plus 8 lowercase hex characters, checked before any
-/// path is formed from it.
-pub fn valid_run_id(id: &str) -> bool {
-    let b = id.as_bytes();
-    b.len() == 26
-        && b[0] == b's'
-        && b[1..9].iter().all(u8::is_ascii_digit)
-        && b[9] == b'T'
-        && b[10..16].iter().all(u8::is_ascii_digit)
-        && b[16] == b'Z'
-        && b[17] == b'-'
-        && b[18..]
+/// Ralph run status (D045): `exhausted` ends a run that reached a bound
+/// without completion.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RalphStatus {
+    Active,
+    Stopped,
+    Completed,
+    Exhausted,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IterationReason {
+    Initial,
+    Continue,
+    Resume,
+    Retry,
+    Accept,
+}
+
+impl IterationReason {
+    pub fn name(self) -> &'static str {
+        match self {
+            IterationReason::Initial => "initial",
+            IterationReason::Continue => "continue",
+            IterationReason::Resume => "resume",
+            IterationReason::Retry => "retry",
+            IterationReason::Accept => "accept",
+        }
+    }
+}
+
+/// What started an invocation of a Ralph run.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InvocationReason {
+    Run,
+    Resume,
+    Retry,
+    Accept,
+}
+
+/// A Ralph record (D045). `max_iterations` is the run's current iteration
+/// bound; each invocation keeps its own wall bound.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RalphRecord {
+    pub v: u32,
+    pub run: String,
+    pub created: String,
+    pub updated: String,
+    pub project: String,
+    pub prompt: String,
+    pub config: String,
+    pub status: RalphStatus,
+    pub max_iterations: u32,
+    pub invocations: Vec<InvocationRecord>,
+    pub iterations: Vec<Iteration>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InvocationRecord {
+    pub started: String,
+    pub reason: InvocationReason,
+    pub max_runtime_secs: u64,
+}
+
+/// One iteration: the D044 attempt fields plus the prompt file and sent
+/// input identities, the completion claim (`null` when the response was not
+/// inspected) and per-backend usage.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Iteration {
+    pub number: u32,
+    pub reason: IterationReason,
+    pub status: Status,
+    pub started: String,
+    pub ended: Option<String>,
+    pub prompt_sha256: String,
+    pub input_sha256: String,
+    pub agent_sha256: Option<String>,
+    pub check: Option<CheckIdentity>,
+    pub route: String,
+    pub model: String,
+    pub fallback: Option<String>,
+    pub permissions: String,
+    pub timeout_secs: u64,
+    pub agent_outcome: Option<String>,
+    pub exit: Option<u8>,
+    pub claim: Option<bool>,
+    pub verification: Option<Verification>,
+    pub backends: Vec<UsageBackend>,
+}
+
+/// The per-backend summary with its D039 usage object.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UsageBackend {
+    pub attempt: u8,
+    pub launched: bool,
+    pub prompt_submitted: bool,
+    pub backend_stop: Option<String>,
+    pub cleanup_confirmed: Option<bool>,
+    pub grants: Option<u64>,
+    pub tool_events: Option<u64>,
+    pub usage: Usage,
+}
+
+/// D039 usage: a backend report, `null` when unknown, never billing.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Usage {
+    pub source: Option<String>,
+    pub context_used_tokens: Option<u64>,
+    pub context_capacity_tokens: Option<u64>,
+    pub turn_tokens: Option<u64>,
+    pub session_cost: Option<Cost>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Cost {
+    pub amount: f64,
+    pub currency: String,
+}
+
+impl RalphRecord {
+    /// Agent iterations counted against the bound; `accept` runs no agent
+    /// turn and is not counted.
+    pub fn counted(&self) -> u32 {
+        self.iterations
             .iter()
-            .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(c))
+            .filter(|i| i.reason != IterationReason::Accept)
+            .count() as u32
+    }
+}
+
+impl Stored for RalphRecord {
+    const KIND: Kind = Kind::Ralph;
+    fn run(&self) -> &str {
+        &self.run
+    }
+    fn consistent(&self) -> bool {
+        (1..=MAX_ITERATIONS as u32).contains(&self.max_iterations)
+            && !self.invocations.is_empty()
+            && self.iterations.len() <= MAX_ITERATIONS
+            && self
+                .iterations
+                .iter()
+                .enumerate()
+                .all(|(index, i)| i.number as usize == index + 1 && i.status != Status::Pending)
+    }
+}
+
+impl Stored for Record {
+    const KIND: Kind = Kind::Sequence;
+    fn run(&self) -> &str {
+        &self.run
+    }
+    fn consistent(&self) -> bool {
+        !self.steps.is_empty()
+    }
+}
+
+/// A sequence run ID (`Kind::Sequence.valid`).
+pub fn valid_run_id(id: &str) -> bool {
+    Kind::Sequence.valid(id)
 }
 
 fn civil(secs: u64) -> (i64, u64, u64, u64, u64, u64) {
@@ -266,15 +477,24 @@ pub fn now() -> String {
     timestamp(now_secs())
 }
 
-/// A new run ID from the current UTC time and 4 bytes of `/dev/urandom`.
+/// A new sequence run ID from the current UTC time and 4 bytes of
+/// `/dev/urandom`.
 pub fn new_run_id() -> Result<String> {
+    new_id(Kind::Sequence)
+}
+
+/// A new run ID of `kind`, as `new_run_id`.
+pub fn new_id(kind: Kind) -> Result<String> {
     let mut random = [0u8; 4];
     File::open("/dev/urandom")
         .and_then(|mut f| f.read_exact(&mut random))
-        .map_err(|_| io("cannot read /dev/urandom for a sequence run ID"))?;
+        .map_err(|_| io("cannot read /dev/urandom for a run ID"))?;
     let (y, mo, d, h, mi, s) = civil(now_secs());
     let hex: String = random.iter().map(|b| format!("{b:02x}")).collect();
-    Ok(format!("s{y:04}{mo:02}{d:02}T{h:02}{mi:02}{s:02}Z-{hex}"))
+    Ok(format!(
+        "{}{y:04}{mo:02}{d:02}T{h:02}{mi:02}{s:02}Z-{hex}",
+        kind.say("s", "r")
+    ))
 }
 
 /// `$XDG_STATE_HOME/agent-harness` when that is absolute, else
@@ -290,7 +510,7 @@ pub fn root(lookup: impl Fn(&str) -> Option<OsString>) -> Result<PathBuf> {
         .map(PathBuf::from)
         .filter(|p| p.is_absolute())
         .ok_or(Invalid(
-            "sequence state needs an absolute XDG_STATE_HOME or HOME",
+            "workflow state needs an absolute XDG_STATE_HOME or HOME",
         ))?;
     Ok(home.join(".local/state/agent-harness"))
 }
@@ -299,7 +519,7 @@ pub fn root(lookup: impl Fn(&str) -> Option<OsString>) -> Result<PathBuf> {
 /// or an agent edit cannot remove it. Missing components resolve through the
 /// deepest existing ancestor.
 fn outside(root: &Path, project: &Path) -> Result<()> {
-    const UNAVAILABLE: Invalid = Invalid("sequence state directory is unavailable");
+    const UNAVAILABLE: Invalid = Invalid("workflow state directory is unavailable");
     let mut existing = root.to_path_buf();
     let mut missing = Vec::new();
     let canonical = loop {
@@ -313,7 +533,7 @@ fn outside(root: &Path, project: &Path) -> Result<()> {
     };
     let full = missing.iter().rev().fold(canonical, |p, n| p.join(n));
     if full.starts_with(project) {
-        return Err(Invalid("sequence state directory must lie outside the project").into());
+        return Err(Invalid("workflow state directory must lie outside the project").into());
     }
     Ok(())
 }
@@ -327,7 +547,7 @@ fn private(meta: &std::fs::Metadata) -> Result<()> {
     use std::os::unix::fs::MetadataExt;
     if meta.uid() != unsafe { libc::geteuid() } || meta.mode() & 0o077 != 0 {
         return Err(Invalid(
-            "sequence state must be owned by the current user and private (directories 0700, files 0600)",
+            "workflow state must be owned by the current user and private (directories 0700, files 0600)",
         )
         .into());
     }
@@ -345,16 +565,17 @@ fn real_dir(path: &Path) -> Result<bool> {
     match std::fs::symlink_metadata(path) {
         Ok(m) if m.is_dir() => private(&m).map(|()| true),
         Ok(_) => Err(Invalid(
-            "sequence state directories must be real directories, not symlinks or files",
+            "workflow state directories must be real directories, not symlinks or files",
         )
         .into()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(_) => Err(Invalid("sequence state directory is unavailable").into()),
+        Err(_) => Err(Invalid("workflow state directory is unavailable").into()),
     }
 }
 
 pub struct Store {
     root: PathBuf,
+    kind: Kind,
 }
 
 /// A held project lock; dropping it releases the lock.
@@ -363,8 +584,13 @@ pub struct Lock {
 }
 
 impl Store {
-    /// Create (0700) or reuse the store for `run`/`resume`.
+    /// Create (0700) or reuse the sequence store for `run`/`resume`.
     pub fn create(root: PathBuf, project: &Path) -> Result<Self> {
+        Self::create_for(Kind::Sequence, root, project)
+    }
+
+    /// Create (0700) or reuse the store of `kind` for `run`/`resume`.
+    pub fn create_for(kind: Kind, root: PathBuf, project: &Path) -> Result<Self> {
         outside(&root, project)?;
         let mut builder = std::fs::DirBuilder::new();
         builder.recursive(true);
@@ -376,33 +602,38 @@ impl Store {
         if !real_dir(&root)? {
             builder
                 .create(&root)
-                .map_err(|_| io("cannot create sequence state directory"))?;
+                .map_err(|_| io("cannot create workflow state directory"))?;
         }
-        for dir in [&root, &root.join("sequences"), &root.join("locks")] {
+        for dir in [&root, &root.join(kind.dir()), &root.join("locks")] {
             if !real_dir(dir)? {
                 builder
                     .create(dir)
-                    .map_err(|_| io("cannot create sequence state directory"))?;
+                    .map_err(|_| io("cannot create workflow state directory"))?;
                 real_dir(dir)?;
             }
         }
-        Ok(Self { root })
+        Ok(Self { root, kind })
+    }
+
+    /// Read-only access to the sequence store; see `existing_for`.
+    pub fn existing(root: PathBuf) -> Result<Option<Self>> {
+        Self::existing_for(Kind::Sequence, root)
     }
 
     /// Read-only access for `show` and `resume`; never creates anything.
-    /// `None` when no run has ever been recorded.
-    pub fn existing(root: PathBuf) -> Result<Option<Self>> {
-        for dir in [&root, &root.join("sequences")] {
+    /// `None` when no run of `kind` has ever been recorded.
+    pub fn existing_for(kind: Kind, root: PathBuf) -> Result<Option<Self>> {
+        for dir in [&root, &root.join(kind.dir())] {
             if !real_dir(dir)? {
                 return Ok(None);
             }
         }
-        Ok(Some(Self { root }))
+        Ok(Some(Self { root, kind }))
     }
 
     pub fn record_path(&self, run: &str) -> PathBuf {
-        debug_assert!(valid_run_id(run));
-        self.root.join("sequences").join(format!("{run}.json"))
+        debug_assert!(self.kind.valid(run));
+        self.root.join(self.kind.dir()).join(format!("{run}.json"))
     }
 
     fn lock_path(&self, project: &Path) -> PathBuf {
@@ -426,25 +657,26 @@ impl Store {
             .mode(0o600)
             .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
             .open(self.lock_path(project))
-            .map_err(|_| io("cannot open sequence project lock"))?;
+            .map_err(|_| io("cannot open workflow project lock"))?;
         match file.metadata() {
             Ok(m) if m.is_file() => private(&m)?,
-            _ => return Err(Invalid("invalid sequence project lock").into()),
+            _ => return Err(Invalid("invalid workflow project lock").into()),
         }
         if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-            return Err(
-                Invalid("another sequence holds this project's lock; nothing launched").into(),
-            );
+            return Err(Invalid(
+                "another sequence or Ralph run holds this project's lock; nothing launched",
+            )
+            .into());
         }
         file.set_len(0)
             .and_then(|()| file.write_all(run.as_bytes()))
-            .map_err(|_| io("cannot write sequence project lock"))?;
+            .map_err(|_| io("cannot write workflow project lock"))?;
         Ok(Lock { _file: file })
     }
 
     #[cfg(not(unix))]
     pub fn lock(&self, _: &Path, _: &str) -> Result<Lock> {
-        Err(Invalid("sequence locks require Unix").into())
+        Err(Invalid("workflow locks require Unix").into())
     }
 
     /// Whether `run` is the live holder of its project's lock. A momentary
@@ -474,9 +706,11 @@ impl Store {
 
     /// Strict read: a bounded regular file, `v` 1, no unknown fields, and the
     /// run ID it is filed under. Nothing is rewritten on refusal.
-    pub fn read(&self, run: &str) -> Result<Record> {
-        if !valid_run_id(run) {
-            return Err(Invalid("run ID must be sYYYYMMDDTHHMMSSZ-xxxxxxxx").into());
+    pub fn read<T: Stored>(&self, run: &str) -> Result<T> {
+        debug_assert_eq!(T::KIND, self.kind);
+        let k = self.kind;
+        if !k.valid(run) {
+            return Err(Invalid(k.invalid_id()).into());
         }
         let mut options = OpenOptions::new();
         options.read(true);
@@ -488,39 +722,75 @@ impl Store {
         let file = match options.open(self.record_path(run)) {
             Ok(file) => file,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                return Err(Invalid("no sequence record with that run ID").into());
+                return Err(Invalid(k.say(
+                    "no sequence record with that run ID",
+                    "no Ralph record with that run ID",
+                ))
+                .into());
             }
-            Err(_) => return Err(Invalid("cannot open sequence record").into()),
+            Err(_) => {
+                return Err(Invalid(
+                    k.say("cannot open sequence record", "cannot open Ralph record"),
+                )
+                .into());
+            }
         };
         if !file.metadata().is_ok_and(|m| m.is_file()) {
-            return Err(Invalid("sequence record must be a regular file").into());
+            return Err(Invalid(k.say(
+                "sequence record must be a regular file",
+                "Ralph record must be a regular file",
+            ))
+            .into());
         }
         let mut bytes = Vec::new();
         file.take(MAX_RECORD_BYTES as u64 + 1)
             .read_to_end(&mut bytes)
-            .map_err(|_| Invalid("cannot read sequence record"))?;
+            .map_err(|_| {
+                Invalid(k.say("cannot read sequence record", "cannot read Ralph record"))
+            })?;
         if bytes.len() > MAX_RECORD_BYTES {
-            return Err(Invalid("sequence record exceeds 4 MiB").into());
+            return Err(Invalid(k.say(
+                "sequence record exceeds 4 MiB",
+                "Ralph record exceeds 4 MiB",
+            ))
+            .into());
         }
         parse(&bytes, run)
     }
 
-    /// Atomic initial publication (D044): write and fsync an exclusive temporary
-    /// file in `sequences/`, publish via hard link so an existing record is never
-    /// overwritten (refusing with `already recorded`), then fsync the directory.
-    pub fn create_record(&self, record: &Record) -> Result<()> {
-        use std::sync::atomic::{AtomicU64, Ordering};
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let mut text = serde_json::to_string_pretty(record)
-            .map_err(|_| io("cannot encode sequence record"))?;
+    /// Pretty JSON with a final newline, within the record bound.
+    fn encode<T: Stored>(&self, record: &T) -> Result<String> {
+        debug_assert_eq!(T::KIND, self.kind);
+        let k = self.kind;
+        let mut text = serde_json::to_string_pretty(record).map_err(|_| {
+            io(k.say(
+                "cannot encode sequence record",
+                "cannot encode Ralph record",
+            ))
+        })?;
         text.push('\n');
         if text.len() > MAX_RECORD_BYTES {
-            return Err(io("sequence record would exceed 4 MiB"));
+            return Err(io(k.say(
+                "sequence record would exceed 4 MiB",
+                "Ralph record would exceed 4 MiB",
+            )));
         }
-        let dir = self.root.join("sequences");
+        Ok(text)
+    }
+
+    /// Atomic initial publication (D044): write and fsync an exclusive temporary
+    /// file in the kind's directory, publish via hard link so an existing record
+    /// is never overwritten (refusing with `already recorded`), then fsync the
+    /// directory.
+    pub fn create_record<T: Stored>(&self, record: &T) -> Result<()> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let k = self.kind;
+        let text = self.encode(record)?;
+        let dir = self.root.join(k.dir());
         let temp = dir.join(format!(
             ".{}.tmp-{}-{}",
-            record.run,
+            record.run(),
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
@@ -531,49 +801,48 @@ impl Store {
             use std::os::unix::fs::OpenOptionsExt;
             options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
         }
-        let mut file = options
-            .open(&temp)
-            .map_err(|_| io("cannot stage sequence record"))?;
+        let stage = k.say("cannot stage sequence record", "cannot stage Ralph record");
+        let mut file = options.open(&temp).map_err(|_| io(stage))?;
         let staged = file
             .write_all(text.as_bytes())
             .and_then(|()| file.sync_all());
         if staged.is_err() {
             let _ = std::fs::remove_file(&temp);
-            return Err(io("cannot stage sequence record"));
+            return Err(io(stage));
         }
-        let target = self.record_path(&record.run);
+        let written = k.say("cannot write sequence record", "cannot write Ralph record");
+        let target = self.record_path(record.run());
         let published = std::fs::hard_link(&temp, &target);
         let _ = std::fs::remove_file(&temp);
         match published {
             Ok(()) => {
                 File::open(&dir)
                     .and_then(|d| d.sync_all())
-                    .map_err(|_| io("cannot write sequence record"))?;
+                    .map_err(|_| io(written))?;
                 Ok(())
             }
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(Failure {
                 exit: Exit::Failed,
-                reason: "sequence run ID already recorded",
+                reason: k.say(
+                    "sequence run ID already recorded",
+                    "Ralph run ID already recorded",
+                ),
             }),
-            Err(_) => Err(io("cannot write sequence record")),
+            Err(_) => Err(io(written)),
         }
     }
 
     /// Atomic replace (D025): exclusive 0600 temporary file in the same
     /// directory, write, fsync, rename, then fsync the directory.
-    pub fn write(&self, record: &Record) -> Result<()> {
+    pub fn write<T: Stored>(&self, record: &T) -> Result<()> {
         use std::sync::atomic::{AtomicU64, Ordering};
         static NEXT: AtomicU64 = AtomicU64::new(0);
-        let mut text = serde_json::to_string_pretty(record)
-            .map_err(|_| io("cannot encode sequence record"))?;
-        text.push('\n');
-        if text.len() > MAX_RECORD_BYTES {
-            return Err(io("sequence record would exceed 4 MiB"));
-        }
-        let dir = self.root.join("sequences");
+        let k = self.kind;
+        let text = self.encode(record)?;
+        let dir = self.root.join(k.dir());
         let temp = dir.join(format!(
             ".{}.tmp-{}-{}",
-            record.run,
+            record.run(),
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
@@ -586,30 +855,30 @@ impl Store {
         }
         let mut file = options
             .open(&temp)
-            .map_err(|_| io("cannot stage sequence record"))?;
+            .map_err(|_| io(k.say("cannot stage sequence record", "cannot stage Ralph record")))?;
         let result = file
             .write_all(text.as_bytes())
             .and_then(|()| file.sync_all())
-            .and_then(|()| std::fs::rename(&temp, self.record_path(&record.run)))
+            .and_then(|()| std::fs::rename(&temp, self.record_path(record.run())))
             .and_then(|()| File::open(&dir)?.sync_all())
-            .map_err(|_| io("cannot write sequence record"));
+            .map_err(|_| io(k.say("cannot write sequence record", "cannot write Ralph record")));
         let _ = std::fs::remove_file(&temp);
         result
     }
 
     /// Every record file, ordered by run ID (creation time); unreadable ones
     /// are reported, not skipped silently.
-    pub fn list(&self) -> Result<Vec<(String, Result<Record>)>> {
+    pub fn list<T: Stored>(&self) -> Result<Vec<(String, Result<T>)>> {
+        let k = self.kind;
+        let failed = Invalid(k.say("cannot list sequence records", "cannot list Ralph records"));
         let mut runs = Vec::new();
-        for entry in std::fs::read_dir(self.root.join("sequences"))
-            .map_err(|_| Invalid("cannot list sequence records"))?
-        {
-            let entry = entry.map_err(|_| Invalid("cannot list sequence records"))?;
+        for entry in std::fs::read_dir(self.root.join(k.dir())).map_err(|_| failed)? {
+            let entry = entry.map_err(|_| failed)?;
             let Some(run) = entry
                 .file_name()
                 .to_str()
                 .and_then(|n| n.strip_suffix(".json"))
-                .filter(|n| valid_run_id(n))
+                .filter(|n| k.valid(n))
                 .map(str::to_owned)
             else {
                 continue;
@@ -624,20 +893,32 @@ impl Store {
 
 /// Parse record bytes: the schema version first, so a future version is
 /// refused as such rather than as unknown fields.
-pub fn parse(bytes: &[u8], run: &str) -> Result<Record> {
+pub fn parse<T: Stored>(bytes: &[u8], run: &str) -> Result<T> {
     #[derive(Deserialize)]
     struct Versioned {
         v: serde_json::Value,
     }
-    let versioned: Versioned = serde_json::from_slice(bytes)
-        .map_err(|_| Invalid("sequence record is unparsable; not rewritten"))?;
+    let k = T::KIND;
+    let versioned: Versioned = serde_json::from_slice(bytes).map_err(|_| {
+        Invalid(k.say(
+            "sequence record is unparsable; not rewritten",
+            "Ralph record is unparsable; not rewritten",
+        ))
+    })?;
     if versioned.v != serde_json::json!(VERSION) {
-        return Err(Invalid("sequence record schema version is unsupported; not rewritten").into());
+        return Err(Invalid(k.say(
+            "sequence record schema version is unsupported; not rewritten",
+            "Ralph record schema version is unsupported; not rewritten",
+        ))
+        .into());
     }
-    let record: Record = serde_json::from_slice(bytes)
-        .map_err(|_| Invalid("sequence record is invalid for schema v1; not rewritten"))?;
-    if record.run != run || record.steps.is_empty() {
-        return Err(Invalid("sequence record is invalid for schema v1; not rewritten").into());
+    let invalid = Invalid(k.say(
+        "sequence record is invalid for schema v1; not rewritten",
+        "Ralph record is invalid for schema v1; not rewritten",
+    ));
+    let record: T = serde_json::from_slice(bytes).map_err(|_| invalid)?;
+    if record.run() != run || !record.consistent() {
+        return Err(invalid.into());
     }
     Ok(record)
 }

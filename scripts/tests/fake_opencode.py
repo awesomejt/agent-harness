@@ -189,13 +189,17 @@ for line in sys.stdin:
                 # An agent edit to a later step file must not change the run.
                 for step in (cwd / 'prompts').glob('3-*.md'):
                     step.write_text('Edited by step agent.\n')
+            if 'EDIT-TASK' in text:
+                # P6.2: an agent edit to the Ralph task file must not change a running loop.
+                (cwd / 'TASK.md').write_text('Edited by the agent.\n')
             if 'SLEEP' in text:
                 (cwd / 'sleeping').touch()
                 continue
             if 'FAIL' in text:
                 reply(prompt_id, dict(stopReason='max_tokens'))
                 continue
-            update(sessionUpdate='agent_message_chunk', content=dict(type='text', text='OK'))
+            update(sessionUpdate='agent_message_chunk', content=dict(type='text',
+                   text='Done.\nAH-RALPH-COMPLETE\n' if 'CLAIM' in text else 'OK'))
             reply(prompt_id, dict(stopReason='end_turn'))
             continue
         if case in ['deny-progress', 'deny-completed', 'named-completed-edit', 'named-completed-read', 'named-completed-unknown']:
