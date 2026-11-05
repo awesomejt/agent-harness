@@ -426,6 +426,7 @@ enum SequenceCommand {
     Run,
     Resume,
     Ralph,
+    RalphResume,
 }
 
 /// Ralph loop bounds (D045): iterations per run, wall time per invocation.
@@ -531,53 +532,118 @@ impl Invocation {
         }
         if args.next().as_deref() != Some(std::ffi::OsStr::new("run")) {
             return Err(Invalid(
-                "unsupported ralph command; use ralph run FILE or ralph show",
+                "unsupported ralph command; use ralph run FILE, ralph resume RUN_ID or ralph show",
             ));
         }
-        let mut bounds = Bounds::default();
-        let (mut iterations, mut runtime) = (false, false);
+        let (rest, iterations, runtime) = Self::ralph_bounds(args)?;
+        let defaults = Bounds::default();
+        let bounds = Bounds {
+            max_iterations: iterations.unwrap_or(defaults.max_iterations),
+            max_runtime_secs: runtime.unwrap_or(defaults.max_runtime_secs),
+        };
+        let (request, file) = Self::options(rest.into_iter(), cwd, SequenceCommand::Ralph)?;
+        let file = file.ok_or(Invalid("provide a prompt file"))?;
+        request.ralph_checked("ralph run")?;
+        Ok((request, file, bounds))
+    }
+
+    /// Parse `ralph resume RUN_ID` (D045) after the caller removes
+    /// `--retry`/`--accept`: the coding options except `--project`,
+    /// `--config` and `--preview`, which come from the record or do not
+    /// apply, plus the loop bounds. `--verify` is required. Returns the raw
+    /// run ID (its grammar is checked by the caller), the iteration bound
+    /// only when given, and this invocation's wall bound.
+    pub fn parse_ralph_resume(
+        args: impl IntoIterator<Item = OsString>,
+        cwd: &Path,
+    ) -> Result<(Self, String, Option<u32>, u64)> {
+        let args: Vec<OsString> = args.into_iter().collect();
+        if args.len() < 2 || args[0] != "ralph" || args[1] != "resume" {
+            return Err(Invalid("expected ralph resume"));
+        }
+        if args[2..]
+            .iter()
+            .any(|a| a == "--project" || a == "--config" || a == "--preview")
+        {
+            return Err(Invalid(
+                "ralph resume takes project, config and prompt file from the record; --project, --config and --preview reject",
+            ));
+        }
+        let (rest, iterations, runtime) = Self::ralph_bounds(args.into_iter().skip(2))?;
+        let (request, run) = Self::options(rest.into_iter(), cwd, SequenceCommand::RalphResume)?;
+        let run = run.ok_or(Invalid("provide a run ID"))?;
+        request.ralph_checked("ralph resume")?;
+        // The positional was joined to cwd; recover the raw argument.
+        let run = run
+            .strip_prefix(cwd)
+            .ok()
+            .and_then(Path::to_str)
+            .ok_or(Invalid("run ID must be rYYYYMMDDTHHMMSSZ-xxxxxxxx"))?
+            .to_owned();
+        let runtime = runtime.unwrap_or(Bounds::default().max_runtime_secs);
+        Ok((request, run, iterations, runtime))
+    }
+
+    /// Remove `--max-iterations` (1–100) and `--max-runtime-secs`
+    /// (1–86400), each at most once, returning the remaining arguments.
+    fn ralph_bounds(
+        mut args: impl Iterator<Item = OsString>,
+    ) -> Result<(Vec<OsString>, Option<u32>, Option<u64>)> {
+        let (mut iterations, mut runtime) = (None, None);
         let mut rest = Vec::new();
         while let Some(arg) = args.next() {
-            let seen = match arg.to_str() {
-                Some("--max-iterations") => &mut iterations,
-                Some("--max-runtime-secs") => &mut runtime,
+            let name = match arg.to_str() {
+                Some(name @ ("--max-iterations" | "--max-runtime-secs")) => name,
                 _ => {
                     rest.push(arg);
                     continue;
                 }
             };
-            if std::mem::replace(seen, true) {
-                return Err(Invalid("duplicate option"));
-            }
             let value = args.next().ok_or(Invalid("missing option value"))?;
             let value = value.to_str().ok_or(Invalid("arguments must be UTF-8"))?;
-            if arg == "--max-iterations" {
-                bounds.max_iterations = value
-                    .parse()
-                    .ok()
-                    .filter(|n| (1..=100).contains(n))
-                    .ok_or(Invalid("--max-iterations must be 1–100"))?;
+            let duplicate = if name == "--max-iterations" {
+                iterations
+                    .replace(
+                        value
+                            .parse()
+                            .ok()
+                            .filter(|n| (1..=100).contains(n))
+                            .ok_or(Invalid("--max-iterations must be 1–100"))?,
+                    )
+                    .is_some()
             } else {
-                bounds.max_runtime_secs = value
-                    .parse()
-                    .ok()
-                    .filter(|s| (1..=86400).contains(s))
-                    .ok_or(Invalid("--max-runtime-secs must be 1–86400 seconds"))?;
+                runtime
+                    .replace(
+                        value
+                            .parse()
+                            .ok()
+                            .filter(|s| (1..=86400).contains(s))
+                            .ok_or(Invalid("--max-runtime-secs must be 1–86400 seconds"))?,
+                    )
+                    .is_some()
+            };
+            if duplicate {
+                return Err(Invalid("duplicate option"));
             }
         }
-        let (request, file) = Self::options(rest.into_iter(), cwd, SequenceCommand::Ralph)?;
-        if request.machine {
+        Ok((rest, iterations, runtime))
+    }
+
+    /// Ralph commands reject machine output and require a check.
+    fn ralph_checked(&self, command: &'static str) -> Result<()> {
+        if self.machine {
             return Err(Invalid(
                 "--output jsonl is unsupported for ralph commands; use human output",
             ));
         }
-        let file = file.ok_or(Invalid("provide a prompt file"))?;
-        if request.verify.is_none() {
-            return Err(Invalid(
-                "ralph run requires --verify CHECK; there is no unverified Ralph completion",
-            ));
+        if self.verify.is_none() {
+            return Err(Invalid(if command == "ralph run" {
+                "ralph run requires --verify CHECK; there is no unverified Ralph completion"
+            } else {
+                "ralph resume requires --verify CHECK; there is no unverified Ralph completion"
+            }));
         }
-        Ok((request, file, bounds))
+        Ok(())
     }
 
     /// Point a resumed invocation at its recorded project and config.
@@ -708,7 +774,12 @@ impl Invocation {
                             _ => return Err(Invalid("unsupported output format")),
                         }
                     }
-                    "--prompt-file" if sequence == SequenceCommand::Ralph => {
+                    "--prompt-file"
+                        if matches!(
+                            sequence,
+                            SequenceCommand::Ralph | SequenceCommand::RalphResume
+                        ) =>
+                    {
                         return Err(Invalid(
                             "ralph reads its prompt only from FILE; prompt sources reject",
                         ));
@@ -740,6 +811,7 @@ impl Invocation {
                     if folder.is_some() {
                         return Err(Invalid(match sequence {
                             SequenceCommand::Resume => "sequence resume takes one run ID",
+                            SequenceCommand::RalphResume => "ralph resume takes one run ID",
                             SequenceCommand::Ralph => {
                                 "ralph run takes one prompt file; prompt sources reject"
                             }

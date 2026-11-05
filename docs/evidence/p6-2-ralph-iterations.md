@@ -125,7 +125,7 @@ P6.3 test matrix are not part of this task.
   resume with `--retry`/`--accept` and the D045 P6.3 tests: false, stale and
   DONE-file signals, cancellation between iterations, check `error`, and the
   resume choices.
-- Known test gap until P6.3: cancellation between iterations is implemented (`next` checks the signal before each launch, and one signal watcher spans the loop). It is unit-tested only as the `next` decision. `ralph.py` exercises SIGINT during an iteration, not between two, and P6.3 adds that positive case.
+- Known test gap until P6.3: cancellation between iterations is implemented (`next` checks the signal before each launch, and one signal watcher spans the loop). It is unit-tested only as the `next` decision. `ralph.py` exercises SIGINT during an iteration, not between two, and P6.3 adds that positive case. Closed in [P6.3](p6-3-ralph-completion.md) by a scripted loop test.
 - Until P6.3, `show` reports any unfinished run as not resumable.
 - No live model run was made; P6.4 is the live use gate.
 - As for sequences, a concurrent `ah single` in the same project is not

@@ -198,8 +198,22 @@ for line in sys.stdin:
             if 'FAIL' in text:
                 reply(prompt_id, dict(stopReason='max_tokens'))
                 continue
+            # P6.3 Ralph signals. Only the first iteration of a run claims
+            # under CLAIM-ONCE; later ones write a DONE file and make the check
+            # pass without claiming. REPAIR fixes the project from iteration 2.
+            # RMCHECK removes the pinned check program before the gate.
+            first = 'Iteration: 1 of' in text
+            if ('REPAIR' in text or 'CLAIM-ONCE' in text) and not first:
+                (cwd / 'fixed').touch()
+            if 'CLAIM-ONCE' in text and not first:
+                (cwd / 'DONE').write_text('complete\n')
+            if 'RMCHECK' in text:
+                os.remove(json.loads((cwd / 'ah.json').read_text())['checks']['test']['argv'][0])
+            claim = (first if 'CLAIM-ONCE' in text
+                     else any(word in text for word in ['CLAIM', 'REPAIR', 'RMCHECK']))
             update(sessionUpdate='agent_message_chunk', content=dict(type='text',
-                   text='Done.\nAH-RALPH-COMPLETE\n' if 'CLAIM' in text else 'OK'))
+                   text='Done.\nAH-RALPH-COMPLETE\n' if claim else
+                   'The marker AH-RALPH-COMPLETE is mentioned, not claimed.\nOK' if 'MENTION' in text else 'OK'))
             reply(prompt_id, dict(stopReason='end_turn'))
             continue
         if case in ['deny-progress', 'deny-completed', 'named-completed-edit', 'named-completed-read', 'named-completed-unknown']:

@@ -24,7 +24,7 @@ Start with one Cargo package, a thin executable entry point and a library/module
 | `process` / `transport` | Streams, connection/process lifetime, cancellation and cleanup | OS/backend I/O behind adapter / 1–2 |
 | `output` | Human progress, redaction, final result and later machine events | Consumes domain events; cannot choose route / 2, 4 |
 | `agents` | Canonical YAML/Markdown validation and backend mapping | Produces constrained requests/emission plans / 4 |
-| `workflows` / `state` | Sequence/Ralph outer coordination and durable records (P5.2: `sequence`, calling the `single` launch path; P5.3: `state` records and lock; P6.2: `ralph`, sharing both) | Calls application; no direct provider bypass / 5–6 |
+| `workflows` / `state` | Sequence/Ralph outer coordination and durable records (P5.2: `sequence`, calling the `single` launch path; P5.3: `state` records and lock; P6.2–P6.3: `ralph`, sharing both, with its own `resume`) | Calls application; no direct provider bypass / 5–6 |
 
 Additional adapters arrive in Phases 7–8. Add traits only where fakes or real alternative implementations justify them; do not freeze an interface around every imagined backend. File placement can change with experiment evidence without altering policy ownership.
 

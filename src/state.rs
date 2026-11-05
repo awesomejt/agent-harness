@@ -402,6 +402,20 @@ pub struct Cost {
     pub currency: String,
 }
 
+impl Iteration {
+    /// Whether the iteration may have had effects, as for a sequence attempt:
+    /// only an agent iteration that ended rejected, failed or cancelled with no
+    /// backend prompt submitted is known to have had none.
+    pub fn may_have_effects(&self) -> bool {
+        self.reason == IterationReason::Accept
+            || !matches!(
+                self.status,
+                Status::Rejected | Status::Failed | Status::Cancelled
+            )
+            || self.backends.iter().any(|b| b.prompt_submitted)
+    }
+}
+
 impl RalphRecord {
     /// Agent iterations counted against the bound; `accept` runs no agent
     /// turn and is not counted.
