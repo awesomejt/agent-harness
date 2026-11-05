@@ -1,19 +1,24 @@
-# Phase 5 holistic review
+# Gemini holistic project review — Phase 5
 
 ## Review scope
 
-- Task: P5.6; reviewer: Antigravity / Gemini 3.8 Flash; date: 2026-11-04 (America/Denver).
-- Accepted entry baseline: `53e1707` (Phase 4 review pass, [PR #43](https://github.com/awesomejt/agent-harness/pull/43)). Reviewed material head: `f886208` (P5.4 sequence use gate, [PR #48](https://github.com/awesomejt/agent-harness/pull/48)). Range `53e1707..f886208`: 39 files (+5921/−140).
-- Included PRs:
+- **Reviewer/date:** Antigravity / Gemini 3.8 Flash, 2026-11-04 (America/Denver).
+- **Review task:** P5.6 ([card](../../tasks/05-sequences.md#p5-6)). This is one reviewer's independent assessment. It is not the canonical `phase-05.md` revision, and it does not record acceptance.
+- **Accepted entry:** `53e1707` (Phase 4 review pass, [PR #43](https://github.com/awesomejt/agent-harness/pull/43)). **Reviewed material head:** `f886208` (P5.4 sequence use gate, [PR #48](https://github.com/awesomejt/agent-harness/pull/48)). Range `53e1707..f886208`: 39 files (+5921/−140).
+- **Included PRs:**
   - [#44](https://github.com/awesomejt/agent-harness/pull/44) P5.5 trusted verification gates (`88db9e9`, `b583aed`, `1fa9df0`, `8642561`)
   - [#45](https://github.com/awesomejt/agent-harness/pull/45) P5.1 sequence decisions (`5473bb3`, `f1140f4`, `5591319`, `5b442ae`, `2add7ac`)
   - [#46](https://github.com/awesomejt/agent-harness/pull/46) P5.2 ordered prompt execution (`d546334`, `b54b613`, `602ec5f`, `5e326c7`)
   - [#47](https://github.com/awesomejt/agent-harness/pull/47) P5.3 durable resume and inspection (`94ec535`, `6959883`, `f16aee5`, `c77c406`)
   - [#48](https://github.com/awesomejt/agent-harness/pull/48) P5.4 sequence use gate (`a044171`, `1bd5b7d`, `ba0758b`, `f886208`)
-- Mandatory scope: P5.5, P5.1, P5.2, P5.3, P5.4, P5.6; D043 (trusted verification gates), D044 (sequence inputs, state and resume); G6 (ordered sequences), G7 (trusted verification gates).
-- Excluded scope: Phase 6 Ralph (P6.1–P6.5), Phase 7 native adapters (P7.1–P7.7), Phase 8 Pi (P8.1–P8.5), Phase 9 resource awareness (P9.1–P9.5), per-prompt operational modes (deferred from D003), continue-on-failure, sequence machine records (`--output jsonl` for sequence commands).
+- **Mandatory scope:** P5.5, P5.1, P5.2, P5.3, P5.4, P5.6; D043 (trusted verification gates), D044 (sequence inputs, state and resume); G6 (ordered sequences), G7 (trusted verification gates).
+- **Excluded scope:** Phase 6 Ralph (P6.1–P6.5), Phase 7 native adapters (P7.1–P7.7), Phase 8 Pi (P8.1–P8.5), Phase 9 resource awareness (P9.1–P9.5), per-prompt operational modes (deferred from D003), continue-on-failure, sequence machine records (`--output jsonl` for sequence commands).
 
-This is revision 1 of the canonical Phase 5 report under [PHASE_REVIEW.md](../PHASE_REVIEW.md) and [D042](../../DECISIONS.md#2026-11-03--d042-review-prs-merge-once-findings-are-recorded-fixes-go-through-grok-reviewed-patch-prs). The review PR records the holistic assessment, findings and remediation plan with gate outcome **changes required**. Remediation patch PR `patch/p5-6-review-fixes` will resolve every finding, record verification and propose the pass.
+## Conclusion
+
+**Changes required before Phase 5 acceptance: five open Low findings.** No Critical, High or Medium finding was identified, and no demonstrated defect in routing isolation, permission enforcement, fallback or project integrity. The implementation, tests and live evidence support Phase 5 ordered sequences and trusted verification gates as scoped on Apple Silicon macOS (`aarch64-apple-darwin`), macOS 27.0.1 with OpenCode 2.2.5.
+
+Under [PHASE_REVIEW.md](../PHASE_REVIEW.md), every finding must be resolved before a pass. Dependent phases must continue to wait for the accepted P5.6 gate.
 
 ## Integrated assessment
 
