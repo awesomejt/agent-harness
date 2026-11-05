@@ -284,10 +284,10 @@ fn records_are_private_atomic_strict_and_versioned() {
         std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
         0o600
     );
-    assert_eq!(store.read(RUN).unwrap(), r);
+    assert_eq!(store.read::<Record>(RUN).unwrap(), r);
     r.steps[0].status = Status::Active;
     store.write(&r).unwrap();
-    assert_eq!(store.read(RUN).unwrap(), r);
+    assert_eq!(store.read::<Record>(RUN).unwrap(), r);
     // No temporary file survives a write.
     let names: Vec<_> = std::fs::read_dir(path.parent().unwrap())
         .unwrap()
@@ -296,17 +296,21 @@ fn records_are_private_atomic_strict_and_versioned() {
     assert_eq!(names, vec![OsString::from(format!("{RUN}.json"))]);
     // Version first, then strict fields, then the filed run ID.
     let text = std::fs::read_to_string(&path).unwrap();
-    let refuse = |bytes: &str, run: &str| parse(bytes.as_bytes(), run).unwrap_err().reason;
+    let refuse =
+        |bytes: &str, run: &str| parse::<Record>(bytes.as_bytes(), run).unwrap_err().reason;
     assert!(refuse(&text.replacen("\"v\": 1", "\"v\": 2", 1), RUN).contains("version"));
     assert!(refuse(&text.replacen("\"v\": 1", "\"v\": \"1\"", 1), RUN).contains("version"));
     assert!(refuse(&text.replacen("{", "{\"extra\": 0,", 1), RUN).contains("schema v1"));
     assert!(refuse(&text, "s20261104T120000Z-ffffffff").contains("schema v1"));
     assert!(refuse("[", RUN).contains("unparsable"));
     // An invalid run ID never forms a path.
-    assert_eq!(store.read("../x").unwrap_err().exit, Exit::Invalid);
+    assert_eq!(
+        store.read::<Record>("../x").unwrap_err().exit,
+        Exit::Invalid
+    );
     assert!(
         store
-            .read("s20261104T120000Z-00000000")
+            .read::<Record>("s20261104T120000Z-00000000")
             .unwrap_err()
             .reason
             .contains("no sequence record")
@@ -314,7 +318,13 @@ fn records_are_private_atomic_strict_and_versioned() {
     // A symlinked record is refused, not followed.
     std::fs::rename(&path, base.join("moved.json")).unwrap();
     std::os::unix::fs::symlink(base.join("moved.json"), &path).unwrap();
-    assert!(store.read(RUN).unwrap_err().reason.contains("cannot open"));
+    assert!(
+        store
+            .read::<Record>(RUN)
+            .unwrap_err()
+            .reason
+            .contains("cannot open")
+    );
     std::fs::remove_dir_all(&base).unwrap();
 }
 
@@ -331,7 +341,7 @@ fn the_project_lock_is_exclusive_and_names_its_holder() {
         .err()
         .unwrap();
     assert_eq!(error.exit, Exit::Invalid);
-    assert!(error.reason.contains("another sequence holds"));
+    assert!(error.reason.contains("another sequence or Ralph run holds"));
     assert!(store.holds(&project, RUN));
     assert!(!store.holds(&project, "s20261104T120000Z-ffffffff"));
     // Another project is independent.

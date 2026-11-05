@@ -55,6 +55,9 @@ struct Summary {
     fallback: bool,
     /// `null` unless `--verify` resolved a check (D043).
     verification: Option<Map<String, Value>>,
+    /// Whether a delivered final response ended in the Ralph completion
+    /// marker (D045); the response itself is not kept for this.
+    claimed: bool,
 }
 
 /// An explicit public mapping of exits, not serialization of the Rust enum.
@@ -423,11 +426,17 @@ impl Progress {
     /// Human mode writes the final response to stdout now; machine mode
     /// carries it in the terminal result record instead.
     pub(crate) async fn deliver(&self, text: String) -> bool {
+        self.summary.lock().unwrap().claimed = crate::ralph::claims(&text);
         if self.machine.is_some() {
             self.summary.lock().unwrap().response = Some(text);
             return true;
         }
         response(text, self.line_end).await
+    }
+    /// Whether this run's delivered response claimed Ralph completion; only
+    /// meaningful after backend success.
+    pub(crate) fn claimed(&self) -> bool {
+        self.summary.lock().unwrap().claimed
     }
 }
 

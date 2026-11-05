@@ -15,7 +15,7 @@ pub const GROUP_PREFIX: &str = "group:";
 pub const MAX_GROUPS: usize = 64;
 
 /// Errors deliberately exclude untrusted input, paths, prompt text and credentials.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Invalid(pub &'static str);
 
 type Result<T> = std::result::Result<T, Invalid>;
@@ -235,7 +235,7 @@ pub(crate) fn instructions(project: &Path) -> Result<Option<PathBuf>> {
     }
 }
 
-fn open_regular_file(path: &Path) -> Result<std::fs::File> {
+pub(crate) fn open_regular_file(path: &Path) -> Result<std::fs::File> {
     let mut options = std::fs::OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
@@ -425,6 +425,23 @@ enum SequenceCommand {
     None,
     Run,
     Resume,
+    Ralph,
+}
+
+/// Ralph loop bounds (D045): iterations per run, wall time per invocation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Bounds {
+    pub max_iterations: u32,
+    pub max_runtime_secs: u64,
+}
+
+impl Default for Bounds {
+    fn default() -> Self {
+        Self {
+            max_iterations: 10,
+            max_runtime_secs: 3600,
+        }
+    }
 }
 
 impl Invocation {
@@ -498,6 +515,69 @@ impl Invocation {
             .ok_or(Invalid("run ID must be sYYYYMMDDTHHMMSSZ-xxxxxxxx"))?
             .to_owned();
         Ok((request, run))
+    }
+
+    /// Parse `ralph run FILE` (D045): the `single` coding options plus
+    /// `--preview` and the loop bounds. FILE is the only prompt source, so
+    /// inline text, `--prompt-file` and stdin reject; `--verify` is required
+    /// and `--output jsonl` rejects. FILE is relative to cwd.
+    pub fn parse_ralph(
+        args: impl IntoIterator<Item = OsString>,
+        cwd: &Path,
+    ) -> Result<(Self, PathBuf, Bounds)> {
+        let mut args = args.into_iter();
+        if args.next().as_deref() != Some(std::ffi::OsStr::new("ralph")) {
+            return Err(Invalid("expected ralph command"));
+        }
+        if args.next().as_deref() != Some(std::ffi::OsStr::new("run")) {
+            return Err(Invalid(
+                "unsupported ralph command; use ralph run FILE or ralph show",
+            ));
+        }
+        let mut bounds = Bounds::default();
+        let (mut iterations, mut runtime) = (false, false);
+        let mut rest = Vec::new();
+        while let Some(arg) = args.next() {
+            let seen = match arg.to_str() {
+                Some("--max-iterations") => &mut iterations,
+                Some("--max-runtime-secs") => &mut runtime,
+                _ => {
+                    rest.push(arg);
+                    continue;
+                }
+            };
+            if std::mem::replace(seen, true) {
+                return Err(Invalid("duplicate option"));
+            }
+            let value = args.next().ok_or(Invalid("missing option value"))?;
+            let value = value.to_str().ok_or(Invalid("arguments must be UTF-8"))?;
+            if arg == "--max-iterations" {
+                bounds.max_iterations = value
+                    .parse()
+                    .ok()
+                    .filter(|n| (1..=100).contains(n))
+                    .ok_or(Invalid("--max-iterations must be 1–100"))?;
+            } else {
+                bounds.max_runtime_secs = value
+                    .parse()
+                    .ok()
+                    .filter(|s| (1..=86400).contains(s))
+                    .ok_or(Invalid("--max-runtime-secs must be 1–86400 seconds"))?;
+            }
+        }
+        let (request, file) = Self::options(rest.into_iter(), cwd, SequenceCommand::Ralph)?;
+        if request.machine {
+            return Err(Invalid(
+                "--output jsonl is unsupported for ralph commands; use human output",
+            ));
+        }
+        let file = file.ok_or(Invalid("provide a prompt file"))?;
+        if request.verify.is_none() {
+            return Err(Invalid(
+                "ralph run requires --verify CHECK; there is no unverified Ralph completion",
+            ));
+        }
+        Ok((request, file, bounds))
     }
 
     /// Point a resumed invocation at its recorded project and config.
@@ -628,6 +708,11 @@ impl Invocation {
                             _ => return Err(Invalid("unsupported output format")),
                         }
                     }
+                    "--prompt-file" if sequence == SequenceCommand::Ralph => {
+                        return Err(Invalid(
+                            "ralph reads its prompt only from FILE; prompt sources reject",
+                        ));
+                    }
                     "--prompt-file" if sequence != SequenceCommand::None => {
                         return Err(Invalid(
                             "sequence steps come from the prompt folder; prompt sources reject",
@@ -653,10 +738,12 @@ impl Invocation {
                 }
                 if sequence != SequenceCommand::None {
                     if folder.is_some() {
-                        return Err(Invalid(if sequence == SequenceCommand::Resume {
-                            "sequence resume takes one run ID"
-                        } else {
-                            "sequence run takes one prompt folder; prompt sources reject"
+                        return Err(Invalid(match sequence {
+                            SequenceCommand::Resume => "sequence resume takes one run ID",
+                            SequenceCommand::Ralph => {
+                                "ralph run takes one prompt file; prompt sources reject"
+                            }
+                            _ => "sequence run takes one prompt folder; prompt sources reject",
                         }));
                     }
                     folder = Some(cwd.join(arg));
@@ -668,7 +755,8 @@ impl Invocation {
                 prompt = Some(PromptSource::Inline(arg.to_owned()));
             }
         }
-        // Each sequence step substitutes its own prompt (`step`).
+        // Each sequence step and Ralph iteration substitutes its own prompt
+        // (`step`).
         request.prompt = if sequence != SequenceCommand::None {
             PromptSource::Inline(String::new())
         } else {
