@@ -406,3 +406,221 @@ fn metadata_conflicts_and_missing_references_name_the_step() {
         (0, "API key environment reference is missing or empty")
     );
 }
+
+#[test]
+fn sequence_resume_options_and_positional_bounds() {
+    let cwd = std::env::temp_dir();
+    let parse = |args: &[&str]| {
+        Invocation::parse_resume(args.iter().map(OsString::from), &cwd)
+            .err()
+            .map(|e| e.0)
+    };
+    for (args, reason) in [
+        (
+            &["sequence", "resume", "s1", "s2"][..],
+            "sequence resume takes one run ID",
+        ),
+        (&["sequence", "resume"], "provide a run ID"),
+        (
+            &["sequence", "resume", "s1", "--project", "/tmp"],
+            "sequence resume takes project and config from the record; --project, --config and --preview reject",
+        ),
+        (
+            &["sequence", "resume", "s1", "--config", "/tmp/ah.json"],
+            "sequence resume takes project and config from the record; --project, --config and --preview reject",
+        ),
+        (
+            &["sequence", "resume", "s1", "--preview"],
+            "sequence resume takes project and config from the record; --project, --config and --preview reject",
+        ),
+        (
+            &["sequence", "resume", "s1", "--output", "jsonl"],
+            "--output jsonl is unsupported for sequence commands; use human output",
+        ),
+    ] {
+        let error = parse(args).expect("rejects");
+        assert!(error.contains(reason), "{args:?}: {error}");
+    }
+}
+
+#[test]
+fn resume_requires_same_check_gate_even_if_later_steps_have_metadata_errors() {
+    use awesomejt_agent_harness::state::{
+        Attempt, Backend, CheckIdentity, Reason, Record, RunStatus, Status, StepRecord, Store,
+    };
+    use std::process::Command;
+
+    let base = std::env::temp_dir().join(format!("ah-resume-gate-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    std::fs::create_dir_all(&base).unwrap();
+    let project_dir = base.join("project");
+    std::fs::create_dir_all(project_dir.join("agents")).unwrap();
+    let prompts_dir = project_dir.join("prompts");
+    std::fs::create_dir_all(&prompts_dir).unwrap();
+    let xdg_state = base.join("state");
+    let state_root = xdg_state.join("agent-harness");
+
+    std::fs::write(
+        project_dir.join("agents/coder.md"),
+        AGENT.replace("NAME", "coder"),
+    )
+    .unwrap();
+    std::fs::write(
+        project_dir.join("ah.json"),
+        br#"{"version":1,"mode":"local-only","model":"fixture","litellm":{"api_base":"http://127.0.0.1:9/v1","api_key_env":"TEST_KEY"},"checks":{"test":{"argv":["/usr/bin/true"]}}}"#,
+    )
+    .unwrap();
+
+    // Step 1: succeeded
+    std::fs::write(prompts_dir.join("1-one.md"), "One.\n").unwrap();
+    // Step 2: failed while gated by check "test"
+    std::fs::write(prompts_dir.join("2-two.md"), "Two.\n").unwrap();
+    // Step 3: has a metadata conflict / error that would fail resolve_all!
+    std::fs::write(
+        prompts_dir.join("3-three.md"),
+        "---\nagent: absent\n---\nThree.\n",
+    )
+    .unwrap();
+
+    let store = Store::create(state_root, &project_dir).unwrap();
+    let run_id = "s20261104T120000Z-12345678";
+    let step1_step = Step::parse("1-one.md", "One.\n").unwrap();
+    let step2_step = Step::parse("2-two.md", "Two.\n").unwrap();
+
+    let check_id = CheckIdentity {
+        name: "test".into(),
+        program: "/usr/bin/true".into(),
+        argv_sha256: "0".repeat(64),
+    };
+
+    let record = Record {
+        v: 1,
+        run: run_id.into(),
+        created: "2026-11-04T12:00:00Z".into(),
+        updated: "2026-11-04T12:00:00Z".into(),
+        project: project_dir.to_str().unwrap().into(),
+        folder: prompts_dir.to_str().unwrap().into(),
+        config: project_dir.join("ah.json").to_str().unwrap().into(),
+        status: RunStatus::Stopped,
+        steps: vec![
+            StepRecord {
+                name: step1_step.name.clone(),
+                sha256: step1_step.sha256.clone(),
+                agent: None,
+                check: None,
+                status: Status::Succeeded,
+                attempts: vec![Attempt {
+                    number: 1,
+                    reason: Reason::Initial,
+                    status: Status::Succeeded,
+                    started: "2026-11-04T12:00:00Z".into(),
+                    ended: Some("2026-11-04T12:00:01Z".into()),
+                    input_sha256: step1_step.sha256.clone(),
+                    agent_sha256: None,
+                    check: None,
+                    route: "local-only".into(),
+                    model: "ah-litellm/fixture".into(),
+                    fallback: None,
+                    permissions: "deny".into(),
+                    timeout_secs: 60,
+                    agent_outcome: None,
+                    exit: Some(0),
+                    verification: None,
+                    backends: vec![Backend {
+                        attempt: 1,
+                        launched: true,
+                        prompt_submitted: true,
+                        backend_stop: None,
+                        cleanup_confirmed: Some(true),
+                        grants: Some(0),
+                        tool_events: Some(0),
+                    }],
+                }],
+            },
+            StepRecord {
+                name: step2_step.name.clone(),
+                sha256: step2_step.sha256.clone(),
+                agent: None,
+                check: Some("test".into()),
+                status: Status::Failed,
+                attempts: vec![Attempt {
+                    number: 1,
+                    reason: Reason::Initial,
+                    status: Status::Failed,
+                    started: "2026-11-04T12:00:02Z".into(),
+                    ended: Some("2026-11-04T12:00:03Z".into()),
+                    input_sha256: step2_step.sha256.clone(),
+                    agent_sha256: None,
+                    check: Some(check_id),
+                    route: "local-only".into(),
+                    model: "ah-litellm/fixture".into(),
+                    fallback: None,
+                    permissions: "deny".into(),
+                    timeout_secs: 60,
+                    agent_outcome: None,
+                    exit: Some(1),
+                    verification: None,
+                    backends: vec![Backend {
+                        attempt: 1,
+                        launched: true,
+                        prompt_submitted: true,
+                        backend_stop: None,
+                        cleanup_confirmed: Some(true),
+                        grants: Some(0),
+                        tool_events: Some(0),
+                    }],
+                }],
+            },
+        ],
+    };
+    store.create_record(&record).unwrap();
+
+    let run_cmd = |extra_args: &[&str]| {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_ah"));
+        cmd.args(["sequence", "resume", run_id]);
+        cmd.args(extra_args);
+        cmd.env("XDG_STATE_HOME", &xdg_state);
+        cmd.env("TEST_KEY", "secret");
+        cmd.output().unwrap()
+    };
+
+    // Bare resume of an attempt with possible effects requires --retry or --accept first.
+    let out = run_cmd(&[]);
+    assert_eq!(out.status.code(), Some(2));
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(err.contains("pass --retry or --accept"), "stderr: {err}");
+
+    // --retry without --verify requires the recorded check gate
+    let out = run_cmd(&["--retry"]);
+    assert_eq!(out.status.code(), Some(2));
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        err.contains("step 2-two.md: its last attempt was gated by check \"test\"; --retry requires --verify and the same check"),
+        "stderr: {err}"
+    );
+
+    // --accept without --verify requires the recorded check gate
+    let out = run_cmd(&["--accept"]);
+    assert_eq!(out.status.code(), Some(2));
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        err.contains("step 2-two.md: its last attempt was gated by check \"test\"; --accept requires --verify and the same check"),
+        "stderr: {err}"
+    );
+
+    // Now test bare resume when the attempt did not submit a prompt (no effects):
+    // Bare resume proceeds without --retry/--accept, but must still enforce the gate.
+    let mut no_effects_record = record.clone();
+    no_effects_record.steps[1].attempts[0].backends[0].prompt_submitted = false;
+    store.write(&no_effects_record).unwrap();
+
+    let out = run_cmd(&[]);
+    assert_eq!(out.status.code(), Some(2));
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        err.contains("step 2-two.md: its last attempt was gated by check \"test\"; resume requires --verify and the same check"),
+        "stderr: {err}"
+    );
+
+    let _ = std::fs::remove_dir_all(base);
+}

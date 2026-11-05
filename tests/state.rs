@@ -97,6 +97,7 @@ fn resume_plan_requires_a_choice_whenever_effects_are_possible() {
     );
     let at = |status, attempt| record(&snapshot, &[done.clone(), (status, vec![attempt])]);
     // Never submitted: rejected, failed or cancelled before the prompt.
+    // D044 (C05-02): Choice::Accept requires an attempt that may have had effects.
     for status in [Status::Rejected, Status::Failed, Status::Cancelled] {
         let r = at(status, attempt(Reason::Initial, status, false));
         assert_eq!(
@@ -106,6 +107,15 @@ fn resume_plan_requires_a_choice_whenever_effects_are_possible() {
         assert_eq!(
             plan(&r, &snapshot, Choice::Retry),
             Ok(Some((1, Reason::Retry)))
+        );
+        assert_eq!(
+            plan(&r, &snapshot, Choice::Accept),
+            Err((
+                "2-b.md".into(),
+                awesomejt_agent_harness::config::Invalid(
+                    "its last attempt had no effects; --accept requires an attempt that may have had effects"
+                )
+            ))
         );
     }
     // Submitted, uncertain, interrupted, or a failed accept: refuse without a
@@ -136,6 +146,15 @@ fn resume_plan_requires_a_choice_whenever_effects_are_possible() {
     assert_eq!(
         plan(&r, &snapshot, Choice::None),
         Ok(Some((1, Reason::Resume)))
+    );
+    assert_eq!(
+        plan(&r, &snapshot, Choice::Accept),
+        Err((
+            "2-b.md".into(),
+            awesomejt_agent_harness::config::Invalid(
+                "this step has not been attempted; --accept requires an attempt that may have had effects"
+            )
+        ))
     );
     // Everything complete: nothing to do, unless steps were appended.
     let all = record(&snapshot[..2], &[done.clone(), done.clone()]);
@@ -251,7 +270,15 @@ fn records_are_private_atomic_strict_and_versioned() {
     }
     let snapshot = three();
     let mut r = record(&snapshot, &vec![(Status::Pending, vec![]); 3]);
-    store.write(&r).unwrap();
+    store.create_record(&r).unwrap();
+    // K05-06: Atomic creation fails if the file already exists.
+    assert!(
+        store
+            .create_record(&r)
+            .unwrap_err()
+            .reason
+            .contains("already recorded")
+    );
     let path = store.record_path(RUN);
     assert_eq!(
         std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,

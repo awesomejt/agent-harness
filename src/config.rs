@@ -420,6 +420,13 @@ fn validate_timeout(seconds: u64) -> Result<()> {
     Ok(())
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SequenceCommand {
+    None,
+    Run,
+    Resume,
+}
+
 impl Invocation {
     /// Parse `single` input without side effects. Paths are relative to
     /// invocation cwd, never project.
@@ -428,7 +435,7 @@ impl Invocation {
         if args.next().as_deref() != Some(std::ffi::OsStr::new("single")) {
             return Err(Invalid("expected single command"));
         }
-        Self::options(args, cwd, false).map(|(request, _)| request)
+        Self::options(args, cwd, SequenceCommand::None).map(|(request, _)| request)
     }
 
     /// Parse `sequence run DIR` (D044): the `single` coding options plus
@@ -447,7 +454,7 @@ impl Invocation {
                 "unsupported sequence command; use sequence run DIR",
             ));
         }
-        let (request, folder) = Self::options(args, cwd, true)?;
+        let (request, folder) = Self::options(args, cwd, SequenceCommand::Run)?;
         if request.machine {
             return Err(Invalid(
                 "--output jsonl is unsupported for sequence commands; use human output",
@@ -476,7 +483,7 @@ impl Invocation {
                 "sequence resume takes project and config from the record; --project, --config and --preview reject",
             ));
         }
-        let (request, run) = Self::options(args.into_iter().skip(2), cwd, true)?;
+        let (request, run) = Self::options(args.into_iter().skip(2), cwd, SequenceCommand::Resume)?;
         if request.machine {
             return Err(Invalid(
                 "--output jsonl is unsupported for sequence commands; use human output",
@@ -523,10 +530,14 @@ impl Invocation {
         self.preview
     }
 
+    pub fn verify(&self) -> Option<&str> {
+        self.verify.as_deref()
+    }
+
     fn options(
         mut args: impl Iterator<Item = OsString>,
         cwd: &Path,
-        sequence: bool,
+        sequence: SequenceCommand,
     ) -> Result<(Self, Option<PathBuf>)> {
         let mut folder = None;
         let mut request = Self {
@@ -617,7 +628,7 @@ impl Invocation {
                             _ => return Err(Invalid("unsupported output format")),
                         }
                     }
-                    "--prompt-file" if sequence => {
+                    "--prompt-file" if sequence != SequenceCommand::None => {
                         return Err(Invalid(
                             "sequence steps come from the prompt folder; prompt sources reject",
                         ));
@@ -640,11 +651,13 @@ impl Invocation {
                         "unsupported option; use --prompt-file for leading-dash text",
                     ));
                 }
-                if sequence {
+                if sequence != SequenceCommand::None {
                     if folder.is_some() {
-                        return Err(Invalid(
-                            "sequence run takes one prompt folder; prompt sources reject",
-                        ));
+                        return Err(Invalid(if sequence == SequenceCommand::Resume {
+                            "sequence resume takes one run ID"
+                        } else {
+                            "sequence run takes one prompt folder; prompt sources reject"
+                        }));
                     }
                     folder = Some(cwd.join(arg));
                     continue;
@@ -656,7 +669,7 @@ impl Invocation {
             }
         }
         // Each sequence step substitutes its own prompt (`step`).
-        request.prompt = if sequence {
+        request.prompt = if sequence != SequenceCommand::None {
             PromptSource::Inline(String::new())
         } else {
             prompt.ok_or(Invalid("provide inline prompt or --prompt-file PATH|-"))?

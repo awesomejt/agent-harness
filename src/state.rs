@@ -505,6 +505,60 @@ impl Store {
         parse(&bytes, run)
     }
 
+    /// Atomic initial publication (D044): write and fsync an exclusive temporary
+    /// file in `sequences/`, publish via hard link so an existing record is never
+    /// overwritten (refusing with `already recorded`), then fsync the directory.
+    pub fn create_record(&self, record: &Record) -> Result<()> {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let mut text = serde_json::to_string_pretty(record)
+            .map_err(|_| io("cannot encode sequence record"))?;
+        text.push('\n');
+        if text.len() > MAX_RECORD_BYTES {
+            return Err(io("sequence record would exceed 4 MiB"));
+        }
+        let dir = self.root.join("sequences");
+        let temp = dir.join(format!(
+            ".{}.tmp-{}-{}",
+            record.run,
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
+        }
+        let mut file = options
+            .open(&temp)
+            .map_err(|_| io("cannot stage sequence record"))?;
+        let staged = file
+            .write_all(text.as_bytes())
+            .and_then(|()| file.sync_all());
+        if staged.is_err() {
+            let _ = std::fs::remove_file(&temp);
+            return Err(io("cannot stage sequence record"));
+        }
+        let target = self.record_path(&record.run);
+        let published = std::fs::hard_link(&temp, &target);
+        let _ = std::fs::remove_file(&temp);
+        match published {
+            Ok(()) => {
+                File::open(&dir)
+                    .and_then(|d| d.sync_all())
+                    .map_err(|_| io("cannot write sequence record"))?;
+                Ok(())
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(Failure {
+                exit: Exit::Failed,
+                reason: "sequence run ID already recorded",
+            }),
+            Err(_) => Err(io("cannot write sequence record")),
+        }
+    }
+
     /// Atomic replace (D025): exclusive 0600 temporary file in the same
     /// directory, write, fsync, rename, then fsync the directory.
     pub fn write(&self, record: &Record) -> Result<()> {

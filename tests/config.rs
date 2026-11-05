@@ -1172,6 +1172,21 @@ fn verify_resolves_a_declared_check_and_pins_its_program_outside_the_project() {
             Some(Invalid(inside))
         );
     }
+    // K05-01: Directory symlinks traversing the project also reject.
+    let outside_dir = base.join("outside_dir");
+    std::fs::create_dir(&outside_dir).unwrap();
+    std::os::unix::fs::symlink(project.join("bin"), outside_dir.join("to_project_bin")).unwrap();
+    std::os::unix::fs::symlink(&bin, project.join("bin/to_outside_bin")).unwrap();
+    let checks_dir_link = format!(
+        r#"{{"test":{{"argv":["{}"]}}}}"#,
+        outside_dir
+            .join("to_project_bin/to_outside_bin/checker")
+            .display()
+    );
+    assert_eq!(
+        resolve(&checks_dir_link, "test", &path).err(),
+        Some(Invalid(inside))
+    );
     // An outside link to an outside program is executed by its found name.
     std::os::unix::fs::symlink(bin.join("checker"), bin.join("alias")).unwrap();
     let alias = r#"{"test":{"argv":["alias"]}}"#;

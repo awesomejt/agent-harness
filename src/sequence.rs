@@ -369,13 +369,7 @@ fn start(args: Vec<OsString>) -> Exit {
             .map(|(step, request)| pending(step, request))
             .collect(),
     };
-    if store.record_path(&run).exists() {
-        return fail(crate::state::Failure {
-            exit: Exit::Failed,
-            reason: "sequence run ID already recorded",
-        });
-    }
-    if let Err(failure) = store.write(&record) {
+    if let Err(failure) = store.create_record(&record) {
         return fail(failure);
     }
     note(format_args!(
@@ -681,14 +675,31 @@ impl Session {
 
     /// An operator `accept` without a check: no agent turn and nothing run;
     /// recorded `accepted`, never labeled verified.
-    fn accept_ungated(&self, index: usize, step: &Step, request: &Resolved) -> Exit {
-        let number = self.record.borrow().steps[index]
-            .attempts
-            .last()
-            .map_or(1, |a| a.number + 1);
+    fn accept_ungated(
+        &self,
+        index: usize,
+        step: &Step,
+        request: &Resolved,
+        progress: &crate::progress::Progress,
+    ) -> Exit {
+        let previous = self.record.borrow().steps[index].attempts.last().cloned();
+        let number = previous.as_ref().map_or(1, |a| a.number + 1);
         let Ok(mut attempt) = attempt(step, request, number, Reason::Accept) else {
             return Exit::Invalid;
         };
+        if let Some(previous) = &previous {
+            let changed = changes(previous, &attempt);
+            progress.event(format!(
+                "sequence step {} attempt {number} (accept) changed since attempt {}: {}",
+                step.name,
+                previous.number,
+                if changed.is_empty() {
+                    "nothing".to_owned()
+                } else {
+                    changed.join(", ")
+                }
+            ));
+        }
         attempt.status = Status::Accepted;
         attempt.exit = Some(0);
         attempt.ended = Some(crate::state::now());
@@ -796,7 +807,7 @@ fn execute(
                         "sequence step {} accepted by the operator; no agent turn and no check; not labeled verified",
                         step.name
                     ));
-                    return session.accept_ungated(index, step, request);
+                    return session.accept_ungated(index, step, request, &progress);
                 }
                 if let Err(exit) = session.begin(index, step, request, reason, &progress) {
                     return exit;
@@ -926,12 +937,20 @@ pub fn plan(
     }
     let Some(stopping) = stopping else {
         // Never attempted: run it with no choice needed.
+        if choice == Choice::Accept {
+            return Err((
+                steps[done].name.clone(),
+                Invalid(
+                    "this step has not been attempted; --accept requires an attempt that may have had effects",
+                ),
+            ));
+        }
         return Ok(Some((
             done,
             match choice {
                 Choice::None => Reason::Resume,
                 Choice::Retry => Reason::Retry,
-                Choice::Accept => Reason::Accept,
+                Choice::Accept => unreachable!(),
             },
         )));
     };
@@ -942,6 +961,14 @@ pub fn plan(
         ));
     }
     let last = stopping.attempts.last().expect("attempted");
+    if choice == Choice::Accept && !last.may_have_effects() {
+        return Err((
+            stopping.name.clone(),
+            Invalid(
+                "its last attempt had no effects; --accept requires an attempt that may have had effects",
+            ),
+        ));
+    }
     let reason = match choice {
         Choice::Retry => Reason::Retry,
         Choice::Accept => Reason::Accept,
@@ -1053,6 +1080,27 @@ fn resume(args: Vec<OsString>) -> Exit {
         }
         Err((step, error)) => return reject(format_args!("step {step}: {}", error.0)),
     };
+    // D044: a step whose last attempt was gated stays gated from the record
+    // on any resume (bare, --retry or --accept); check before resolving later
+    // steps so subsequent metadata cannot obscure it.
+    let recorded_gate = record
+        .steps
+        .get(start)
+        .and_then(|s| s.attempts.last())
+        .and_then(|a| a.check.as_ref());
+    if let Some(gate) = recorded_gate {
+        let action = match reason {
+            Reason::Accept => "--accept",
+            Reason::Retry => "--retry",
+            _ => "resume",
+        };
+        if invocation.verify() != Some(&gate.name) {
+            return reject(format_args!(
+                "step {}: its last attempt was gated by check \"{}\"; {action} requires --verify and the same check",
+                steps[start].name, gate.name
+            ));
+        }
+    }
     // Only the remaining steps resolve, afresh from the current config and
     // this invocation's route options.
     invocation.rebase(project.clone(), config_path.clone());
@@ -1067,14 +1115,15 @@ fn resume(args: Vec<OsString>) -> Exit {
     if requests[0].project != project {
         return reject("recorded project path no longer resolves to itself; start a new run");
     }
-    if reason == Reason::Accept {
-        // A step whose last attempt was gated stays gated from the record.
-        let recorded = record.steps.get(start).and_then(|s| s.attempts.last());
-        if let Some(gate) = recorded.and_then(|a| a.check.as_ref())
-            && requests[0].verify.as_ref().map(|c| &c.name) != Some(&gate.name)
-        {
+    if let Some(gate) = recorded_gate {
+        if requests[0].verify.as_ref().map(|c| &c.name) != Some(&gate.name) {
+            let action = match reason {
+                Reason::Accept => "--accept",
+                Reason::Retry => "--retry",
+                _ => "resume",
+            };
             return reject(format_args!(
-                "step {}: its last attempt was gated by check \"{}\"; --accept requires --verify and the same check",
+                "step {}: its last attempt was gated by check \"{}\"; {action} requires --verify and the same check",
                 steps[start].name, gate.name
             ));
         }

@@ -116,6 +116,20 @@ impl Definition {
     }
 }
 
+fn normalize_lexical(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                normalized.pop();
+            }
+            c => normalized.push(c),
+        }
+    }
+    normalized
+}
+
 /// Reject the program when it, or any symlink hop to it, lies inside the
 /// project: the agent could replace or retarget that entry during the run.
 fn outside(found: &Path, project: &Path) -> Result<(), Invalid> {
@@ -123,24 +137,79 @@ fn outside(found: &Path, project: &Path) -> Result<(), Invalid> {
         "check program must resolve outside the project; agent-editable programs are untrusted",
     );
     const UNAVAILABLE: Invalid = Invalid("check program is unavailable");
-    let mut hop = found.to_path_buf();
-    for _ in 0..40 {
-        let (Some(parent), Some(name)) = (hop.parent(), hop.file_name()) else {
-            return Err(UNAVAILABLE);
+
+    if !found.is_absolute() {
+        return Err(UNAVAILABLE);
+    }
+
+    let mut current = PathBuf::from("/");
+    let mut remaining = found
+        .strip_prefix("/")
+        .map_err(|_| UNAVAILABLE)?
+        .to_path_buf();
+    let mut hops = 0;
+
+    while !remaining.as_os_str().is_empty() {
+        let (first, next_remaining) = {
+            let mut components = remaining.components();
+            let first = components
+                .next()
+                .ok_or(UNAVAILABLE)?
+                .as_os_str()
+                .to_os_string();
+            let next_remaining = components.as_path().to_path_buf();
+            (first, next_remaining)
         };
-        let entry = parent.canonicalize().map_err(|_| UNAVAILABLE)?.join(name);
-        if entry.starts_with(project) {
+        remaining = next_remaining;
+
+        if first == ".." {
+            current.pop();
+        } else if first != "." {
+            current.push(first);
+        }
+
+        if current.starts_with(project) {
             return Err(INSIDE);
         }
-        // Fail closed: only a confirmed non-symlink ends the walk.
-        let metadata = std::fs::symlink_metadata(&entry).map_err(|_| UNAVAILABLE)?;
-        if !metadata.file_type().is_symlink() {
-            return Ok(());
+
+        let metadata = std::fs::symlink_metadata(&current).map_err(|_| UNAVAILABLE)?;
+        if metadata.file_type().is_symlink() {
+            hops += 1;
+            if hops > 40 {
+                return Err(UNAVAILABLE);
+            }
+            let target = std::fs::read_link(&current).map_err(|_| UNAVAILABLE)?;
+            let parent = current.parent().unwrap_or(Path::new("/"));
+            let full_target = normalize_lexical(&if target.is_absolute() {
+                target
+            } else {
+                parent.join(target)
+            });
+
+            if full_target.starts_with(project) {
+                return Err(INSIDE);
+            }
+            if !full_target.is_absolute() {
+                return Err(UNAVAILABLE);
+            }
+
+            current = PathBuf::from("/");
+            remaining = full_target
+                .strip_prefix("/")
+                .map_err(|_| UNAVAILABLE)?
+                .join(&remaining);
         }
-        let target = std::fs::read_link(&entry).map_err(|_| UNAVAILABLE)?;
-        hop = entry.parent().unwrap_or(Path::new("/")).join(target);
     }
-    Err(UNAVAILABLE)
+
+    if current.starts_with(project) {
+        return Err(INSIDE);
+    }
+    let canonical = current.canonicalize().map_err(|_| UNAVAILABLE)?;
+    if canonical.starts_with(project) {
+        return Err(INSIDE);
+    }
+
+    Ok(())
 }
 
 fn executable(path: &Path) -> bool {

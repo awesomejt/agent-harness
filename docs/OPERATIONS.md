@@ -1,6 +1,6 @@
 # Operations and distribution contract
 
-Status: P4.5 core-MVP runbook for `0.1.0-alpha.2` (D041): the declared platform matrix, installation, separate prerequisites, sample configuration and agents, setup check, upgrade from `0.1.0-alpha.1`, rollback and the maintainer release procedure. All three routing modes, named agents and machine output ship in this artifact. Workflow and additional native-adapter guidance remains prospective. See [P4.5 evidence](evidence/p4-5-mvp-artifacts.md); the first artifact's [P2.5 evidence](evidence/p2-5-installable-binary.md) remains the historical record for alpha.1.
+Status: P4.5 core-MVP runbook for `0.1.0-alpha.2` (D041): the declared platform matrix, installation, separate prerequisites, sample configuration and agents, setup check, upgrade from `0.1.0-alpha.1`, rollback and the maintainer release procedure. All three routing modes, named agents and machine output ship in this artifact. Ordered sequences and verification gates are implemented in Phase 5 (source functionality); Ralph and additional native-adapter guidance remains prospective. See [P4.5 evidence](evidence/p4-5-mvp-artifacts.md); the first artifact's [P2.5 evidence](evidence/p2-5-installable-binary.md) remains the historical record for alpha.1.
 
 The [deployment diagram](ARCHITECTURE.md) separates the release pipeline, local executable, installed runtime and external services. Rust library dependencies are linked/packaged for the target as required; binary users do not install Cargo packages manually.
 
