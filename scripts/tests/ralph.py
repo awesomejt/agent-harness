@@ -324,6 +324,17 @@ assert len(prompts) == 1 and [(i['reason'], i['status']) for i in r['iterations'
     ('initial', 'failed'), ('retry', 'succeeded')], r['iterations']
 assert r['status'] == 'exhausted' and r['invocations'][1]['reason'] == 'retry', r
 
+# A submitted failure at the iteration bound: show names both paths, since
+# --retry needs a larger bound and --accept does not.
+f = Fixture('FAIL the task.\n')
+_, err, _ = f.ah('run', str(f.task), '--max-iterations', '1', expect=1)
+run = f.run_id(err)
+out, _, _ = f.ah('show', run, expect=0)
+assert (f'then ah ralph resume {run} --verify test --retry --max-iterations N (N greater than 1, at most 100) '
+        f'or ah ralph resume {run} --verify test --accept (needs no larger bound)') in out, out
+_, err, prompts = f.ah('resume', run, '--retry', expect=2)
+assert prompts == [] and 'pass --max-iterations greater' in err, err
+
 # Wall-time bound: each iteration's agent deadline is capped by the time left;
 # the run ends exhausted at an iteration boundary (exit 1).
 f = Fixture()

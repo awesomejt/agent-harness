@@ -1022,9 +1022,9 @@ where
             ));
         } else {
             progress.event(format!(
-                "ralph iteration {}/{bound} ({}) prompt sha256={} input sha256={} timeout={timeout}s agent={} check={}",
-                counted + 1,
+                "ralph iteration {number} ({}); agent iteration {}/{bound}; prompt sha256={} input sha256={} timeout={timeout}s agent={} check={}",
                 reason.name(),
+                counted + 1,
                 record.prompt_sha256,
                 record.input_sha256,
                 task.request.agent.as_ref().map_or("none", |a| a.name()),
@@ -1344,6 +1344,10 @@ fn detail(store: &crate::state::Store, record: &RalphRecord) -> String {
         _ if stale.iterations.len() >= crate::state::MAX_ITERATIONS => writeln!(
             report,
             "next: the run reached 100 recorded iterations; start a new run"
+        ),
+        _ if !settled(stale.iterations.last()) && counted >= record.max_iterations => writeln!(
+            report,
+            "next: its last iteration may have had effects; inspect the project, then {resume} --retry --max-iterations N (N greater than {counted}, at most 100) or {resume} --accept (needs no larger bound)"
         ),
         _ if !settled(stale.iterations.last()) => writeln!(
             report,

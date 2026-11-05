@@ -153,3 +153,17 @@ and the between-iteration signal check were already in P6.2.
   always `interrupted`.
 - Usage stays reported, not enforced (D045). There are still no no-progress
   or consecutive-failure detectors; both are re-evaluated from P6.4 use.
+
+## Review
+
+Grok's first review of PR #55 found 0 blockers, 1 concern and 1 nit, with no
+critical or high findings, so no re-review is needed. Both are addressed:
+
+- Concern: after an unsettled last iteration at the iteration bound, `show`
+  suggested only `--retry or --accept`, but `--retry` also needs a larger
+  `--max-iterations`. It now names both paths. A `ralph.py` case covers this,
+  including the bare `--retry` refusal.
+- Nit: the per-iteration progress line numbered agent iterations
+  (`counted + 1`) while the loop notes used the record number. It now leads
+  with the record number and states the agent count separately:
+  `ralph iteration N (reason); agent iteration K/BOUND`.
