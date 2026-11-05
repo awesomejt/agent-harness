@@ -475,10 +475,10 @@ fn resume_requires_same_check_gate_even_if_later_steps_have_metadata_errors() {
     std::fs::write(prompts_dir.join("1-one.md"), "One.\n").unwrap();
     // Step 2: failed while gated by check "test"
     std::fs::write(prompts_dir.join("2-two.md"), "Two.\n").unwrap();
-    // Step 3: has a metadata conflict / error that would fail resolve_all!
+    // Step 3: verify metadata would fail resolve_all without --verify (R05-01).
     std::fs::write(
         prompts_dir.join("3-three.md"),
-        "---\nagent: absent\n---\nThree.\n",
+        "---\nverify: build\n---\nThree.\n",
     )
     .unwrap();
 
