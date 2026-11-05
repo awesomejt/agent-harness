@@ -79,7 +79,7 @@ Borrow ai-queue's test injection, error/HTTP patterns and later quota readers as
 
 The [test plan](TESTING.md) covers policy, fixtures, fake children, sync conflicts/secrets, CLI output, releases and live use. Each core-MVP acceptance row in [SPECIFICATION.md](SPECIFICATION.md) maps to tracked tasks and concrete evidence.
 
-Phase 1 fixes package/toolchain, transport, libraries and permission handling. Phase 2 fixes harness config/CLI/exits, transactional writes, deadlines and initial packaging. Phase 3 fixes fallback eligibility, native isolation and model groups. Phase 4 fixes agent schema, machine output and declared platform support. Workflow schemas and completion protocols stay deferred to Phases 5–6. Record choices and superseded assumptions in DECISIONS.md before shipping their consumers.
+Phase 1 fixes package/toolchain, transport, libraries and permission handling. Phase 2 fixes harness config/CLI/exits, transactional writes, deadlines and initial packaging. Phase 3 fixes fallback eligibility, native isolation and model groups. Phase 4 fixes agent schema, machine output and declared platform support. Workflow schemas and durable state are finalized in Phase 5 (D044); Ralph completion protocols remain deferred to Phase 6. Record choices and superseded assumptions in DECISIONS.md before shipping their consumers.
 
 ## Phase 1 validated boundaries
 

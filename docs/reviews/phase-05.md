@@ -1,0 +1,46 @@
+# Phase 5 holistic review
+
+## Review scope
+
+- **Task:** P5.6; consolidating reviewer: Gemini (primary agent), incorporating independent review reports from Codex ([2026-11-04-codex-phase-5-holistic-review.md](2026-11-04-codex-phase-5-holistic-review.md)) and Claude Opus ([2026-11-04-claude-opus-phase-5-holistic-review.md](2026-11-04-claude-opus-phase-5-holistic-review.md)), and the initial review ([2026-11-04-gemini-phase-5-holistic-review.md](2026-11-04-gemini-phase-5-holistic-review.md)).
+- **Accepted entry baseline:** `53e1707` (Phase 4 review pass, [PR #43](https://github.com/awesomejt/agent-harness/pull/43)). Reviewed material implementation head: `f886208` (PR #48 merged). Range `53e1707..f886208`: 39 files (+5921/−140).
+- **Included PRs:** [#44](https://github.com/awesomejt/agent-harness/pull/44) P5.5 verification gates; [#45](https://github.com/awesomejt/agent-harness/pull/45) P5.1 sequence decisions; [#46](https://github.com/awesomejt/agent-harness/pull/46) P5.2 ordered execution; [#47](https://github.com/awesomejt/agent-harness/pull/47) P5.3 durable resume and locks; [#48](https://github.com/awesomejt/agent-harness/pull/48) P5.4 live sequence use; [#49](https://github.com/awesomejt/agent-harness/pull/49) initial P5.6 review recording; [#50](https://github.com/awesomejt/agent-harness/pull/50) review remediation and report consolidation.
+- **Mandatory scope:** P5.5, P5.1–P5.4 and P5.6 gate; D043/D044; G6; F07, F14, F15, F17. G1–G5 and AC01–AC11 are regression constraints. Excluded: Ralph (Phase 6), additional native CLIs (Phase 7), Pi (Phase 8), scheduling, parallel execution, and sequence machine output.
+
+## Integrated assessment
+
+Across the three independent reviews, the Phase 5 implementation was found to deliver sound linear execution, strict snapshotting, fresh per-step context, durable state recording, nonblocking per-project locking, and explicit recovery semantics.
+
+- **Rust design and architecture:** The modular monolith structure remains intact and clean. `verify` owns check validation, program path pinning, and execution; `sequence` coordinates snapshots, step loops, resume planning, and inspection; `state` owns durable v1 records, atomic writes, and locks; `single::launch` provides the shared execution service for both single runs and sequence steps. OpenCode continues to own the inner coding loop.
+- **Verification program path trust (K05-01):** Codex identified that `verify::outside` canonicalized the entire parent before checking project membership, erasing intermediate directory symlinks inside the project. Remediation replaces whole-parent canonicalization with an incremental component-by-component walk that validates every symlink expansion against the project path.
+- **Gate retention across resume (C05-01, K05-03):** Claude Opus and Codex identified that bare resume and `resume --retry` dropped or allowed substitution of a stopping step's recorded gate, while `resolve_all` ran before checking the recorded gate. Remediation enforces that any resume (bare, `--retry`, or `--accept`) of a previously gated step requires `--verify` and the exact same check name, and performs this validation before resolving subsequent steps so subsequent step errors cannot obscure it.
+- **Acceptance bounds (C05-02, K05-05):** Claude Opus and Codex demonstrated that `Choice::Accept` was mapped to `Reason::Accept` even when a step had never been attempted or its last attempt never submitted a prompt. Remediation restricts `Choice::Accept` to attempts that `may_have_effects()`, returning an invalid request error (exit 2) otherwise.
+- **State integrity and concurrency (K05-06):** Codex identified a potential initial publication clobbering race between `exists()` and `write()` across concurrent initial runs from different projects. Remediation introduces `Store::create_record`, which atomically publishes new records via hard link (or `create_new`), returning `already recorded` on collision.
+- **Diagnostics and identity changes (K05-02, C05-03):** `accept_ungated` now emits identity change notifications via progress events, and positional parse errors for `sequence resume` properly report `"sequence resume takes one run ID"`.
+- **Documentation consistency (K05-04, R05-02..05, C05-04):** Corrected summary and status drift across `DESIGN.md`, `OPERATIONS.md`, `WORKFLOWS.md`, and `PROJECT.md`. Clarified that Phase 7 and initial Phase 8 work is independently selection-gated following Phase 4, while only Phase 6 and consumers of Phase 5 state are strictly gated by Phase 5 acceptance.
+
+## Consolidated findings and resolution
+
+| Consolidated ID | Severity | Description / Affected Requirement | Reviewer IDs | Resolution / Patch | Verification Evidence | Status |
+|---|---|---|---|---|---|---|
+| K05-01 | Medium | `verify::outside` parent canonicalization bypassed project path boundary when traversing directory symlinks inside the project. | K05-01 | Replaced whole-parent canonicalization with component-by-component walk checking intermediate symlinks and targets against project. | `tests/config.rs` verifies directory symlinks traversing project reject with `Invalid(inside)`. | Resolved (`patch/p5-6-gemini-review`) |
+| C05-01 | Medium | `sequence resume` dropped or substituted recorded check gate on bare resume or `--retry`. | C05-01 | Check stopping step's recorded gate on all resume paths (bare, `--retry`, `--accept`), requiring `--verify` with the exact same check name. | `tests/sequence.rs` verifies bare resume and `--retry` require recorded gate. | Resolved (`patch/p5-6-gemini-review`) |
+| C05-02 | Medium | `--accept` was accepted on unattempted or never-submitted steps where D044 requires retry. | C05-02, K05-05 | Require `last.may_have_effects()` in `sequence::plan` for `Choice::Accept`, rejecting with exit 2 otherwise. | `tests/state.rs` verifies `plan()` rejects `Choice::Accept` for pending and never-submitted steps. | Resolved (`patch/p5-6-gemini-review`) |
+| K05-02 | Low | `accept_ungated` omitted identity change comparison (`changes()`). | K05-02 | Emits `changed since attempt ...` event when identities changed. | `src/sequence.rs` updated; verified across offline test suites. | Resolved (`patch/p5-6-gemini-review`) |
+| K05-03 | Low | `resolve_all` ran before checking stopping step gate requirement, allowing later step metadata errors to obscure it. | K05-03, R05-01 | Moved recorded gate validation prior to `resolve_all` in `resume()`. | `tests/sequence.rs` verifies stopping step gate error takes precedence over later step metadata error. | Resolved (`patch/p5-6-gemini-review`) |
+| C05-03 | Low | `parse_resume` positional error named `sequence run takes one prompt folder`. | C05-03 | Differentiated `SequenceCommand::Resume` in `Invocation::options` to report `sequence resume takes one run ID`. | `tests/sequence.rs` asserts `sequence resume takes one run ID`. | Resolved (`patch/p5-6-gemini-review`) |
+| K05-06 | Low | Initial record write used `exists()` check followed by replacement `write()`, allowing collision clobbering. | K05-06 | Added `Store::create_record` using atomic hard link to fail with `already recorded` if target exists. | `tests/state.rs` asserts `create_record` fails atomically if file exists. | Resolved (`patch/p5-6-gemini-review`) |
+| K05-04 | Low | Documentation and status drift across `DESIGN.md`, `OPERATIONS.md`, `WORKFLOWS.md`, and `PROJECT.md`. | K05-04, R05-02–05, C05-04 | Updated documentation lines, clarified `show` lock inspection vs store validation, corrected test count to 104, and refined Phase 7–8 gating notes. | Documents re-read and aligned with implemented contracts and decisions. | Resolved (`patch/p5-6-gemini-review`) |
+
+## Verification and integrated recheck
+
+- `cargo fmt --check`: Passes with no formatting diffs.
+- `cargo clippy --all-targets --locked -- -D warnings`: Passes with zero warnings.
+- `cargo test --locked`: **104 tests pass** (19 library tests + 85 integration tests across 8 test binaries; zero doc tests).
+- `python3 scripts/tests/offline.py`: All 22 offline suites pass, covering modes, permissions, runtime adapters, sequence state, and verification checks.
+- Live evidence: P5.4 recorded live run with real LiteLLM inference, SIGINT/SIGKILL recovery, and verification gate passes remains valid and intact.
+
+## Gate outcome
+
+**Pass proposed** for Phase 5 (`53e1707..f886208` plus remediation in PR #50).
+All findings across Gemini, Codex, and Claude Opus reviews are resolved with regression tests. Upon merge of PR #50 into `main`, Phase 5 is accepted and P5.6 closes. Phase 6 (Ralph) and consumers of Phase 5 workflow state may then proceed.
