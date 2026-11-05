@@ -72,7 +72,7 @@ Canonical agents have a name, a description, a capacity (`primary`, `specialized
 
 - Single: one task delegated to an existing runtime, potentially involving many internal tool turns.
 - Sequence: deterministic folder ordering; stop/continue behavior, shared versus fresh context, and restart rules specified before Phase 5 implementation.
-- Ralph: fresh context each iteration, filesystem-persisted progress, explicit completion verification, iteration limits, cancellation, and restart without silently rerunning uncertain work. Choose the completion protocol in Phase 6.
+- Ralph: fresh context each iteration, filesystem-persisted progress, explicit completion verification, iteration limits, cancellation, and restart without silently rerunning uncertain work. D045 (P6.1) selects a claim plus a trusted check as the completion protocol.
 
 Every workflow uses the same route policy and agent constraints. A queue is not a substitute for sequence or Ralph semantics. No exactly-once guarantee for external side effects is assumed.
 
