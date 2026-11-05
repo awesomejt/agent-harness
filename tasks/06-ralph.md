@@ -24,7 +24,7 @@ Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify 
 ## P6.3 — Completion, bounds and cancellation
 
 - **Depends on:** [P6.2](06-ralph.md#p6-2)
-- **Deliverable and boundary:** Verify the selected completion signal and configured checks, enforce iteration/time bounds, and stop/cancel descendants with an explicit terminal outcome.
+- **Deliverable and boundary:** Verify the selected completion signal and configured checks, apply the check-status stop rules and explicit resume, and complete the bound and cancellation tests. The iteration/time bounds and between-iteration signal handling ship in P6.2.
 - **Acceptance evidence:** False/stale signal, failing check, non-completion, cancellation and exhausted-limit tests prevent success from mere prose or clean exit.
 - **Decision/readiness gate:** Usage budgets apply only where reporting/enforcement is trustworthy.
 - **Contract:** [docs/WORKFLOWS.md](../docs/WORKFLOWS.md); status/evidence summary in [PROJECT.md](../PROJECT.md).

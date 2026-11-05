@@ -105,7 +105,7 @@ Detailed scope, dependencies and evidence: [Phase 6 cards](tasks/06-ralph.md).
 
 - [x] P6.1 Evaluate Rust Ralph examples; decide completion verification, limits, and recovery ([card](tasks/06-ralph.md#p6-1)); completion effective on PR merge; [D045](DECISIONS.md#2026-11-05--d045-ralph-claim-plus-trusted-check-completion-fresh-iterations-and-explicit-bounds), [study](docs/evidence/p6-1-ralph-study.md).
 - [x] P6.2 Implement fresh-context iterations and durable filesystem progress ([card](tasks/06-ralph.md#p6-2)); completion effective on PR merge; [evidence](docs/evidence/p6-2-ralph-iterations.md).
-- [ ] P6.3 Enforce completion verification, iteration/time bounds, and cancellation ([card](tasks/06-ralph.md#p6-3)).
+- [ ] P6.3 Enforce completion verification and check stop rules, add resume, and complete bound/cancellation tests; both bounds and between-iteration signal handling ship in P6.2 ([card](tasks/06-ralph.md#p6-3)).
 - [ ] P6.4 Demonstrate completion, bounded non-completion, and interrupted-run recovery ([card](tasks/06-ralph.md#p6-4)).
 - [ ] P6.5 Phase review: holistically assess all Phase 6 deliverables, resolve/verify findings, and accept the review before phase exit or dependent work ([card](tasks/06-ralph.md#p6-5)).
 
