@@ -7,6 +7,7 @@ prompt, then system/init, rate_limit_event, assistant and result records, and an
 aborted result after an interrupt. With `--permission-prompts=host` (trusted) it
 announces tool calls, sends `can_use_tool` prompts, waits for the harness's
 answer and records it in `permissions.jsonl`, writing a file only on a grant.
+`get_settings` echoes `--effort` (else the model default, `medium`).
 The project's `case` file selects a deviation.
 Records argv and every stdin line in the project; the test wrapper records the environment.
 """
@@ -25,6 +26,7 @@ log = open(cwd / 'stdin.jsonl', 'a')
 TRUSTED = '--permission-prompts=host' in sys.argv
 TOOLS = next((a.split('=', 1)[1] for a in sys.argv if a.startswith('--tools=')), '')
 TOOLS = [t for t in TOOLS.split(',') if t]
+EFFORT = next((a.split('=', 1)[1] for a in sys.argv if a.startswith('--effort=')), 'medium')
 
 
 def read():
@@ -65,7 +67,8 @@ def respond(request_id, subtype):
             'current_permission_mode': 'acceptEdits' if case == 'permission-mode' else 'default'})
     elif subtype == 'get_settings':
         control(request_id, {
-            'effective': {}, 'applied': {'model': MODEL, 'effort': 'medium'},
+            'effective': {},
+            'applied': {'model': MODEL, 'effort': 'medium' if case == 'agent-effort-mismatch' else EFFORT},
             'sources': [{'source': 'policySettings'}] if case == 'managed-settings' else []})
     elif subtype == 'mcp_status':
         control(request_id, {'mcpServers': [{'name': 'm'}] if case == 'mcp' else []})
@@ -173,10 +176,21 @@ def trusted_turn():
     if case == 'trusted-cancel':
         use('t1', 'Bash', {'command': 'sleep 60'})
         return
+    if case == 'agent-reviewer-write':
+        # A read-only role is offered no Write; calling it is a violation.
+        use('t1', 'Write', {'file_path': str(cwd / 'made.txt'), 'content': 'x'})
+        time.sleep(0.5)
+        return
     # The runtime allows a project read by itself: no prompt.
     use('t0', 'Read', {'file_path': str(cwd / 'user.txt')})
     result('t0', 'preserve dirty user content')
-    if case == 'trusted-mismatch':
+    if case == 'agent-reviewer':
+        # A read outside the project prompts; a read-only ceiling denies it.
+        outside = {'file_path': str(cwd.parent / 'outside.txt')}
+        use('t1', 'Read', outside)
+        result('t1', 'outside content' if ask('q1', 'Read', 't1', outside) else 'denied',
+               False)
+    elif case == 'trusted-mismatch':
         write('t1', made, prompted_input={**made, 'content': 'something else'})
     elif case == 'trusted-unknown-call':
         use('t1', 'Write', made)
