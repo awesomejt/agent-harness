@@ -1,0 +1,84 @@
+# Phase 6 holistic review
+
+## Review scope
+
+- **Task:** P6.5 ([card](../../tasks/06-ralph.md#p6-5)); consolidating reviewer: Claude Code (Claude Opus 5.5), 2026-11-05 (America/Denver). This report consolidates three independent reports, which stay unchanged beside it: [Claude Opus](2026-11-05-claude-opus-phase-6-holistic-review.md) (C06-*), [Codex](2026-11-05-codex-phase-6-holistic-review.md) (X06-*) and [Grok](2026-11-05-grok-phase-6-holistic-review.md) (G06-*).
+- **Accepted entry baseline:** `f146d0d` (Phase 5 pass, [PR #52](https://github.com/awesomejt/agent-harness/pull/52)). **Reviewed material head:** `45cd62c` (P6.4 merged, [PR #56](https://github.com/awesomejt/agent-harness/pull/56)). Range `f146d0d..45cd62c`: 26 files, +4593/−162.
+- **Included PRs:** [#53](https://github.com/awesomejt/agent-harness/pull/53) P6.1 Ralph decisions (D045); [#54](https://github.com/awesomejt/agent-harness/pull/54) P6.2 fresh iterations and records; [#55](https://github.com/awesomejt/agent-harness/pull/55) P6.3 completion verification and resume; [#56](https://github.com/awesomejt/agent-harness/pull/56) P6.4 live use gate and `doclinks.py`; [#57](https://github.com/awesomejt/agent-harness/pull/57) the reviewer reports and this plan.
+- **Mandatory scope:** P6.1–P6.4 and the P6.5 gate; D045; G7; F08 and the Phase 6 portions of F14–F17; the [IMPLEMENTATION Phase 6 exit criteria](../IMPLEMENTATION.md#phase-6--bounded-ralph-loops). D024, D031, D034, D038, D043/D044, the three routing modes, permission narrowing and AC01–AC11 are regression constraints, because every Ralph iteration reuses `single::launch` and the D044 store.
+- **Excluded:** Pi sequence/Ralph parity (P8.4), further native adapters (Phase 7), scheduling, token/cost enforcement, no-progress detection and Ralph machine output.
+
+This is revision 1 of the canonical Phase 6 report under [PHASE_REVIEW.md](../PHASE_REVIEW.md) and [D042](../../DECISIONS.md#2026-11-03--d042-review-prs-merge-once-findings-are-recorded-fixes-go-through-grok-reviewed-patch-prs). The review PR records the assessment, the consolidated findings and the remediation plan with gate outcome **changes required**. One remediation patch PR, `patch/p6-5-review-fixes`, resolves every finding, records verification and proposes the pass.
+
+## Integrated assessment
+
+All three reviewers agree on the substance: no Critical or High finding, three Medium findings and a set of Low findings. Codex adds two independently reproduced Low defects (X06-05, X06-06) and classifies C06-05 and C06-06 as maintenance rather than defects.
+
+- **Requirements:** P6.1–P6.4 meet their cards. D045's core invariant holds on every exercised path. Completion needs a claim plus a passing pinned check from the same iteration. Prose, DONE files, stale claims and clean exits never complete a run. Every re-launch after possible effects needs an explicit `--retry` or `--accept`. The Phase 6 exit criteria are met by P6.4's live runs, except that R06-01 can make a record unreadable and R06-02 lets a resumed run complete against a changed check.
+- **Rust design:** `ralph` is a thin coordinator over `single::launch`, `verify::gate` and the shared `state` store. The `Stored`/`Kind` refactor gives both workflows one store, lock and atomic-write implementation. `drive` behind an injectable launcher is a good test seam. No dependency was added. One layering inversion (R06-06): `progress` calls into `ralph`.
+- **Routing, permissions and fallback:** Ralph adds no route surface. Mode, model, agent, permissions and check resolve once per invocation, and `single::supported` checks them. Codex's scratch runs show cloud-only, local-first native fallback and a named coder work today, but the repository has no test for them (R06-03).
+- **State and recovery:** Records share the D044 store, private modes, atomic create/replace and the project lock shared with sequences. `Store::write` does not enforce `consistent()`, which lets a 101-iteration record persist (R06-01). Resume re-pins the check from the current config by name only (R06-02). Completed-run resume needs the task file (R06-07).
+- **Tests and evidence:** 120 root tests, fmt, Clippy, `offline.py` 24/24 and `doclinks.py` pass at `45cd62c` (Claude, Codex). The tests check observable behavior. The gaps are the local-only coverage, the changed-check path and the accept-plus-100-iterations path. P6.4's dated live evidence supplies the required live scenarios.
+- **Platforms and operations:** Apple Silicon macOS 27.0.1, Rust 1.88.0 and installed OpenCode 2.2.5. The D041 release boundary is unchanged, and the published alpha.2 archive does not contain Ralph. OPERATIONS has no Ralph runbook, and several summaries have drifted (R06-09).
+
+## Findings and resolution
+
+Severities follow [PHASE_REVIEW.md](../PHASE_REVIEW.md). Where reviewers disagree, both labels are recorded and the disposition says which applies. Every finding is **open** and planned for `patch/p6-5-review-fixes`.
+
+| ID | Severity | Concrete issue / affected requirement | Reviewer IDs | Planned correction | Required verification | Status |
+|---|---|---|---|---|---|---|
+| R06-01 | Medium | **An accept iteration lets the loop write an unreadable 101st iteration.** The loop bounds agent iterations only (`counted()`). `consistent()` caps recorded iterations at 100, `plan()` checks that cap only when resume starts, and `Store::write` does not apply `consistent()`. After that, `show` and every `resume` exit 2 (F14/F16, D045 limits). | C06-01, X06-01, G06-01 | In `drive`, before every append (agent or accept), stop when the record already holds 100 iterations. The run ends `exhausted`, with a note naming the record cap. Make `Store::encode` (used by `write` and `create_record`) refuse a record that fails `consistent()`, so no path can persist one. Before launch that exits 1, and after launch it exits 4, through the existing `Session` handling. Add the rule to D045. | A `ralph.py` case (accept followed by `--retry --max-iterations 100`) ends with at most 100 rows. `show` still works afterwards, and the next resume is refused with the "start a new run" explanation. A `state` unit test shows `write` and `create_record` refusing an inconsistent record. A `drive` unit test covers the cap. | Open |
+| R06-02 | Medium | **Resume lets a changed check complete a run (P6.4 F2).** Resume checks only the recorded check *name*. It re-pins the program and argv from the current config, which defaults to the in-project `ah.json` that a trusted agent can rewrite, and only reports the change. `--accept` or the next claim then completes against the rewritten check (D043 integrity). Sequence resume follows the same name-only rule. | C06-02, X06-02, G06-02 | The recorded check identity becomes binding. If the re-pinned check program or `argv_sha256` differs from the last recorded check identity, bare, `--retry` and `--accept` resume all exit 2. Nothing is launched, the record is unchanged, and the error names the changed fields and tells the operator to restore the check or start a new run. There is no override flag; a changed definition of done means a new run. The same rule applies to `sequence resume` for the stopping step's recorded gate. Steps with no recorded gate still resolve afresh. Amend D045 and D044, and update WORKFLOWS and OPERATIONS, keeping the config-outside-project advice. | `ralph.py`: changing the program and changing the argv each refuse bare, `--retry` and `--accept`, with the record hash unchanged and the checker never run. An unchanged check still resumes. A matching `sequence_state.py` case for the sequence rule. | Open |
+| R06-03 | Medium | **Ralph routing coverage is local-only.** No committed test runs Ralph under local-first fallback, cloud-only or `--agent`. Dropping the fallback prompt/timeout rewrite (`ralph.rs:1010–1013`) passes every suite. The changed-check path has no regression test (routing/fallback invariants). | C06-03, X06-03, G06-03 | Add fake-runtime `ralph.py` cases: local-first with an unreachable LiteLLM and native fallback, checking the header on the fallback prompt and the claim/check flow; cloud-only through the native fake; `--agent NAME`, checking the role reaches the runtime and `agent_sha256` is recorded. The R06-02 cases cover the changed-check path. | The cases pass. A recorded mutation that removes the fallback rewrite fails the local-first case. `offline.py` passes. | Open |
+| R06-04 | Low | **A rejected claim reports "no automatic retry, repair or fallback after verification"** right before Ralph starts its bounded repair. | C06-04, X06-04, G06-04 | When a claimed check ends `failed` or `timed_out`, Ralph replaces the gate's recovery text with its own bounded-repair wording. Single-run and sequence wording stays as it is. The `outcome=Failed` label is kept. | `ralph.py` checks that rejected-claim stderr has the bounded-repair wording and not the contradictory clause. Existing single-run and sequence suites still pass. | Open |
+| R06-05 | Low (Claude, Grok); maintenance (Codex) | **Accept iterations report agent-turn identities (P6.4 F3).** An accept runs no agent turn. Its change report still lists agent, route, model, fallback and permissions, and `show` presents the accept invocation's `permissions deny` as if it were the row's policy. | C06-05, G06-05; Codex disposition | **Fix as Low.** The report misleads the operator at exactly the point where they decide whether to accept. Codex is right that the record fields are not wrong under D044, so the record schema does not change. An accept's change report covers only prompt and check identity, and `show` marks an accept row's route, model, fallback and permissions as not applicable (no agent turn). Note this in D045. | A `ralph.py` case: an accept without route flags reports only prompt/check changes, and `show` does not present `permissions deny` as the accept's policy. | Open |
+| R06-06 | Low (Claude, Grok); maintenance (Codex) | **`progress` depends on the `ralph` workflow module** (`progress::deliver` calls `ralph::claims`). | C06-06, G06-06; Codex disposition | **Fix as Low (maintenance, no behavior change).** `progress` records only the final non-empty response line through a neutral helper. `ralph` compares that line with its marker. | The `claims` tests still pass, and `progress.rs` no longer refers to `crate::ralph`. All suites pass. | Open |
+| R06-07 | Low | **Resuming a completed run still needs the task file.** Resume reads the recorded prompt before it finds the run completed, so the advertised no-op success turns into exit 2 once `TASK.md` is gone (D045). | X06-05 | Check for a completed record before reading anything that only another iteration needs. FILE must still be re-read before an unfinished run launches. | A `ralph.py` case: a completed run resumes with exit 0 after `TASK.md` is deleted, with no record change. An unfinished run whose FILE is missing is still refused before launch. | Open |
+| R06-08 | Low | **`doclinks.py` takes anchors from inline-code examples.** Anchor collection masks fenced blocks but not inline code, so a literal `<a id="ghost"></a>` inside a code span satisfies a broken `#ghost` link (P6.4 work product). | X06-06 | Mask inline code before collecting explicit HTML anchors, keeping heading slugs (including headings with inline code) and real HTML anchors. Add a committed fixture test for `doclinks.py`. | The fixture shows an anchor that appears only in an example fails, a real HTML anchor passes, and a heading containing inline code keeps its slug. The repository link check and `offline.py` pass. | Open |
+| R06-09 | Low | **Documentation and status drift.** OPERATIONS calls Ralph guidance prospective, has no Ralph runbook and says the lock is per sequence. docs/README omits P6.4 and the P6.1 study. The DESIGN implementation paragraph omits `ralph`. PROJECT.md names P6.4 as active. | C06-07, X06-07, G06-07 | Add a short Ralph runbook to OPERATIONS covering records, `show`, resume choices, `stopped` versus `exhausted`, the binding check identity, config outside the project and the source-versus-release distinction. Fix its status line and lock sentence. Add P6.4 and the study to docs/README, and add `ralph` to the DESIGN paragraph. PROJECT.md names P6.5 and this remediation as active; this PR already makes that change. | Each document re-read against the code and WORKFLOWS. `doclinks.py` passes. | Open |
+
+### P6.4 recorded findings
+
+| Item | Agreed disposition |
+|---|---|
+| F1: agents kept working to the deadline after finishing | Resolved in P6.4 by the WORKFLOWS use guidance (explicit scope and stopping rule). All reviewers agree a no-progress detector would not have caught it. |
+| F2: the in-project `ah.json` exposes the check and lets an agent change it | Exposure alone is within D043, which protects integrity, not secrecy. Rewriting the check and then completing on resume is **R06-02**. |
+| F3: an accept reports agent and permission changes | **R06-05.** |
+| P6.3 open question: `outcome=Failed` before the continuation note | The label is accurate and stays. The contradictory recovery clause is **R06-04**. |
+
+### Recommendations (not defects)
+
+All three reviewers treat these as optional. They are not Phase 6 scope and are recorded for later candidate review.
+
+- **R06-REC1: tool-kind counters** (carried from R05-REC1). Per-kind counts would have told the operator whether the long P6.4 iterations were still editing. They inform the decision but cannot prove that no effects occurred.
+- **R06-REC2: a minimum launch budget.** Exhaust the run instead of launching an iteration with almost no wall time left.
+- **R06-REC3: a stopping instruction in the header.** Tell the agent, in fixed header text, to stop and claim once the task's checks pass. The task file's own stopping rule remains the primary control.
+- **R06-REC4: the resume wall-bound default.** Inherit the previous invocation's `--max-runtime-secs`, or print it prominently. Today it is printed in the loop's first note.
+
+## Action plan
+
+1. **Review PR #57 (`review/06-claude-ralph`)** merges under D042 with the three reviewer reports, this report and gate outcome **changes required**.
+2. **Patch PR `patch/p6-5-review-fixes`** (one open PR, `/grok review`):
+   - Decisions first: amend D045 (record cap, binding check identity, accept row identities) and D044 (binding stopping-step gate identity).
+   - Code: R06-01 (`ralph.rs`, `state.rs`), R06-02 (`ralph.rs`, `sequence.rs`), R06-04 (`ralph.rs`), R06-05 (`ralph.rs`), R06-06 (`progress.rs`, `ralph.rs`), R06-07 (`ralph.rs`), R06-08 (`scripts/tests/doclinks.py`).
+   - Tests: Rust unit/integration tests, `ralph.py` cases for R06-01 through R06-05 and R06-07, a `sequence_state.py` case for R06-02, and a `doclinks.py` fixture test for R06-08. Record the R06-03 mutation check.
+   - Documentation: R06-09, plus WORKFLOWS/OPERATIONS for the new resume rule.
+   - Checks: `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked`, `python3 scripts/tests/offline.py` and `python3 scripts/tests/doclinks.py`.
+   - Update this report with verification and the integrated recheck, propose the pass, and update PROJECT.md (effective on merge).
+3. **Live recheck:** R06-02 tightens resume, so no resume can now succeed that would have been refused before. The P6.4 live runs did not change their check between invocations, so their behavior is unaffected. The offline cases exercise the new refusal, and a live repeat is not required.
+4. **Progression:** P8.4 (Pi sequence/Ralph parity) and other work that depends on Phase 6 wait for the accepted P6.5 gate.
+
+## Verification and integrated recheck
+
+Baseline at `45cd62c` (Apple Silicon macOS 27.0.1, Rust 1.88.0, installed OpenCode 2.2.5), from the Claude and Codex reports:
+
+- `cargo fmt --check` and `cargo clippy --locked --all-targets -- -D warnings`: pass.
+- `cargo test --locked`: 120 tests pass (24 library tests and 96 integration tests).
+- `python3 scripts/tests/offline.py`: 24/24 suites pass. `python3 scripts/tests/doclinks.py`: exit 0.
+- Reproduced with fake OpenCode and no provider traffic: R06-01 and R06-02 (Claude and Codex), R06-04 (Claude), R06-07 and R06-08 (Codex). Codex's scratch cloud-only, local-first fallback and named-coder runs pass, which supports R06-03 as a coverage gap rather than a behavior defect.
+
+A passing baseline does not verify the fixes. That verification is recorded here when the remediation PR lands.
+
+## Gate outcome
+
+**Changes required** for the reviewed scope `f146d0d..45cd62c`: three Medium findings (R06-01 to R06-03) and six Low findings (R06-04 to R06-09), each with a recorded disposition and plan. Under D042 this review PR may merge; that merge is not a pass. P6.5 stays open until `patch/p6-5-review-fixes` resolves and verifies every finding and merges.
