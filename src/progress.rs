@@ -55,9 +55,21 @@ struct Summary {
     fallback: bool,
     /// `null` unless `--verify` resolved a check (D043).
     verification: Option<Map<String, Value>>,
-    /// Whether a delivered final response ended in the Ralph completion
-    /// marker (D045); the response itself is not kept for this.
-    claimed: bool,
+    /// The delivered final response's last non-empty line (`last_line`), for
+    /// a workflow that reads a marker from it (Ralph, D045); the rest of the
+    /// response is not kept for this.
+    final_line: Option<String>,
+}
+
+/// A response's last non-empty line, with trailing ASCII whitespace removed
+/// from the text and from that line; `None` for a blank response.
+pub fn last_line(text: &str) -> Option<&str> {
+    let space = |c: char| c.is_ascii_whitespace();
+    text.trim_end_matches(space)
+        .rsplit('\n')
+        .next()
+        .map(|line| line.trim_end_matches(space))
+        .filter(|line| !line.is_empty())
 }
 
 /// An explicit public mapping of exits, not serialization of the Rust enum.
@@ -426,17 +438,17 @@ impl Progress {
     /// Human mode writes the final response to stdout now; machine mode
     /// carries it in the terminal result record instead.
     pub(crate) async fn deliver(&self, text: String) -> bool {
-        self.summary.lock().unwrap().claimed = crate::ralph::claims(&text);
+        self.summary.lock().unwrap().final_line = last_line(&text).map(str::to_owned);
         if self.machine.is_some() {
             self.summary.lock().unwrap().response = Some(text);
             return true;
         }
         response(text, self.line_end).await
     }
-    /// Whether this run's delivered response claimed Ralph completion; only
-    /// meaningful after backend success.
-    pub(crate) fn claimed(&self) -> bool {
-        self.summary.lock().unwrap().claimed
+    /// The delivered response's last non-empty line; only meaningful after
+    /// backend success.
+    pub(crate) fn final_line(&self) -> Option<String> {
+        self.summary.lock().unwrap().final_line.clone()
     }
 }
 

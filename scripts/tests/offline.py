@@ -41,6 +41,7 @@ SUITES = [
     ['scripts/tests/agent_exec_runtime.py'],
     ['scripts/tests/capabilities_runtime.py'],
     ['scripts/tests/doclinks.py'],
+    ['scripts/tests/doclinks_cases.py'],
 ]
 
 
