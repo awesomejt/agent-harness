@@ -5,6 +5,7 @@ A fake `claude` on a disposable PATH records argv, environment names and stdin.
 Cases cover the pre-submission control preflight, the submission boundary,
 system/init checks, deny-profile tool refusal, trusted host-prompt grants
 (exact, once, never after an interrupt) and trusted protocol violations,
+named roles (intersected tools, appended body, effort, ceiling-denied prompts),
 terminal mapping, interrupt cancellation, machine output, preview, and refusals
 that must not launch.
 """
@@ -26,6 +27,43 @@ EXPECTED_ARGS = ['-p', '--output-format=stream-json', '--input-format=stream-jso
 TRUSTED_ARGS = EXPECTED_ARGS[:9] + ['--permission-prompts=host', '--permission-prompt-tool=stdio',
                                     '--tools=Bash,Edit,Glob,Grep,Read,Write', '--model=sonnet']
 T = ['--permissions', 'trusted']
+HOST = ['--permission-prompts=host', '--permission-prompt-tool=stdio']
+EFFORTFUL = ('---\nversion: 1\nname: effortful\ndescription: d\ncapacity: both\n'
+             'permissions: trusted\ntools: [edit, read]\neffort: high\n---\nThink hard.\n')
+EMPTY = ('---\nversion: 1\nname: empty\ndescription: d\ncapacity: primary\n'
+         'permissions: trusted\ntools: []\n---\nNo tools.\n')
+BIG = EMPTY.replace('name: empty', 'name: big').replace('No tools.', 'x' * (128 * 1024 + 1))
+# Agent file text per case, and the arguments the launch must end with.
+AGENT_FILES = {'reviewer': (ROOT / 'agents/reviewer.md').read_text(),
+               'coder': (ROOT / 'agents/coder.md').read_text(),
+               'effortful': EFFORTFUL, 'empty': EMPTY, 'big': BIG}
+
+
+def body(text):
+    return text.split('\n---\n', 1)[1]
+
+
+def append(name):
+    return [f'--append-system-prompt={body(AGENT_FILES[name])}']
+
+
+AGENT_CASES = {
+    'agent-deny': ('reviewer', EXPECTED_ARGS + append('reviewer')),
+    'agent-reviewer': ('reviewer', EXPECTED_ARGS[:9] + HOST + ['--tools=Glob,Grep,Read', '--model=sonnet']
+                       + append('reviewer')),
+    'agent-reviewer-write': ('reviewer', EXPECTED_ARGS[:9] + HOST + ['--tools=Glob,Grep,Read', '--model=sonnet']
+                             + append('reviewer')),
+    'agent-coder': ('coder', TRUSTED_ARGS + append('coder')),
+    'agent-effort': ('effortful', EXPECTED_ARGS[:9] + HOST + ['--tools=Edit,Read,Write', '--model=sonnet',
+                                                             '--effort=high'] + append('effortful')),
+    'agent-effort-mismatch': ('effortful', EXPECTED_ARGS[:9] + HOST + ['--tools=Edit,Read,Write',
+                                                                      '--model=sonnet', '--effort=high']
+                              + append('effortful')),
+    'agent-empty': ('empty', EXPECTED_ARGS + append('empty')),
+    'agent-big': ('big', None),
+    'agent-empty-preview': ('empty', None),
+    'agent-preview': ('effortful', None),
+}
 SECRETS = ['SECRET_ACCOUNT_SENTINEL', 'SECRET_REASONING_SENTINEL', 'SECRET_PROVIDER_ERROR', 'poison']
 
 # (case, exit, prompted, extra args)
@@ -71,8 +109,18 @@ CASES = [
     ('trusted-hook', 4, True, T),
     ('trusted-init-tools', 4, True, T),
     ('trusted-cancel', 3, True, T + ['--timeout-secs', '3']),
+    # Named roles: the invocation intersected with the role (D050).
+    ('agent-deny', 0, True, ['--agent', 'reviewer']),
+    ('agent-reviewer', 0, True, T + ['--agent', 'reviewer']),
+    ('agent-reviewer-write', 4, True, T + ['--agent', 'reviewer']),
+    ('agent-coder', 0, True, T + ['--agent', 'coder']),
+    ('agent-effort', 0, True, T + ['--agent', 'effortful']),
+    ('agent-effort-mismatch', 2, False, T + ['--agent', 'effortful']),
+    ('agent-empty', 0, True, T + ['--agent', 'empty']),
+    ('agent-preview', 0, False, T + ['--agent', 'effortful', '--preview']),
+    ('agent-empty-preview', 0, False, T + ['--agent', 'empty', '--preview']),
     # Refused before any launch.
-    ('agent', 2, False, ['--agent', 'reviewer']),
+    ('agent-big', 2, False, T + ['--agent', 'big']),
     ('local-first', 2, False, ['--mode', 'local-first', '--model', 'local']),
     ('slash', 2, False, []),
     ('preview', 0, False, ['--preview']),
@@ -97,9 +145,10 @@ for case, expected, prompted, extra in CASES:
         (project / 'CLAUDE.md').write_text('never loaded')
         if case == 'agents-md':
             (project / 'AGENTS.md').write_text('project instructions')
-        if case == 'agent':
+        if case in AGENT_CASES:
+            name = AGENT_CASES[case][0]
             (project / 'agents').mkdir()
-            (project / 'agents/reviewer.md').write_text((ROOT / 'agents/reviewer.md').read_text())
+            (project / f'agents/{name}.md').write_text(AGENT_FILES[name])
         cfg = dict(version=1, mode='cloud-only', native=dict(target='claude', model='sonnet'),
                    litellm=dict(api_base='http://127.0.0.1:9/v1', api_key_env='LOCAL_KEY'))
         (project / 'ah.json').write_text(json.dumps(cfg))
@@ -119,10 +168,13 @@ for case, expected, prompted, extra in CASES:
         assert (project / 'user.txt').read_text() == 'preserve dirty user content', case
         assert (project / 'prompted').exists() == prompted, case
         launched = (project / 'argv.json').exists()
-        assert launched == (case not in ('agent', 'local-first', 'slash', 'preview', 'missing-runtime')), case
+        assert launched == (case not in ('agent-big', 'agent-preview', 'agent-empty-preview', 'local-first', 'slash', 'preview',
+                                         'missing-runtime')), case
         if launched:
             argv = json.loads((project / 'argv.json').read_text())
             wanted = (TRUSTED_ARGS if case.startswith('trusted') else EXPECTED_ARGS) + ([f'--append-system-prompt-file={project}/AGENTS.md'] if case == 'agents-md' else [])
+            if case in AGENT_CASES:
+                wanted = AGENT_CASES[case][1]
             assert argv == wanted, (case, argv)
             names = {l.split('=', 1)[0] for l in (project / 'env.txt').read_text().splitlines() if '=' in l}
             # /bin/sh itself adds PWD, SHLVL and _.
@@ -194,7 +246,7 @@ for case, expected, prompted, extra in CASES:
         if case == 'trusted-repeat-id':
             assert 'repeated or unbounded tool call; stopping' in p.stderr, p.stderr
         if case == 'trusted-outside-tool':
-            assert 'tool call outside the trusted tool set; stopping' in p.stderr, p.stderr
+            assert 'tool call outside the offered tool set; stopping' in p.stderr, p.stderr
         if case in ('trusted-subagent', 'trusted-hook'):
             assert 'unsupported host request or tool record; stopping' in p.stderr, p.stderr
         if case == 'trusted-background':
@@ -211,6 +263,39 @@ for case, expected, prompted, extra in CASES:
             # A violation sends a best-effort interrupt and waits up to 2 s for
             # a result before group cleanup; the stalled fake answers it.
             assert (project / 'interrupted').exists(), case
+        if case in ('agent-deny', 'agent-reviewer', 'agent-coder', 'agent-effort', 'agent-empty'):
+            assert p.stdout == 'fake response\nfinal line', (case, p.stdout)
+            assert f'; agent {AGENT_CASES[case][0]} (body appended to the system prompt)' in p.stderr, case
+        if case == 'agent-deny':
+            assert 'effort model default; permissions deny (no tools offered)' in p.stderr, p.stderr
+        if case == 'agent-reviewer':
+            # Project reads run unprompted; the outside read is denied by the ceiling.
+            assert answers == [{'request_id': 'q1', 'behavior': 'deny',
+                                'message': 'denied by agent-harness policy'}], answers
+            assert ('permissions trusted narrowed by agent (tools Glob, Grep, Read; '
+                    'host prompts denied (ceiling below trusted)') in p.stderr, p.stderr
+            assert 'permission requests: 1; grants: 0; tool events: 4' in p.stderr, p.stderr
+        if case == 'agent-reviewer-write':
+            assert 'tool call outside the offered tool set; stopping' in p.stderr, p.stderr
+            assert (project / 'interrupted').exists() and not (project / 'made.txt').exists()
+        if case in ('agent-coder', 'agent-effort'):
+            assert [a['behavior'] for a in answers] == ['allow'], (case, answers)
+            assert (project / 'made.txt').read_text() == 'made by fake', case
+            assert 'host prompts granted once each' in p.stderr, (case, p.stderr)
+        if case == 'agent-effort':
+            assert 'effort high; permissions trusted narrowed by agent (tools Edit, Read, Write' in p.stderr, p.stderr
+        if case == 'agent-effort-mismatch':
+            assert 'preflight failed' in p.stderr, p.stderr
+        if case == 'agent-empty':
+            assert 'permissions trusted narrowed by agent to no tools' in p.stderr, p.stderr
+        if case == 'agent-big':
+            assert 'agent body exceeds 128 KiB' in p.stderr, p.stderr
+        if case == 'agent-preview':
+            assert ('runtime: Claude Code system-prompt append with --effort high with effective '
+                    'permissions tools [Edit, Read, Write]; host prompts granted once each') in p.stdout, p.stdout
+            assert 'effort high' in p.stdout and 'execution refused' not in p.stdout, p.stdout
+        if case == 'agent-empty-preview':
+            assert 'with effective permissions tools []; host prompts denied' in p.stdout, p.stdout
         if case == 'preview':
             assert 'route: native Claude Code' in p.stdout, p.stdout
             assert 'credentials: official CLI login' in p.stdout, p.stdout
@@ -250,4 +335,4 @@ with tempfile.TemporaryDirectory(prefix='ah-claude-seq-') as d:
             assert 'supports ah single only' in p.stderr, p.stderr
         count += 1
 
-print(f'PASS {count} Claude runtime CLI cases; preflight before prompt; deny offers no tools; trusted grants each exact prompt once; no secrets echoed')
+print(f'PASS {count} Claude runtime CLI cases; preflight before prompt; deny offers no tools; trusted grants each exact prompt once; roles narrow tools and map effort; no secrets echoed')

@@ -179,9 +179,40 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
             } else {
                 "managed project file (see planned changes)"
             };
+            // D050: the same mapping the Claude runtime launches with.
+            let (runtime, effective, refusal) = if claude {
+                (
+                    format!(
+                        "Claude Code system-prompt append{}",
+                        crate::claude::effort(r)
+                            .map(|e| format!(" with --effort {e}"))
+                            .unwrap_or_default()
+                    ),
+                    format!(
+                        "tools [{}]; host prompts {}",
+                        crate::claude::tools(r).join(", "),
+                        if crate::claude::grants(r) {
+                            "granted once each"
+                        } else {
+                            "denied"
+                        }
+                    ),
+                    crate::claude::supported(r),
+                )
+            } else {
+                (
+                    "default agent".to_owned(),
+                    if r.permissions == crate::config::Permissions::Deny {
+                        "deny (invocation)".to_owned()
+                    } else {
+                        format!("{:?}", crate::opencode::grantable(r))
+                    },
+                    crate::opencode::supports(agent),
+                )
+            };
             // Name grammar excludes quotes/controls; description/body omitted.
             format!(
-                "\"{}\" (capacity {}; ceiling {}; tools [{}]; effort {}); OpenCode emission: {emission}; runtime: default agent with effective permissions {}{}",
+                "\"{}\" (capacity {}; ceiling {}; tools [{}]; effort {}); OpenCode emission: {emission}; runtime: {runtime} with effective permissions {effective}{}",
                 agent.name(),
                 match agent.capacity() {
                     Capacity::Primary => "primary",
@@ -201,12 +232,7 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
                     Effort::High => "high",
                     Effort::Max => "max",
                 },
-                if r.permissions == crate::config::Permissions::Deny {
-                    "deny (invocation)".to_owned()
-                } else {
-                    format!("{:?}", crate::opencode::grantable(r))
-                },
-                match crate::opencode::supports(agent) {
+                match refusal {
                     Ok(()) => String::new(),
                     Err(error) => format!("; execution refused: {}", error.0),
                 },

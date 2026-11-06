@@ -4,7 +4,10 @@
 //! environment, deadline and cleanup; Claude Code owns the inner loop. It runs
 //! cloud-only single attempts: `deny` offers no tool (D048); `trusted` offers
 //! a fixed built-in set and answers each host permission prompt with one
-//! request-bound allow-once grant (D049).
+//! request-bound allow-once grant (D049). A named role narrows that set to
+//! its own tools, appends its body to the system prompt and maps its effort
+//! to `--effort` (D050).
+use crate::agents::{self, Agent, Effort, Tool};
 use crate::config::{Invalid, Permissions, Resolved, RuntimeKind};
 use crate::permission::{
     OptionKind, PermissionOption, PermissionPolicy, PermissionRequest, PermissionResponse,
@@ -26,23 +29,82 @@ const TOOL_CONTEXT: &str = "system_tools";
 /// background-task and planning tools are never offered.
 pub(crate) const TRUSTED_TOOLS: [&str; 6] = ["Bash", "Edit", "Glob", "Grep", "Read", "Write"];
 
-/// Tools offered to the runtime under the invocation's permission profile.
-pub(crate) fn tools(request: &Resolved) -> &'static [&'static str] {
-    match request.permissions {
-        Permissions::Deny => &[],
-        Permissions::Trusted => &TRUSTED_TOOLS,
+/// Built-in tools for each canonical tool (D050), within the trusted set.
+fn builtins(tool: Tool) -> &'static [&'static str] {
+    match tool {
+        Tool::Read => &["Read"],
+        Tool::Search => &["Glob", "Grep"],
+        Tool::Edit => &["Edit", "Write"],
+        Tool::Execute => &["Bash"],
     }
 }
 
-/// Capabilities this increment cannot enforce yet are refused before launch,
-/// so a later PR widens the surface deliberately (D048/D049).
+/// Tools offered to the runtime: the invocation profile intersected with a
+/// selected role's tools (D038/D050). A deny invocation offers none for every
+/// role; a trusted one offers the role's mapped tools, never more than the
+/// trusted set. Listed in `TRUSTED_TOOLS` order.
+pub(crate) fn tools(request: &Resolved) -> Vec<&'static str> {
+    match (request.permissions, &request.agent) {
+        (Permissions::Deny, _) => Vec::new(),
+        (Permissions::Trusted, None) => TRUSTED_TOOLS.to_vec(),
+        (Permissions::Trusted, Some(agent)) => {
+            let mapped: Vec<&str> = agent
+                .tools()
+                .iter()
+                .flat_map(|t| builtins(*t))
+                .copied()
+                .collect();
+            TRUSTED_TOOLS
+                .into_iter()
+                .filter(|tool| mapped.contains(tool))
+                .collect()
+        }
+    }
+}
+
+/// Whether a host prompt may be granted at all. Claude Code prompts for
+/// project-local reads and searches never (observed), and for any path
+/// outside the project; a role whose ceiling is below `trusted` is denied
+/// every prompt, as OpenCode denies its `external_directory` (D037/D050).
+/// An empty offered set launches as deny, so it grants nothing either.
+pub(crate) fn grants(request: &Resolved) -> bool {
+    request.permissions == Permissions::Trusted
+        && !tools(request).is_empty()
+        && request
+            .agent
+            .as_ref()
+            .is_none_or(|agent| agent.permissions() == agents::Permissions::Trusted)
+}
+
+/// `--effort` value for a role's canonical effort; `default` passes none and
+/// leaves the model's own default (D050).
+pub(crate) fn effort(request: &Resolved) -> Option<&'static str> {
+    match request.agent.as_ref().map(Agent::effort)? {
+        Effort::Default => None,
+        Effort::Low => Some("low"),
+        Effort::Medium => Some("medium"),
+        Effort::High => Some("high"),
+        Effort::Max => Some("max"),
+    }
+}
+
+/// The role body travels as one launch argument; it stays well inside the
+/// macOS argument limit, so launch cannot fail on its size (D050).
+pub(crate) const BODY_LIMIT: usize = 128 << 10;
+
+/// Capabilities this increment cannot enforce are refused before launch, so a
+/// later PR widens the surface deliberately (D048–D050).
 pub(crate) fn supported(request: &Resolved) -> Result<(), Invalid> {
     if request.runtime != RuntimeKind::Claude {
         return Ok(());
     }
-    if request.agent.is_some() {
+    if request
+        .agent
+        .as_ref()
+        .is_some_and(|agent| agent.body().len() > BODY_LIMIT)
+    {
         return Err(Invalid(
-            "named agents are not yet supported on the Claude runtime",
+            "agent body exceeds 128 KiB, the Claude runtime's launch-argument bound",
         ));
     }
     Ok(())
@@ -55,8 +117,11 @@ pub(crate) fn supported(request: &Resolved) -> Result<(), Invalid> {
 /// deny, `--tools=` offers no tool and `--permission-prompts=none` denies any
 /// prompt; under trusted, `--tools` names the fixed set and prompts go to the
 /// harness over stdin (`--permission-prompt-tool=stdio`). The project
-/// `AGENTS.md`, when present, is the only instruction source, named by path
-/// and read by the runtime (D040).
+/// `AGENTS.md`, when present, is named by path and read by the runtime
+/// (D040); a selected role's body follows it as `--append-system-prompt`
+/// (only the last `--append-system-prompt-file` applies, so the body cannot
+/// be a second file). A non-default role effort adds `--effort` (D050).
+/// An empty offered set (deny, or a role with no tools) launches as deny.
 pub(crate) fn args(request: &Resolved) -> Vec<OsString> {
     let mut args: Vec<OsString> = [
         "-p",
@@ -72,19 +137,25 @@ pub(crate) fn args(request: &Resolved) -> Vec<OsString> {
     .into_iter()
     .map(OsString::from)
     .collect();
-    match request.permissions {
-        Permissions::Deny => args.push("--permission-prompts=none".into()),
-        Permissions::Trusted => {
-            args.push("--permission-prompts=host".into());
-            args.push("--permission-prompt-tool=stdio".into());
-        }
+    let offered = tools(request);
+    if offered.is_empty() {
+        args.push("--permission-prompts=none".into());
+    } else {
+        args.push("--permission-prompts=host".into());
+        args.push("--permission-prompt-tool=stdio".into());
     }
-    args.push(format!("--tools={}", tools(request).join(",")).into());
+    args.push(format!("--tools={}", offered.join(",")).into());
     args.push(format!("--model={}", request.model).into());
+    if let Some(effort) = effort(request) {
+        args.push(format!("--effort={effort}").into());
+    }
     if let Some(path) = &request.instructions {
         let mut arg = OsString::from("--append-system-prompt-file=");
         arg.push(path);
         args.push(arg);
+    }
+    if let Some(agent) = &request.agent {
+        args.push(format!("--append-system-prompt={}", agent.body()).into());
     }
     args
 }
@@ -161,12 +232,14 @@ pub(crate) fn validate_initialize(response: &Value) -> Result<(), ()> {
 }
 
 /// `get_settings`: no setting source at all, so admin-managed (policy)
-/// settings refuse too; returns the resolved model.
-pub(crate) fn validate_settings(response: &Value) -> Result<String, ()> {
+/// settings refuse too, and a requested effort applied exactly; returns the
+/// resolved model. With no requested effort the model default stands.
+pub(crate) fn validate_settings(response: &Value, effort: Option<&str>) -> Result<String, ()> {
     if !empty_array(&response["sources"])
         || response["effective"]
             .as_object()
             .is_none_or(|m| !m.is_empty())
+        || effort.is_some_and(|effort| response["applied"]["effort"] != effort)
     {
         return Err(());
     }
@@ -743,7 +816,7 @@ mod supervise {
             };
             let checked = match subtype {
                 "initialize" => validate_initialize(&response),
-                "get_settings" => validate_settings(&response).map(|m| model = m),
+                "get_settings" => validate_settings(&response, effort(request)).map(|m| model = m),
                 "mcp_status" => validate_mcp(&response),
                 _ => validate_context(&response, &model, !tools(request).is_empty()),
             };
@@ -755,17 +828,30 @@ mod supervise {
             return Outcome::Stopped;
         }
         let offered = tools(request);
+        let grants = grants(request);
         progress.event(format!(
-            "{label} via Claude Code {VERSION}; model {} (resolved {model}); {}",
+            "{label} via Claude Code {VERSION}; model {} (resolved {model}); effort {}; {}{}",
             request.model,
-            if offered.is_empty() {
-                "permissions deny (no tools offered)".to_owned()
-            } else {
-                format!(
-                    "permissions trusted (tools {}; host prompts granted once each; host privileges, no OS sandbox)",
-                    offered.join(", ")
-                )
-            }
+            effort(request).map_or("model default", |e| e),
+            match (request.permissions, offered.is_empty()) {
+                (Permissions::Deny, _) => "permissions deny (no tools offered)".to_owned(),
+                (Permissions::Trusted, true) => "permissions trusted narrowed by agent to no tools".to_owned(),
+                (Permissions::Trusted, false) => format!(
+                    "permissions trusted{} (tools {}; host prompts {}; host privileges, no OS sandbox)",
+                    if offered.len() < TRUSTED_TOOLS.len() || !grants {
+                        " narrowed by agent"
+                    } else {
+                        ""
+                    },
+                    offered.join(", "),
+                    if grants { "granted once each" } else { "denied (ceiling below trusted)" }
+                ),
+            },
+            request
+                .agent
+                .as_ref()
+                .map(|a| format!("; agent {} (body appended to the system prompt)", a.name()))
+                .unwrap_or_default()
         ));
         // The submission boundary precedes the write: a failed send can
         // still deliver (D031).
@@ -816,7 +902,7 @@ mod supervise {
             };
             if !session {
                 if record["type"] == "system" && record["subtype"] == "init" {
-                    let Ok(id) = validate_init(&record, &model, &request.project, offered) else {
+                    let Ok(id) = validate_init(&record, &model, &request.project, &offered) else {
                         observed.violation = true;
                         progress.event("system/init did not match the preflight configuration");
                         violation_interrupt(channel, observed).await;
@@ -836,7 +922,7 @@ mod supervise {
                 }
             }
             let event = classify(&record, observed.interrupted);
-            if let Err(reason) = tool_event(&event, offered, observed) {
+            if let Err(reason) = tool_event(&event, &offered, observed) {
                 observed.violation = true;
                 progress.event(format!("{reason}; stopping"));
                 violation_interrupt(channel, observed).await;
@@ -857,17 +943,21 @@ mod supervise {
                     progress.emit("attempt.activity", observed.counters());
                 }
                 Event::Permission(prompt) => {
-                    let eligible = !observed.interrupted
+                    // The pending entry is marked prompted whatever the
+                    // answer, so a repeat is never granted.
+                    let first_exact = observed.pending.get_mut(&prompt.call.id).is_some_and(
+                        |(call, prompted)| {
+                            let first = !*prompted;
+                            *prompted = true;
+                            first && *call == prompt.call
+                        },
+                    );
+                    let eligible = first_exact
+                        && grants
+                        && !observed.interrupted
                         && !cancelled.is_cancelled()
-                        && Instant::now() < deadline
-                        && observed.pending.get_mut(&prompt.call.id).is_some_and(
-                            |(call, prompted)| {
-                                let first = !*prompted;
-                                *prompted = true;
-                                first && *call == prompt.call
-                            },
-                        );
-                    let Some(allow) = decide(&prompt, offered, eligible) else {
+                        && Instant::now() < deadline;
+                    let Some(allow) = decide(&prompt, &offered, eligible) else {
                         observed.violation = true;
                         progress.event("malformed permission prompt; stopping");
                         violation_interrupt(channel, observed).await;
@@ -949,7 +1039,7 @@ mod supervise {
                 }
                 for call in calls {
                     if !offered.contains(&call.name.as_str()) {
-                        return Err("tool call outside the trusted tool set");
+                        return Err("tool call outside the offered tool set");
                     }
                     if call.input["run_in_background"] == true {
                         return Err("background tool call");
@@ -1088,7 +1178,7 @@ mod tests {
         let settings =
             json!({"effective": {}, "sources": [], "applied": {"model": "claude-sonnet-5-5"}});
         assert_eq!(
-            validate_settings(&settings).as_deref(),
+            validate_settings(&settings, None).as_deref(),
             Ok("claude-sonnet-5-5")
         );
         for (field, value) in [
@@ -1099,8 +1189,15 @@ mod tests {
         ] {
             let mut changed = settings.clone();
             changed[field] = value;
-            assert!(validate_settings(&changed).is_err(), "{field}");
+            assert!(validate_settings(&changed, None).is_err(), "{field}");
         }
+        // A requested effort must apply exactly; none leaves the model default.
+        let mut high = settings.clone();
+        high["applied"]["effort"] = json!("high");
+        assert!(validate_settings(&high, Some("high")).is_ok());
+        assert!(validate_settings(&high, None).is_ok());
+        assert!(validate_settings(&high, Some("max")).is_err());
+        assert!(validate_settings(&settings, Some("high")).is_err());
         assert!(validate_mcp(&json!({"mcpServers": []})).is_ok());
         assert!(validate_mcp(&json!({"mcpServers": [{"name": "m"}]})).is_err());
         let context = json!({"model": "claude-sonnet-5-5", "memoryFiles": [], "mcpTools": [], "agents": [],
@@ -1272,6 +1369,106 @@ mod tests {
         let deny = permission_response(&prompt, false);
         assert_eq!(deny["response"]["response"]["behavior"], "deny");
         assert!(!allow.to_string().contains("updatedPermissions"));
+    }
+
+    fn request(permissions: &str, agent: Option<(&str, &str, &str)>) -> Resolved {
+        let config =
+            r#"{"version":1,"mode":"cloud-only","native":{"target":"claude","model":"sonnet"}}"#;
+        let args = ["single", "task", "--permissions", permissions].map(Into::into);
+        let mut r = crate::config::Invocation::parse(args.to_vec(), Path::new("/tmp"))
+            .unwrap()
+            .resolve(
+                crate::config::Config::read(config.as_bytes()).unwrap(),
+                |_| None,
+                &b""[..],
+            )
+            .unwrap();
+        r.agent = agent.map(|(ceiling, tools, effort)| {
+            Agent::read(format!("---\nversion: 1\nname: reviewer\ndescription: d\ncapacity: specialized\npermissions: {ceiling}\ntools: {tools}\neffort: {effort}\n---\nRole body\n").as_bytes()).unwrap()
+        });
+        r
+    }
+
+    fn arg(r: &Resolved, prefix: &str) -> Vec<String> {
+        args(r)
+            .into_iter()
+            .map(|a| a.into_string().unwrap())
+            .filter(|a| a.starts_with(prefix))
+            .collect()
+    }
+
+    #[test]
+    fn named_roles_intersect_tools_and_map_effort_and_body() {
+        // No role: deny offers nothing; trusted offers the whole fixed set.
+        assert!(tools(&request("deny", None)).is_empty());
+        assert_eq!(tools(&request("trusted", None)), TRUSTED_TOOLS);
+        // A deny invocation offers nothing for every role.
+        let deny = request(
+            "deny",
+            Some(("trusted", "[read, search, edit, execute]", "default")),
+        );
+        assert!(tools(&deny).is_empty());
+        assert!(!grants(&deny));
+        assert_eq!(
+            arg(&deny, "--permission-prompts"),
+            ["--permission-prompts=none"]
+        );
+        // Trusted narrows to the role's tools, in the fixed order.
+        let full = request(
+            "trusted",
+            Some(("trusted", "[execute, edit, search, read]", "default")),
+        );
+        assert_eq!(tools(&full), TRUSTED_TOOLS);
+        assert!(grants(&full));
+        let reviewer = request("trusted", Some(("read-only", "[search, read]", "default")));
+        assert_eq!(tools(&reviewer), ["Glob", "Grep", "Read"]);
+        assert!(
+            !grants(&reviewer),
+            "read-only ceiling is denied every prompt"
+        );
+        assert_eq!(arg(&reviewer, "--tools="), ["--tools=Glob,Grep,Read"]);
+        let editor = request("trusted", Some(("trusted", "[edit]", "default")));
+        assert_eq!(tools(&editor), ["Edit", "Write"]);
+        assert!(grants(&editor));
+        // A role with no tools launches as deny.
+        let none = request("trusted", Some(("trusted", "[]", "default")));
+        assert!(tools(&none).is_empty());
+        assert!(!grants(&none), "no offered tool, no grant");
+        assert_eq!(
+            arg(&none, "--permission-prompts"),
+            ["--permission-prompts=none"]
+        );
+        assert_eq!(arg(&none, "--tools="), ["--tools="]);
+        // Effort: default passes nothing; every other level maps by name.
+        assert!(arg(&full, "--effort").is_empty());
+        for level in ["low", "medium", "high", "max"] {
+            let r = request("deny", Some(("read-only", "[]", level)));
+            assert_eq!(effort(&r), Some(level));
+            assert_eq!(arg(&r, "--effort"), [format!("--effort={level}")]);
+        }
+        // The body is appended after any AGENTS.md file, as one argument.
+        assert_eq!(
+            arg(&full, "--append-system-prompt="),
+            ["--append-system-prompt=Role body\n"]
+        );
+        assert!(arg(&request("trusted", None), "--append-system-prompt").is_empty());
+        let mut both = full;
+        both.instructions = Some("/tmp/AGENTS.md".into());
+        let all = arg(&both, "--append-system-prompt");
+        assert_eq!(all.len(), 2);
+        assert!(all[0].starts_with("--append-system-prompt-file="));
+        assert!(supported(&both).is_ok());
+    }
+
+    #[test]
+    fn oversized_role_bodies_refuse_before_launch() {
+        let mut r = request("trusted", None);
+        let body = "x".repeat(BODY_LIMIT + 1);
+        r.agent = Some(Agent::read(format!("---\nversion: 1\nname: big\ndescription: d\ncapacity: primary\npermissions: trusted\ntools: []\n---\n{body}").as_bytes()).unwrap());
+        assert!(supported(&r).is_err());
+        let body = "x".repeat(BODY_LIMIT);
+        r.agent = Some(Agent::read(format!("---\nversion: 1\nname: big\ndescription: d\ncapacity: primary\npermissions: trusted\ntools: []\n---\n{body}").as_bytes()).unwrap());
+        assert!(supported(&r).is_ok());
     }
 
     #[test]

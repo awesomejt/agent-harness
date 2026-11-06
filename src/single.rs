@@ -104,7 +104,10 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
 /// both attempts share them. Sequences apply it to every step before step 1.
 pub(crate) fn supported(request: &crate::config::Resolved) -> Result<(), crate::config::Invalid> {
     crate::claude::supported(request)?;
-    if let Some(agent) = &request.agent {
+    // Effort maps on Claude Code (D050); OpenCode still runs only default.
+    if let Some(agent) = &request.agent
+        && request.runtime == crate::config::RuntimeKind::OpenCode
+    {
         crate::opencode::supports(agent)?;
     }
     crate::opencode::prompt_supported(&request.prompt)
