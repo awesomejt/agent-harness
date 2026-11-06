@@ -515,6 +515,12 @@ fn resume(args: Vec<OsString>) -> Exit {
         ));
         return Exit::Success;
     }
+    // A full record refuses every choice; say so before FILE is needed.
+    if original.iterations.len() >= crate::state::MAX_ITERATIONS {
+        return reject(format_args!(
+            "run {run}: the run reached 100 recorded iterations; start a new run"
+        ));
+    }
     let project = std::path::PathBuf::from(&original.project);
     let config_path = std::path::PathBuf::from(&original.config);
     // D045: FILE is re-read from the recorded path before any key lookup,

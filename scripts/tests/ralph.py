@@ -527,6 +527,10 @@ assert 'next: the run reached 100 recorded iterations; start a new run' in out, 
 for choice in [('--retry',), ('--accept',)]:
     _, err, prompts = f.ah('resume', run, *choice, expect=2)
     assert prompts == [] and 'the run reached 100 recorded iterations; start a new run' in err, (choice, err)
+# The record-limit refusal holds even when FILE is gone.
+f.task.unlink()
+_, err, prompts = f.ah('resume', run, '--retry', expect=2)
+assert prompts == [] and 'the run reached 100 recorded iterations; start a new run' in err, err
 
 # R06-07 counterpart: an unfinished run still re-reads FILE before launch.
 f = Fixture()
