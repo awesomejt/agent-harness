@@ -265,7 +265,8 @@ MODE = 'mode must be local-only, cloud-only or local-first'
 invalid = [
     ('local-first without native', config('local-first', REACHABLE, native=None), (), (), REQUIRES),
     ('local-first without litellm', config('local-first', REACHABLE, litellm=None, model='fixture'), (), (), REQUIRES),
-    ('local-first native target', config('local-first', REACHABLE, native={**native, 'target': 'claude'}), (), (), 'native target must be opencode'),
+    ('local-first native target', config('local-first', REACHABLE, native={**native, 'target': 'codex'}), (), (), 'native target must be opencode'),
+    ('local-first claude target', config('local-first', REACHABLE, native={k: v for k, v in native.items() if k != 'api_key_env'} | {'target': 'claude'}), (), (), 'local-first fallback supports only native target opencode'),
     ('local-first native group model', config('local-first', REACHABLE, native={**native, 'model': 'group:coder'}), (), (), 'model must be a 1–128 byte identifier'),
     ('local-first native proxy field', config('local-first', REACHABLE, native={**native, 'api_base': REACHABLE}), (), (), 'strict version-1 JSON schema'),
     ('local-first native key missing', config('local-first', REACHABLE), (), ['NATIVE_KEY'], KEY),

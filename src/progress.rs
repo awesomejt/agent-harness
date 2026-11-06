@@ -363,6 +363,24 @@ impl Progress {
         self.note(json!({"usage": usage}));
         self.emit("attempt.usage", usage);
     }
+    /// Claude Code `result.total_cost_usd`, a backend report in USD, not
+    /// billing (D046/D048). Token and context metrics stay unknown.
+    #[cfg(target_os = "macos")]
+    pub fn claude_usage(&self, cost: Option<f64>) {
+        let Some(amount) = cost.filter(|c| c.is_finite() && *c >= 0.0) else {
+            *self.usage.lock().unwrap() =
+                Some("unknown (Claude Code stream-json; no result cost report)".into());
+            return;
+        };
+        *self.usage.lock().unwrap() = Some(format!(
+            "source=Claude Code stream-json result; context_used=unknown; context_capacity=unknown; turn_tokens=unknown; session_cost={amount} USD (backend report, not billing)"
+        ));
+        let usage = json!({"source": "claude-stream-json-result", "context_used_tokens": null,
+                           "context_capacity_tokens": null, "turn_tokens": null,
+                           "session_cost": {"amount": amount, "currency": "USD"}});
+        self.note(json!({"usage": usage}));
+        self.emit("attempt.usage", usage);
+    }
     fn result(&self, exit: Exit) -> Value {
         let summary = self.summary.lock().unwrap();
         json!({

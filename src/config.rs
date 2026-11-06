@@ -100,7 +100,18 @@ fn present<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
 struct Native {
     target: String,
     model: String,
-    api_key_env: String,
+    /// Required for `opencode`; rejected for `claude`, which uses the
+    /// operator's existing official CLI login (D047/D048).
+    #[serde(default, deserialize_with = "present")]
+    api_key_env: Option<String>,
+}
+
+/// Runtime executing an attempt. The LiteLLM route always runs OpenCode; the
+/// native route runs the runtime named by `native.target` (D048).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RuntimeKind {
+    OpenCode,
+    Claude,
 }
 
 #[derive(Clone)]
@@ -169,7 +180,10 @@ pub struct Resolved {
     /// operator handoff. Empty for native requests.
     pub proxy_groups: Vec<String>,
     pub api_base: Option<String>,
-    pub api_key_env: String,
+    /// Environment name of the selected route key; `None` for the Claude
+    /// runtime, which uses the operator's existing CLI login (D047).
+    pub api_key_env: Option<String>,
+    pub runtime: RuntimeKind,
     pub permissions: Permissions,
     pub timeout_secs: u64,
     pub no_sync: bool,
@@ -306,13 +320,24 @@ impl Config {
             }
         }
         if let Some(native) = &self.native {
-            if native.target != "opencode" {
-                return Err(Invalid(
-                    "native target must be opencode (built-in API-key provider)",
-                ));
+            match (native.target.as_str(), &native.api_key_env) {
+                ("opencode", Some(key)) => validate_key_name(key)?,
+                ("opencode", None) => {
+                    return Err(Invalid("native target opencode requires api_key_env"));
+                }
+                ("claude", None) => {}
+                ("claude", Some(_)) => {
+                    return Err(Invalid(
+                        "native target claude uses the existing official CLI login; api_key_env is unsupported",
+                    ));
+                }
+                _ => {
+                    return Err(Invalid(
+                        "native target must be opencode (built-in API-key provider) or claude (official CLI login)",
+                    ));
+                }
             }
             validate_model(&native.model)?;
-            validate_key_name(&native.api_key_env)?;
         }
         if self.mode != "cloud-only" && self.model.is_none() {
             return Err(Invalid(
@@ -380,15 +405,32 @@ impl Config {
                 "model group reference is not defined in litellm.groups",
             ))
     }
-    fn key_name(&self, mode: &str) -> Result<&str> {
+    /// The selected route's key reference. Only the OpenCode native target
+    /// can be the local-first fallback until Claude single runs are accepted
+    /// (D046/D048).
+    fn key_name(&self, mode: &str) -> Result<Option<&str>> {
         let local = self.litellm.as_ref().map(|v| v.api_key_env.as_str());
-        let native = self.native.as_ref().map(|v| v.api_key_env.as_str());
+        let native = self.native.as_ref();
         match mode {
-            "local-only" => local.ok_or(Invalid("local-only requires litellm configuration")),
-            "cloud-only" => native.ok_or(Invalid("cloud-only requires native configuration")),
-            "local-first" => native.and(local).ok_or(Invalid(
-                "local-first requires litellm and native configuration",
-            )),
+            "local-only" => local
+                .map(Some)
+                .ok_or(Invalid("local-only requires litellm configuration")),
+            "cloud-only" => native
+                .map(|n| n.api_key_env.as_deref())
+                .ok_or(Invalid("cloud-only requires native configuration")),
+            "local-first" => {
+                let (Some(native), Some(local)) = (native, local) else {
+                    return Err(Invalid(
+                        "local-first requires litellm and native configuration",
+                    ));
+                };
+                if native.target != "opencode" {
+                    return Err(Invalid(
+                        "local-first fallback supports only native target opencode",
+                    ));
+                }
+                Ok(Some(local))
+            }
             _ => Err(Invalid(UNSUPPORTED_MODE)),
         }
     }
@@ -869,7 +911,11 @@ impl Invocation {
         }
         let instructions = instructions(&project)?;
         let mode = self.mode.as_deref().unwrap_or(&config.mode);
-        let key_name = config.key_name(mode)?.to_owned();
+        let key_name = config.key_name(mode)?.map(str::to_owned);
+        let runtime = match (mode, config.native.as_ref()) {
+            ("cloud-only", Some(native)) if native.target == "claude" => RuntimeKind::Claude,
+            _ => RuntimeKind::OpenCode,
+        };
         let agent = self
             .agent
             .as_deref()
@@ -887,7 +933,7 @@ impl Invocation {
                     ))?;
                 let scrub = [
                     config.litellm.as_ref().map(|l| l.api_key_env.clone()),
-                    config.native.as_ref().map(|n| n.api_key_env.clone()),
+                    config.native.as_ref().and_then(|n| n.api_key_env.clone()),
                 ]
                 .into_iter()
                 .flatten()
@@ -957,7 +1003,10 @@ impl Invocation {
         } else {
             Mode::LocalOnly
         };
-        for name in std::iter::once(&key_name).chain(fallback.as_ref().map(|(_, key, _)| key)) {
+        for name in key_name
+            .iter()
+            .chain(fallback.as_ref().and_then(|(_, key, _)| key.as_ref()))
+        {
             if key_lookup(name).is_none_or(|key| key.is_empty()) {
                 return Err(Invalid(MISSING_KEY));
             }
@@ -1020,6 +1069,7 @@ impl Invocation {
                 None
             },
             api_key_env: key_name,
+            runtime,
             permissions: self.permissions.or(config.permissions).unwrap_or_default(),
             timeout_secs: self
                 .timeout_secs
@@ -1046,6 +1096,7 @@ impl Invocation {
                 proxy_groups: Vec::new(),
                 api_base: None,
                 api_key_env,
+                runtime: RuntimeKind::OpenCode,
                 permissions: resolved.permissions,
                 timeout_secs: resolved.timeout_secs,
                 no_sync: resolved.no_sync,
@@ -1062,7 +1113,12 @@ impl Invocation {
 }
 
 impl Resolved {
+    /// Model as the runtime selects it: `PROVIDER/MODEL` for OpenCode, the
+    /// alias or full model name for Claude Code.
     pub fn runtime_model(&self) -> String {
+        if self.runtime == RuntimeKind::Claude {
+            return self.model.clone();
+        }
         format!(
             "{}/{}",
             if self.mode == Mode::LocalOnly {

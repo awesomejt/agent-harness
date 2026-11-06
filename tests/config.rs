@@ -47,7 +47,7 @@ fn resolves_overrides_without_reading_unused_stdin() {
     assert!(resolved.no_sync && resolved.preview);
     assert_eq!(resolved.prompt, "edit");
     assert!(resolved.project.is_absolute());
-    assert_eq!(resolved.api_key_env, "TEST_KEY");
+    assert_eq!(resolved.api_key_env.as_deref(), Some("TEST_KEY"));
 }
 
 struct NeverRead;
@@ -794,7 +794,7 @@ fn local_first_resolves_litellm_primary_with_configured_native_fallback() {
     assert_eq!(native.mode, Mode::CloudOnly);
     assert_eq!(native.runtime_model(), "opencode/gpt-5.4");
     assert_eq!(native.sources.model, Source::Config);
-    assert_eq!(native.api_key_env, "NATIVE_KEY");
+    assert_eq!(native.api_key_env.as_deref(), Some("NATIVE_KEY"));
     assert!(native.api_base.is_none() && native.group.is_none());
     assert!(native.proxy_groups.is_empty() && native.fallback.is_none());
     assert_eq!(native.project, r.project);
@@ -1223,4 +1223,111 @@ fn verify_resolves_a_declared_check_and_pins_its_program_outside_the_project() {
         .unwrap();
     assert!(resolved.verify.is_none());
     std::fs::remove_dir_all(base).unwrap();
+}
+
+const CLAUDE: &str =
+    r#"{"version":1,"mode":"cloud-only","native":{"target":"claude","model":"sonnet"}}"#;
+
+#[test]
+fn claude_target_uses_the_existing_login_and_reads_no_key() {
+    let r = invocation(&["single", "task"])
+        .resolve(
+            Config::read(CLAUDE.as_bytes()).unwrap(),
+            |name| panic!("no key lookup for the Claude login: {name}"),
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!(r.mode, Mode::CloudOnly);
+    assert_eq!(
+        r.runtime,
+        awesomejt_agent_harness::config::RuntimeKind::Claude
+    );
+    assert_eq!(r.api_key_env, None);
+    assert_eq!(r.runtime_model(), "sonnet");
+    assert!(r.api_base.is_none());
+    let full = invocation(&["single", "task", "--model", "claude-sonnet-5-5"])
+        .resolve(
+            Config::read(CLAUDE.as_bytes()).unwrap(),
+            |_| None,
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!(full.runtime_model(), "claude-sonnet-5-5");
+    assert_eq!(full.sources.model, Source::Invocation);
+    // The LiteLLM route still runs OpenCode when a mode override selects it.
+    let both = CLAUDE.replace(
+        "\"version\":1",
+        "\"version\":1,\"litellm\":{\"api_base\":\"http://127.0.0.1:9/v1\",\"api_key_env\":\"LOCAL_KEY\"}",
+    );
+    let local = invocation(&["single", "task", "--mode", "local-only", "--model", "m"])
+        .resolve(
+            Config::read(both.as_bytes()).unwrap(),
+            |name| {
+                assert_eq!(name, "LOCAL_KEY");
+                Some("local".into())
+            },
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!(
+        local.runtime,
+        awesomejt_agent_harness::config::RuntimeKind::OpenCode
+    );
+    assert_eq!(local.runtime_model(), "ah-litellm/m");
+}
+
+#[test]
+fn claude_target_rejects_keys_fallback_and_groups() {
+    for (input, message) in [
+        (
+            CLAUDE.replace("\"sonnet\"", "\"sonnet\",\"api_key_env\":\"ANTHROPIC_API_KEY\""),
+            "native target claude uses the existing official CLI login; api_key_env is unsupported",
+        ),
+        (
+            CLAUDE.replace("\"sonnet\"", "\"sonnet\",\"api_key_env\":null"),
+            "invalid config: expected strict version-1 JSON schema",
+        ),
+        (
+            NATIVE.replace(",\"api_key_env\":\"NATIVE_KEY\"", ""),
+            "native target opencode requires api_key_env",
+        ),
+        (
+            CLAUDE.replace("claude", "codex"),
+            "native target must be opencode (built-in API-key provider) or claude (official CLI login)",
+        ),
+        (
+            CLAUDE
+                .replace("cloud-only", "local-first")
+                .replace("\"version\":1", "\"version\":1,\"model\":\"m\",\"litellm\":{\"api_base\":\"http://127.0.0.1:9/v1\",\"api_key_env\":\"LOCAL_KEY\"}"),
+            "local-first fallback supports only native target opencode",
+        ),
+    ] {
+        assert_eq!(
+            Config::read(input.as_bytes()).err(),
+            Some(Invalid(message)),
+            "{input}"
+        );
+    }
+    let both = CLAUDE.replace(
+        "\"version\":1",
+        "\"version\":1,\"litellm\":{\"api_base\":\"http://127.0.0.1:9/v1\",\"api_key_env\":\"LOCAL_KEY\"}",
+    );
+    let fallback = invocation(&["single", "task", "--mode", "local-first", "--model", "m"])
+        .resolve(
+            Config::read(both.as_bytes()).unwrap(),
+            |_| Some("local".into()),
+            NeverRead,
+        );
+    assert_eq!(
+        fallback.err(),
+        Some(Invalid(
+            "local-first fallback supports only native target opencode"
+        ))
+    );
+    let group = invocation(&["single", "task", "--model", "group:coder"]).resolve(
+        Config::read(CLAUDE.as_bytes()).unwrap(),
+        |_| None,
+        NeverRead,
+    );
+    assert!(group.is_err());
 }

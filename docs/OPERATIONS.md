@@ -1,6 +1,6 @@
 # Operations and distribution contract
 
-Status: P4.5 core-MVP runbook for `0.1.0-alpha.2` (D041): the declared platform matrix, installation, separate prerequisites, sample configuration and agents, setup check, upgrade from `0.1.0-alpha.1`, rollback and the maintainer release procedure. All three routing modes, named agents and machine output ship in that artifact. Phase 5 adds trusted verification gates (D043), ordered sequences and durable resume (D044); Phase 6 adds bounded Ralph loops (D045). The sequence and Ralph runbooks below apply to current source, not to the published alpha.2 artifact. Additional native-adapter guidance remains prospective. See [P4.5 evidence](evidence/p4-5-mvp-artifacts.md); the first artifact's [P2.5 evidence](evidence/p2-5-installable-binary.md) remains the historical record for alpha.1.
+Status: P4.5 core-MVP runbook for `0.1.0-alpha.2` (D041): the declared platform matrix, installation, separate prerequisites, sample configuration and agents, setup check, upgrade from `0.1.0-alpha.1`, rollback and the maintainer release procedure. All three routing modes, named agents and machine output ship in that artifact. Phase 5 adds trusted verification gates (D043), ordered sequences and durable resume (D044); Phase 6 adds bounded Ralph loops (D045). The sequence and Ralph runbooks below apply to current source, not to the published alpha.2 artifact. The Claude runtime section (P7.2, D048) also applies to current source only; other native adapters remain prospective. See [P4.5 evidence](evidence/p4-5-mvp-artifacts.md); the first artifact's [P2.5 evidence](evidence/p2-5-installable-binary.md) remains the historical record for alpha.1.
 
 The [deployment diagram](ARCHITECTURE.md) separates the release pipeline, local executable, installed runtime and external services. Rust library dependencies are linked/packaged for the target as required; binary users do not install Cargo packages manually.
 
@@ -184,6 +184,17 @@ and ignores emitted agent files; remove `.opencode/agents/` entries listed in
 `.ah-opencode-agents.json`, before deliberately reconciling or removing them;
 uninstall performs no automatic project cleanup.
 
+### Native Claude cloud-only (P7.2)
+
+Install Claude Code 2.1.314 with its official installer so `claude` is on an absolute PATH entry, then log in with `claude` itself. The harness uses that existing login and never handles it ([D047](../DECISIONS.md#2026-11-06--d047-native-adapters-use-the-operators-existing-official-cli-login)). Use the [Claude configuration](CONFIGURATION.md#native-claude-runtime-p72--d048) and run:
+
+```bash
+ah single "Explain the build steps in this project." --preview
+ah single "Explain the build steps in this project."
+```
+
+The first command launches nothing. The second draws on the operator's Claude plan or usage credits. Runs are `deny` only: Claude answers from the prompt and the project `AGENTS.md` without tools, so it cannot read or edit files yet. A missing or expired login, an unavailable model or a rate limit exits 1 with no retry or fallback. A different Claude Code version, admin-managed settings or any configured setting source refuses before the prompt with exit 2 ([D048](../DECISIONS.md#2026-11-06--d048-claude-runtime-launch-preflight-and-deny-profile-single-runs)).
+
 ### Native cloud-only (P3.2)
 
 Use the [native configuration example](CONFIGURATION.md#native-opencode-route-p32--d032) or `examples/ah.cloud-only.json`, install OpenCode 2.2.5 on an absolute PATH entry, and export a valid OpenCode Console/Zen API key under the configured `native.api_key_env` name. Select a model in that runtime's built-in `opencode` catalog. Then run:
@@ -257,6 +268,8 @@ Errors explain what failed, which attempt/route was affected, whether tools may 
 | LiteLLM unavailable/model missing | Show permitted endpoint/model and sanitized error; fix proxy/model config or explicitly choose another permitted mode. |
 | Native API key or model access rejected (cloud-only or local-first fallback) | Check the value exported under `native.api_key_env` and the account's access to `native.model`. The harness consumes no login store, so `/connect` or CLI login does not help; never inspect token stores. A rejection after prompt submission exits 4 even with 0 grants (P3.5). |
 | Provider failure after prompt submission (exit 4, 0 grants) | Seen for a bad key or a missing LiteLLM alias. The outcome is conservatively uncertain (R03-REC1 declined, D039); with `--output jsonl` the result shows `prompt_submitted: true`, `backend_stop: null`, `grants: 0`. Confirm no project change, fix the key or alias, then start a new run. local-first never falls back after the reachability check passes. |
+| Claude runtime refuses with `preflight failed` | Check `claude --version` is exactly 2.1.314, and that no admin-managed (policy) settings apply. The harness loads no user, project or local settings, MCP servers or plugins, so changing those does not help. |
+| Claude runtime exits 1 after `prompt submitted` | Run `claude` directly to confirm the login and model access; the harness never reads the login and does not show the CLI's error text. |
 | local-first ran the native fallback unexpectedly | Progress shows `attempt=2`; the LiteLLM host could not be resolved or reached. A mistyped `api_base` host falls back too (D034); correct it or use `--mode local-only`. |
 | Project instructions not followed | Preview shows `project instructions:`. Only the selected project's root `AGENTS.md` is loaded (D040); parent-directory, `CLAUDE.md` and `opencode.json` `instructions` are not. Move needed rules into that file. A link to a file outside the project exits 2. |
 | "prompt starts with a runtime slash command" (exit 2) | The first word was `/NAME`, which OpenCode would run as a command and not as a task. Rephrase so the prompt starts with other text; a leading path such as `/src/x.rs` is accepted. |

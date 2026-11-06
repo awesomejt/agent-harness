@@ -346,7 +346,7 @@ fn start(args: Vec<OsString>) -> Exit {
     if invocation.preview() {
         return preview(&task, &file, &config_path);
     }
-    if let Err(error) = crate::single::supported(&task.request) {
+    if let Err(error) = crate::single::workflow_supported(&task.request) {
         return reject(error.0);
     }
     let project = task.request.project.clone();
@@ -575,7 +575,7 @@ fn resume(args: Vec<OsString>) -> Exit {
     if task.request.project != project {
         return reject("recorded project path no longer resolves to itself; start a new run");
     }
-    let pinned = match crate::single::supported(&task.request)
+    let pinned = match crate::single::workflow_supported(&task.request)
         .and_then(|()| crate::sequence::identity(&task.check))
     {
         Ok(pinned) => pinned,
@@ -1448,7 +1448,7 @@ fn preview(task: &Task, file: &Path, config: &Path) -> Exit {
         Ok(_) => "none".to_owned(),
         Err(error) => format!("refused: {}", error.0),
     };
-    let refusal = match crate::single::supported(request) {
+    let refusal = match crate::single::workflow_supported(request) {
         Ok(()) => String::new(),
         Err(error) => format!("execution refused: {}\n", error.0),
     };
