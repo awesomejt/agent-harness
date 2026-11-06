@@ -21,13 +21,13 @@ Run from a disposable git directory with a cleared environment, the D048 isolati
 ## Fixture and regression results
 
 - `cargo fmt --check`, `cargo clippy --all-targets --locked -- -D warnings` and `cargo test --locked` pass. New unit tests cover the tool intersection for each invocation and ceiling (deny offers none; full, read-only `[search, read]`, `[edit]` and empty roles), the grant rule, the `--permission-prompts`, `--tools`, `--effort` and `--append-system-prompt` arguments and their order after the `AGENTS.md` file, effort checks in `get_settings`, and the 128 KiB body bound at and above the limit.
-- `python3 scripts/tests/claude.py`: **54 cases pass** (46 before this PR). The fake now echoes `--effort` in `get_settings`. The earlier `--agent` refusal case is replaced by these cases:
+- `python3 scripts/tests/claude.py`: **55 cases pass** (46 before this PR). The fake now echoes `--effort` in `get_settings`. The earlier `--agent` refusal case is replaced by these cases:
   - `deny` invocation of the sample reviewer: deny launch flags plus the body, success, `effort model default; permissions deny`.
   - `trusted` sample reviewer (read-only ceiling): `--tools=Glob,Grep,Read`; a project read runs unprompted; an outside-project read prompt is denied; `requests 1; grants 0; tool events 4`.
   - The same reviewer calling `Write`: protocol violation, exit 4, interrupt sent, nothing written.
   - `trusted` sample coder: the full D049 set plus the body; the prompted write is granted once.
   - A trusted `[edit, read]` role at `effort: high`: `--tools=Edit,Read,Write --effort=high`, granted write, `effort high` reported. If the runtime reports another effort, it exits 2 with no prompt.
-  - A trusted role with no tools launches as `deny` (`--tools=`, `--permission-prompts=none`).
+  - A trusted role with no tools launches as `deny` (`--tools=`, `--permission-prompts=none`), and its preview reports `tools []; host prompts denied` (Grok PR #63).
   - A body over 128 KiB exits 2 without launching.
   - Preview shows `runtime: Claude Code system-prompt append with --effort high` and the effective tools.
 - `python3 scripts/tests/offline.py`: **26/26** suites pass. The OpenCode effort refusal (`agents_exec.py`) is unchanged.

@@ -61,6 +61,7 @@ AGENT_CASES = {
                               + append('effortful')),
     'agent-empty': ('empty', EXPECTED_ARGS + append('empty')),
     'agent-big': ('big', None),
+    'agent-empty-preview': ('empty', None),
     'agent-preview': ('effortful', None),
 }
 SECRETS = ['SECRET_ACCOUNT_SENTINEL', 'SECRET_REASONING_SENTINEL', 'SECRET_PROVIDER_ERROR', 'poison']
@@ -117,6 +118,7 @@ CASES = [
     ('agent-effort-mismatch', 2, False, T + ['--agent', 'effortful']),
     ('agent-empty', 0, True, T + ['--agent', 'empty']),
     ('agent-preview', 0, False, T + ['--agent', 'effortful', '--preview']),
+    ('agent-empty-preview', 0, False, T + ['--agent', 'empty', '--preview']),
     # Refused before any launch.
     ('agent-big', 2, False, T + ['--agent', 'big']),
     ('local-first', 2, False, ['--mode', 'local-first', '--model', 'local']),
@@ -166,7 +168,7 @@ for case, expected, prompted, extra in CASES:
         assert (project / 'user.txt').read_text() == 'preserve dirty user content', case
         assert (project / 'prompted').exists() == prompted, case
         launched = (project / 'argv.json').exists()
-        assert launched == (case not in ('agent-big', 'agent-preview', 'local-first', 'slash', 'preview',
+        assert launched == (case not in ('agent-big', 'agent-preview', 'agent-empty-preview', 'local-first', 'slash', 'preview',
                                          'missing-runtime')), case
         if launched:
             argv = json.loads((project / 'argv.json').read_text())
@@ -292,6 +294,8 @@ for case, expected, prompted, extra in CASES:
             assert ('runtime: Claude Code system-prompt append with --effort high with effective '
                     'permissions tools [Edit, Read, Write]; host prompts granted once each') in p.stdout, p.stdout
             assert 'effort high' in p.stdout and 'execution refused' not in p.stdout, p.stdout
+        if case == 'agent-empty-preview':
+            assert 'with effective permissions tools []; host prompts denied' in p.stdout, p.stdout
         if case == 'preview':
             assert 'route: native Claude Code' in p.stdout, p.stdout
             assert 'credentials: official CLI login' in p.stdout, p.stdout

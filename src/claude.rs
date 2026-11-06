@@ -66,8 +66,10 @@ pub(crate) fn tools(request: &Resolved) -> Vec<&'static str> {
 /// project-local reads and searches never (observed), and for any path
 /// outside the project; a role whose ceiling is below `trusted` is denied
 /// every prompt, as OpenCode denies its `external_directory` (D037/D050).
+/// An empty offered set launches as deny, so it grants nothing either.
 pub(crate) fn grants(request: &Resolved) -> bool {
     request.permissions == Permissions::Trusted
+        && !tools(request).is_empty()
         && request
             .agent
             .as_ref()
@@ -1431,6 +1433,7 @@ mod tests {
         // A role with no tools launches as deny.
         let none = request("trusted", Some(("trusted", "[]", "default")));
         assert!(tools(&none).is_empty());
+        assert!(!grants(&none), "no offered tool, no grant");
         assert_eq!(
             arg(&none, "--permission-prompts"),
             ["--permission-prompts=none"]
