@@ -103,10 +103,24 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
 /// command prompt (D040) before any runtime, network check or project write;
 /// both attempts share them. Sequences apply it to every step before step 1.
 pub(crate) fn supported(request: &crate::config::Resolved) -> Result<(), crate::config::Invalid> {
+    crate::claude::supported(request)?;
     if let Some(agent) = &request.agent {
         crate::opencode::supports(agent)?;
     }
     crate::opencode::prompt_supported(&request.prompt)
+}
+
+/// Sequences and Ralph (D044/D045) reuse `supported` per step and add this
+/// gate: the Claude runtime is accepted for single runs first (D048).
+pub(crate) fn workflow_supported(
+    request: &crate::config::Resolved,
+) -> Result<(), crate::config::Invalid> {
+    if request.runtime == crate::config::RuntimeKind::Claude {
+        return Err(crate::config::Invalid(
+            "the Claude runtime supports ah single only; sequences and Ralph are not yet supported",
+        ));
+    }
+    supported(request)
 }
 
 /// One validated request through route policy, the D034 fallback and the D043
@@ -279,6 +293,9 @@ async fn attempt(
 ) -> Exit {
     let progress = &progress.attempt(number);
     progress.start(describe(request, label));
+    if request.runtime == crate::config::RuntimeKind::Claude {
+        return crate::claude::attempt(request, label, deadline, cancelled, progress).await;
+    }
     let mut adapter =
         match crate::runtime::Runtime::new(request, deadline, cancelled, progress.clone()) {
             Ok(adapter) => adapter,
@@ -365,8 +382,14 @@ async fn attempt(
 fn describe(request: &crate::config::Resolved, label: &str) -> serde_json::Value {
     serde_json::json!({
         "route": label,
-        "runtime": "opencode",
-        "runtime_version": crate::opencode::VERSION,
+        "runtime": match request.runtime {
+            crate::config::RuntimeKind::OpenCode => "opencode",
+            crate::config::RuntimeKind::Claude => "claude",
+        },
+        "runtime_version": match request.runtime {
+            crate::config::RuntimeKind::OpenCode => crate::opencode::VERSION,
+            crate::config::RuntimeKind::Claude => crate::claude::VERSION,
+        },
         "model": request.runtime_model(),
         "group": request.group,
         "permissions": match request.permissions {

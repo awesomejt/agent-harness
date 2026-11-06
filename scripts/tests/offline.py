@@ -26,6 +26,7 @@ SUITES = [
     ['scripts/tests/single_runtime.py', '--refuse'],
     ['scripts/tests/native.py'],
     ['scripts/tests/native_runtime.py'],
+    ['scripts/tests/claude.py'],
     ['scripts/tests/agents_runtime.py'],
     ['scripts/tests/agent_emission_runtime.py'],
     ['scripts/tests/local_first.py'],

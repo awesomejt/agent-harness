@@ -1,6 +1,6 @@
 # Configuration and agent contract
 
-Status: P2.1 fixes the first-slice input contract below and implements library validation. P2.2 exposes `ah single` on tested macOS; P3.7 moves the runtime pin to OpenCode 2.2.5 (D035). P2.3 owns managed OpenCode configuration and effective-route validation; P2.7 exposes read-only `ah single ... --preview` diagnostics. P3.2 adds isolated native OpenCode cloud-only execution (D032); P3.3 adds LiteLLM model-group references and the read-only proxy handoff (D033) and the configured local-first fallback (D034); P3.7 moves both routes to OpenCode 2.2.5. Phase 3 passed P3.6. P4.1 fixes the canonical schema below; P4.2 adds `--agent` selection, model precedence, read-only preview and conflict-aware project emission (D037); P4.3 enforces named execution with intersected runtime rules and refuses unsupported effort (D038). P4.5 adds one validated sample config per mode under `examples/`, packaged with `agents/*.md` in the release archive (D041).
+Status: P2.1 fixes the first-slice input contract below and implements library validation. P2.2 exposes `ah single` on tested macOS; P3.7 moves the runtime pin to OpenCode 2.2.5 (D035). P2.3 owns managed OpenCode configuration and effective-route validation; P2.7 exposes read-only `ah single ... --preview` diagnostics. P3.2 adds isolated native OpenCode cloud-only execution (D032); P3.3 adds LiteLLM model-group references and the read-only proxy handoff (D033) and the configured local-first fallback (D034); P3.7 moves both routes to OpenCode 2.2.5. Phase 3 passed P3.6. P4.1 fixes the canonical schema below; P4.2 adds `--agent` selection, model precedence, read-only preview and conflict-aware project emission (D037); P4.3 enforces named execution with intersected runtime rules and refuses unsupported effort (D038). P4.5 adds one validated sample config per mode under `examples/`, packaged with `agents/*.md` in the release archive (D041). P7.2 adds the Claude runtime as `native.target: "claude"` for deny-profile cloud-only single runs ([D048](../DECISIONS.md#2026-11-06--d048-claude-runtime-launch-preflight-and-deny-profile-single-runs)).
 
 ## Version 1 first-slice configuration (D024)
 
@@ -49,6 +49,23 @@ Validate the whole config even if invocation flags override fields; malformed/un
 Cloud-only bypasses the project transaction planner entirely, including with `--no-sync`; it neither reads nor rewrites `opencode.json`, `opencode.jsonc`, ownership receipts, locks or staging files. Its generated in-memory routing has an empty `providers` object, a `provider.use` policy allowing only `opencode`, and the selected model for both the primary and the title helper. Private HOME/XDG, cleared environment, project-config discovery disabling, exact source/agent/catalog checks and ACP session-model checks still apply. Unmanaged project/global runtime settings and auth/endpoint/catalog environment overrides are excluded. Project instruction loading remains enabled under the existing trust scope. The tested runtime/platform is OpenCode **2.2.5 on macOS arm64** (D035).
 
 Native preview uses the same input resolver, reports native selection and no managed changes, and performs no child launch, catalog read or network check. `--no-sync` has no additional effect on this route: effective runtime checks are always mandatory. No harness retry or fallback is added; unknown post-submission outcomes remain uncertain.
+
+### Native Claude runtime (P7.2 / D048)
+
+```json
+{
+  "version": 1,
+  "mode": "cloud-only",
+  "native": {
+    "target": "claude",
+    "model": "sonnet"
+  }
+}
+```
+
+`native.target: "claude"` runs the native route through the official Claude Code CLI, pinned to **2.1.314 on macOS arm64**, instead of OpenCode. The prerequisite is the operator's existing official login: install `claude` on an absolute PATH entry and log in with it before using the harness ([D047](../DECISIONS.md#2026-11-06--d047-native-adapters-use-the-operators-existing-official-cli-login)). The harness never reads, copies or proxies that login, and it passes no `ANTHROPIC_*` or `CLAUDE_*` variable. `native.api_key_env` is rejected for this target; no API-key form is offered. `native.model` is a Claude alias (such as `sonnet` or `opus`) or a full model name under the identifier grammar above; `--model` overrides it, and `group:NAME` rejects. Plan use draws on the operator's own plan limits or usage credits, as Anthropic applies them; the harness makes no claim about either.
+
+This increment supports `ah single` with `deny` permissions only: no tool is offered. `--permissions trusted`, `--agent`, `ah sequence`, `ah ralph` and `local-first` with a `claude` target reject with exit 2 before launch, as does a `--mode local-first` override of such a config. `--mode local-only` with a `litellm` block still runs OpenCode on the LiteLLM route. Preview reports the Claude runtime and the login prerequisite without launching it. See [execution](EXECUTION.md#p72-claude-runtime-d048) for the preflight and outcome mapping.
 
 ### LiteLLM model groups (P3.3 / D033)
 

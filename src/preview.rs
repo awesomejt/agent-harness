@@ -6,12 +6,12 @@ use crate::{
 use std::path::{Path, PathBuf};
 
 /// Shared with execution: relative PATH entries are deliberately excluded.
-pub(crate) fn discover_runtime() -> Option<PathBuf> {
+pub(crate) fn discover_runtime(name: &str) -> Option<PathBuf> {
     std::env::var_os("PATH")
         .into_iter()
         .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
         .filter(|p| p.is_absolute())
-        .map(|p| p.join("opencode"))
+        .map(|p| p.join(name))
         .find(|p| {
             p.metadata().is_ok_and(|m| {
                 #[cfg(unix)]
@@ -40,15 +40,33 @@ fn source(source: Source) -> &'static str {
 pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String {
     // Debug path formatting escapes control characters. No raw configuration,
     // endpoint, key value, prompt, or unmanaged settings are formatted here.
-    let runtime = match discover_runtime() {
-        Some(path) => format!(
-            "discovered {path:?}; version unverified (requires {})",
-            crate::opencode::VERSION
-        ),
-        None => format!(
-            "missing; install OpenCode {} on an absolute PATH entry",
-            crate::opencode::VERSION
-        ),
+    let claude = r.runtime == crate::config::RuntimeKind::Claude;
+    let runtime = if claude {
+        let refused = match crate::claude::supported(r) {
+            Ok(()) => String::new(),
+            Err(error) => format!("; execution refused: {}", error.0),
+        };
+        match discover_runtime("claude") {
+            Some(path) => format!(
+                "Claude Code stream-json; discovered {path:?}; version unverified (requires {}){refused}",
+                crate::claude::VERSION
+            ),
+            None => format!(
+                "Claude Code stream-json; missing; install Claude Code {} on an absolute PATH entry{refused}",
+                crate::claude::VERSION
+            ),
+        }
+    } else {
+        match discover_runtime("opencode") {
+            Some(path) => format!(
+                "OpenCode ACP; discovered {path:?}; version unverified (requires {})",
+                crate::opencode::VERSION
+            ),
+            None => format!(
+                "OpenCode ACP; missing; install OpenCode {} on an absolute PATH entry",
+                crate::opencode::VERSION
+            ),
+        }
     };
     // A named role can narrow a trusted invocation (D038); report the
     // effective scope from the same mapping the runtime enforces.
@@ -89,11 +107,15 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
         "LiteLLM primary; configured native OpenCode fallback"
     } else if local {
         "LiteLLM only"
+    } else if claude {
+        "native Claude Code on the operator's existing official CLI login"
     } else {
         "native OpenCode built-in opencode API-key provider"
     };
     let before = if local {
         "ensure configured LiteLLM /v1 service is reachable and selected alias exists"
+    } else if claude {
+        "install the official claude CLI and log in with it first; the harness never reads its login"
     } else {
         "ensure the native API key and built-in model are available; login stores are not consumed"
     };
@@ -212,6 +234,11 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
             check.timeout_secs
         ),
     };
+    let credentials = if claude {
+        "official CLI login (operator prerequisite; never read, copied or proxied by the harness)"
+    } else {
+        "environment reference present (config); value and endpoint omitted"
+    };
     let health = if local {
         "LiteLLM reachability, alias availability"
     } else {
@@ -221,13 +248,13 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
         "ah {} preview: valid resolved request; execution readiness unverified\n\
          project: {:?}\nconfig: {:?}\n\
          mode: {mode} ({}); route: {route}; fallback: {fallback}\n\
-         runtime: OpenCode ACP; {runtime}\n\
+         runtime: {runtime}\n\
          execution platform: {}\n\
          model: {} ({}); helper: same model\n\
          agent: {agent}\n\
          project instructions: {instructions}; skills/MCP/plugins/project config not inherited\n\
          proxy handoff: {handoff}\n\
-         credentials: environment reference present (config); value and endpoint omitted\n\
+         credentials: {credentials}\n\
          permissions: {scope} ({}); external tools/subagents/network tools disabled\n\
          timeout: {} seconds ({})\n\
          sync: {} ({}); planned changes: {changes}\n\

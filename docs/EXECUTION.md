@@ -158,6 +158,21 @@ Records never contain prompts, partial assistant text, reasoning, tool arguments
 
 R03-REC1 is declined (D039). A post-submission failure without a trustworthy terminal response stays exit 4, even with zero grants and zero completed tool calls; the result exposes `prompt_submitted`, `backend_stop: null`, `grants` and `tool_events` instead. Headless behavior is unchanged: stdin is read only for `--prompt-file -`, permission requests use the noninteractive policy, and there is no TTY prompt. See [Operations](OPERATIONS.md#headless-and-ci-use-p47) for CI usage.
 
+## P7.2 Claude runtime (D048)
+
+`native.target: "claude"` launches the official `claude` 2.1.314 in print mode with stream-json input and output, in the project directory, with a cleared environment that keeps the real `HOME` for the operator's existing login. Launch flags drop customizations (`--safe-mode`, empty `--setting-sources`, `--strict-mcp-config`, `--disable-slash-commands`), persist no session and offer no tool (`--tools=`, `--permission-prompts=none`). The project `AGENTS.md`, when present, is the only instruction source, passed by path with `--append-system-prompt-file`; `CLAUDE.md` is not loaded.
+
+| Stage | Check or mapping | Exit on failure |
+|---|---|---|
+| Before the prompt | `initialize`: version 2.1.314, permission mode `default`, no commands, default output style. `get_settings`: no setting source or effective setting. `mcp_status`: no server. `get_context_usage`: resolved model; no memory files, MCP tools, agents or tool-definition context | 2, no prompt sent |
+| Submission | Boundary set before the user message is written (D031) | — |
+| `system/init` | First turn record; same version, model and `cwd`; empty tools, MCP servers, slash commands and skills; default modes; built-in plugins only; `apiKeySource: "none"` | 4 |
+| Turn records | Assistant text counts as activity; any tool call, tool result or host control request is a violation under deny | 4 |
+| `result` | Only `subtype: "success"`, `is_error: false`, `stop_reason: "end_turn"` succeeds (exit 0); an aborted result after the harness's interrupt is cancellation (exit 3); any other result exits 1 | — |
+| Signal or deadline | One `interrupt` control request, then five seconds for a result; none, EOF or a malformed record after submission is uncertain | 4 |
+
+Machine output keeps the D039 v1 schema: `attempt.started` carries `runtime: "claude"`, the 2.1.314 version and the bare model; `permission_requests` and `grants` are always 0; `usage.source` is `claude-stream-json-result` with `session_cost` in USD from `total_cost_usd`, a backend report rather than billing, and token/context metrics `null`. Raw stderr, account fields, reasoning and provider error text are never shown. Process-group cleanup follows D026/D030; the attempt has no private runtime directory.
+
 ## P4.8 inherited capabilities (D040)
 
 The [P4.8 capability matrix](evidence/p4-8-inherited-capabilities.md) is versioned against OpenCode 2.2.5 and records each capability as tested, unsupported or unverified.

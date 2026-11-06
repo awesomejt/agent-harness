@@ -282,7 +282,7 @@ fn resolve_all(
         },
     )?;
     for (step, request) in steps.iter().zip(&requests).filter(|_| launch) {
-        if let Err(error) = crate::single::supported(request) {
+        if let Err(error) = crate::single::workflow_supported(request) {
             return Err(reject(format_args!("step {}: {}", step.name, error.0)));
         }
         // Surfaces non-UTF-8 record paths before any lock or write.
@@ -1433,7 +1433,7 @@ fn preview(steps: &[Step], requests: &[Resolved], folder: &Path, config: &Path) 
             Ok(_) => "none".to_owned(),
             Err(error) => format!("refused: {}", error.0),
         };
-        let refusal = match crate::single::supported(request) {
+        let refusal = match crate::single::workflow_supported(request) {
             Ok(()) => String::new(),
             Err(error) => format!("; execution refused: {}", error.0),
         };

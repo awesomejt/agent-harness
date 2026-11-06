@@ -120,7 +120,7 @@ fn desired(r: &Resolved) -> BTreeMap<String, Value> {
         ("enabled_providers".into(), json!([PROVIDER])),
         (
             "provider".into(),
-            json!({PROVIDER: {"npm": "@ai-sdk/openai-compatible", "options": {"baseURL": r.api_base, "apiKey": format!("{{env:{}}}", r.api_key_env)}, "models": {&r.model: {"name": r.model}}}}),
+            json!({PROVIDER: {"npm": "@ai-sdk/openai-compatible", "options": {"baseURL": r.api_base, "apiKey": format!("{{env:{}}}", r.api_key_env.as_deref().unwrap_or_default())}, "models": {&r.model: {"name": r.model}}}}),
         ),
     ])
 }
@@ -338,7 +338,10 @@ pub struct Plan {
 impl Plan {
     /// Read-only; never consults HOME, environment values or global settings.
     pub fn prepare(r: &Resolved) -> Result<Self> {
-        if r.mode != crate::config::Mode::LocalOnly || r.api_base.is_none() {
+        if r.mode != crate::config::Mode::LocalOnly
+            || r.api_base.is_none()
+            || r.api_key_env.is_none()
+        {
             return Err(Invalid("managed LiteLLM plan requires local-only routing"));
         }
         let project = r

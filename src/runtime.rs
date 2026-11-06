@@ -24,7 +24,7 @@ impl Runtime {
         cancelled: tokio_util::sync::CancellationToken,
         progress: crate::progress::Progress,
     ) -> Result<Self, Exit> {
-        let executable = crate::preview::discover_runtime().ok_or_else(|| {
+        let executable = crate::preview::discover_runtime("opencode").ok_or_else(|| {
             progress.event(format!(
                 "OpenCode missing: install {} on an absolute PATH entry",
                 crate::opencode::VERSION
@@ -32,7 +32,10 @@ impl Runtime {
             progress.reason("OpenCode missing on an absolute PATH entry");
             Exit::Invalid
         })?;
-        let key = std::env::var_os(&request.api_key_env)
+        let key = request
+            .api_key_env
+            .as_ref()
+            .and_then(std::env::var_os)
             .filter(|s| !s.is_empty())
             .ok_or_else(|| {
                 progress.reject(crate::config::MISSING_KEY);
