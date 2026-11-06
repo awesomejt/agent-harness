@@ -19,11 +19,16 @@ ROOT = Path(__file__).resolve().parents[2]
 BINARY = ROOT / 'target/debug/ah'
 FAKE = ROOT / 'scripts/tests/fake_opencode.py'
 
-# Fake check: logs its name, then acts on MODE. `lockdown` makes the record
-# directory read-only before passing, so the step result write fails.
+# Fake check: logs its name, then acts on MODE, or on the content of
+# tools/NAME.mode when present (so behavior changes without changing argv).
+# `lockdown` makes the record directory read-only before passing, so the step
+# result write fails.
 CHECKER = '''#!/usr/bin/env python3
 import os, sys
 name, mode, out = sys.argv[1], sys.argv[2], sys.argv[3]
+override = os.path.join(out, name + '.mode')
+if os.path.exists(override):
+    mode = open(override).read().strip()
 with open(os.path.join(out, 'checks.log'), 'a') as f:
     f.write(name + '\\n')
 if mode == 'lockdown':
@@ -288,9 +293,26 @@ r = f.record(run)
 assert r['status'] == 'stopped' and attempt_reasons(r, 0) == [('initial', 'failed'), ('accept', 'failed')]
 _, err, _ = f.ah('resume', run, expect=2)
 assert 'may have had effects' in err
+# R06-02: the recorded check identity binds the stopping step. A changed argv
+# or program refuses --retry and --accept before launch, with the record
+# unchanged (bare resume already needs a choice after a failed gate).
+before = f.record(run)
 f.configure(dict(test=['pass'], build=['pass']))
+for choice in [('--retry',), ('--accept',)]:
+    _, err, prompts = f.ah('resume', run, *choice, '--verify', 'test', expect=2)
+    assert prompts == [] and 'check "test" changed since its last attempt (check argv sha256)' in err, (choice, err)
+    assert 'restore the recorded check or start a new run' in err, err
+config = json.loads((f.project / 'ah.json').read_text())
+config['checks']['test']['argv'][0] = '/usr/bin/true'
+(f.project / 'ah.json').write_text(json.dumps(config))
+_, err, prompts = f.ah('resume', run, '--accept', '--verify', 'test', expect=2)
+assert prompts == [] and 'changed since its last attempt (check program, check argv sha256)' in err, err
+assert f.record(run) == before and f.checks() == ['test', 'test'], f.checks()
+# The restored check resumes; the project's state, not the check, changed.
+f.configure(dict(test=['fail'], build=['pass']))
+(f.tools / 'test.mode').write_text('pass')
 _, err, prompts = f.ah('resume', run, '--accept', '--verify', 'test', expect=0)
-assert prompts == ['Two.\n'] and 'changed since attempt 2: check argv sha256' in err, err
+assert prompts == ['Two.\n'] and 'changed since attempt 2: nothing' in err, err
 r = f.record(run)
 accept = r['steps'][0]['attempts'][2]
 assert accept['status'] == 'accepted' and accept['agent_outcome'] is None

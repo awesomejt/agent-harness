@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""P6.2/P6.3 Ralph loops (D045) against fake OpenCode 2.2.5.
+"""P6.2/P6.3 Ralph loops (D045) and the P6.5 review fixes against fake OpenCode 2.2.5.
 
 Covers fresh runtime context and private state per iteration, the fixed
 header and prompt snapshot, durable records and their privacy, both bounds,
 completion only from a claim plus a passing check, rejected claims and the
 repair iteration, false, stale and DONE-file signals, check outcomes that
 stop the run, interrupted and cancelled iterations, explicit resume choices,
-the lock shared with sequences, read-only show/preview and argument rules.
+the lock shared with sequences, read-only show/preview and argument rules,
+local-first fallback, cloud-only and named-role runs, the binding check
+identity on resume, accept identities and the 100-row record limit.
 No model traffic. Build target/debug/ah first.
 """
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -28,7 +31,7 @@ CHECKER = ('#!/bin/sh\necho "$1" >> "$2/checks.log"\n[ -f "$2/check-hang" ] && s
 
 
 class Fixture:
-    def __init__(self, task='Work on the task.\n', check_exit=None, check_timeout=None):
+    def __init__(self, task='Work on the task.\n', check_exit=None, check_timeout=None, mode='local-only'):
         self.dirs = [tempfile.TemporaryDirectory(prefix=f'ah-ralph-{n}-') for n in ('project', 'tools', 'home')]
         self.project, self.tools, self.home = (Path(d.name).resolve() for d in self.dirs)
         self.state = self.home / 'state'
@@ -45,14 +48,26 @@ class Fixture:
         test = dict(argv=[str(checker), 'ARGV_SENTINEL', str(self.tools)])
         if check_timeout:
             test['timeout_secs'] = check_timeout
-        config = dict(version=1, mode='local-only', model='fixture',
+        config = dict(version=1, mode=mode, model='fixture',
                       litellm=dict(api_base='http://127.0.0.1:9/v1', api_key_env='TEST_KEY'),
                       checks=dict(test=test, other=dict(argv=[str(checker), 'ARGV_SENTINEL', str(self.tools)])))
+        if mode != 'local-only':
+            # Native route through the same fake; for local-first the closed
+            # LiteLLM endpoint forces the D034 pre-submission fallback.
+            config['native'] = dict(target='opencode', model='fixture', api_key_env='NATIVE_KEY')
         (self.project / 'ah.json').write_text(json.dumps(config))
+        (self.project / 'agents').mkdir()
+        (self.project / 'agents/reviewer.md').write_text((ROOT / 'agents/reviewer.md').read_text())
+
+    def config(self, change):
+        path = self.project / 'ah.json'
+        config = json.loads(path.read_text())
+        change(config)
+        path.write_text(json.dumps(config))
 
     def env(self, **extra):
         env = {**os.environ, 'PATH': f'{self.project}:{self.tools}:' + os.environ['PATH'],
-               'TEST_KEY': 'SECRET_SENTINEL', 'XDG_STATE_HOME': str(self.state)}
+               'TEST_KEY': 'SECRET_SENTINEL', 'NATIVE_KEY': 'SECRET_SENTINEL', 'XDG_STATE_HOME': str(self.state)}
         env.update(extra)
         return {k: v for k, v in env.items() if v is not None}
 
@@ -101,8 +116,11 @@ class Fixture:
     def runs(self):
         return sorted(p.stem for p in (self.state / 'agent-harness/ralph').glob('r*.json'))
 
+    def record_path(self, run):
+        return self.state / f'agent-harness/ralph/{run}.json'
+
     def record(self, run):
-        path = self.state / f'agent-harness/ralph/{run}.json'
+        path = self.record_path(run)
         text = path.read_text()
         for secret in ['SECRET_SENTINEL', 'ARGV_SENTINEL', 'TEST_KEY', 'Work on', 'Ralph loop', 'Iteration:', 'OK']:
             assert secret not in text, (secret, text)
@@ -207,6 +225,13 @@ assert 'next: complete; nothing to resume' in out, out
 _, err, prompts = f.ah('resume', run, expect=0)
 assert prompts == [] and f'run {run} is already completed; nothing launched' in err, err
 assert f.checks() == ['ARGV_SENTINEL']
+# R06-07: a completed run's resume needs neither FILE nor the config.
+before = f.record_path(run).read_bytes()
+f.task.unlink()
+(f.project / 'ah.json').unlink()
+_, err, prompts = f.ah('resume', run, expect=0)
+assert prompts == [] and f'run {run} is already completed; nothing launched' in err, err
+assert f.record_path(run).read_bytes() == before and f.checks() == ['ARGV_SENTINEL']
 
 # A rejected claim (check failed) continues: the next iteration is the bounded
 # repair, told the claim and check status; the repaired claim completes.
@@ -215,6 +240,9 @@ out, err, prompts = f.ah('run', str(f.task), expect=0)
 run = f.run_id(err)
 assert len(prompts) == 2 and f.checks() == ['ARGV_SENTINEL'] * 2, (prompts, f.checks())
 assert 'claim rejected at iteration 1: check failed; the next iteration is the bounded repair' in err, err
+# R06-04: the iteration summary names the repair, not the shared gate's text.
+assert 'claim rejected; Ralph continues with a bounded repair iteration unless a bound is reached' in err, err
+assert 'no automatic retry, repair' not in err, err
 head, _ = header_of(prompts[1])
 assert 'Previous iteration: agent outcome succeeded; completion claimed: yes; check status: failed.\n' in head, head
 r = f.record(run)
@@ -409,6 +437,104 @@ _, err, prompts = f.ah('run', str(f.task), expect=2)
 assert prompts == [] and "another sequence or Ralph run holds this project's lock" in err, err
 proc.send_signal(signal.SIGINT)
 proc.communicate(timeout=60)
+
+# R06-03: Ralph under every route. Local-first's closed LiteLLM endpoint
+# forces the D034 pre-submission fallback, which must carry the same header,
+# snapshot and claim/check flow; cloud-only goes straight to the native route.
+for mode, backends in [('local-first', 2), ('cloud-only', 1)]:
+    f = Fixture('CLAIM the task.\n', mode=mode)
+    _, err, prompts = f.ah('run', str(f.task), '--max-iterations', '2', expect=0)
+    run = f.run_id(err)
+    assert len(prompts) == 1 and prompts[0]['provider'] == 'opencode', (mode, prompts)
+    head, task = header_of(prompts[0])
+    assert task == 'CLAIM the task.\n' and head.startswith('[agent-harness Ralph loop]\n'), (mode, head)
+    assert 'Iteration: 1 of at most 2.\n' in head and 'AH-RALPH-COMPLETE' in head, (mode, head)
+    assert 'completed at iteration 1: claim verified by a passing check' in err, (mode, err)
+    r = f.record(run)
+    i = r['iterations'][0]
+    assert r['status'] == 'completed' and i['route'] == mode and len(i['backends']) == backends, (mode, i)
+    assert [b['prompt_submitted'] for b in i['backends']][-1] and i['claim'] is True, (mode, i)
+    assert (i['fallback'] is not None) == (mode == 'local-first'), (mode, i)
+    assert i['verification']['status'] == 'passed' and f.checks() == ['ARGV_SENTINEL'], (mode, i)
+# A named role reaches the runtime, and its definition and policy are recorded.
+f = Fixture('CLAIM the task.\n')
+_, err, prompts = f.ah('run', str(f.task), '--agent', 'reviewer', expect=0)
+run = f.run_id(err)
+assert [p['agent'] for p in prompts] == ['reviewer'] and 'agent=reviewer' in err, (prompts, err)
+i = f.record(run)['iterations'][0]
+assert i['agent_sha256'] == hashlib.sha256((f.project / 'agents/reviewer.md').read_bytes()).hexdigest(), i
+assert i['permissions'] == 'deny' and i['claim'] is True, i
+
+# R06-02: the recorded check identity binds every resume choice. A changed
+# argv or program (here, as an agent could in the in-project ah.json) refuses
+# before anything launches or is written; the restored check resumes.
+f = Fixture()
+_, err, _ = f.ah('run', str(f.task), '--max-iterations', '1', '--permissions', 'trusted', expect=1)
+run = f.run_id(err)
+before = f.record_path(run).read_bytes()
+original = [str(f.tools / 'checker'), 'ARGV_SENTINEL', str(f.tools)]
+for index, value, fields in [(1, 'CHANGED', 'check argv sha256'),
+                             (0, '/usr/bin/true', 'check program')]:
+    f.config(lambda c: c['checks']['test']['argv'].__setitem__(index, value))
+    for choice in [('--max-iterations', '2'), ('--retry', '--max-iterations', '2'), ('--accept',)]:
+        _, err, prompts = f.ah('resume', run, *choice, expect=2)
+        assert prompts == [] and f'check "test" changed since it was recorded ({fields})' in err, (choice, err)
+        assert 'restore the recorded check or start a new run; nothing launched' in err, err
+    f.config(lambda c: c['checks']['test'].__setitem__('argv', original))
+assert f.record_path(run).read_bytes() == before and f.checks() == []
+# R06-05: an accept without route flags reports only prompt and check
+# changes, and show does not present its resolved policy as the row's.
+_, err, prompts = f.ah('resume', run, '--accept', expect=0)
+assert prompts == [] and 'ralph iteration 2 (accept) changed since iteration 1: nothing' in err, err
+out, _, _ = f.ah('show', run, expect=0)
+assert 'iteration 1 initial: succeeded' in out and 'permissions trusted' in out, out
+none = 'n/a (no agent turn)'
+assert (f'iteration 2 accept: accepted; exit 0; agent outcome none; claim none; verification test passed (exit 0); '
+        f'prompt submitted no; route {none}; model {none}; fallback {none}; permissions {none};') in out, out
+# A later agent iteration compares with the last agent iteration, not the accept.
+f = Fixture('FAIL the task.\n')
+_, err, _ = f.ah('run', str(f.task), '--permissions', 'trusted', expect=1)
+run = f.run_id(err)
+(f.tools / 'check-exit').write_text('1')
+_, err, _ = f.ah('resume', run, '--accept', expect=1)
+f.task.write_text('Work.\n')
+_, err, prompts = f.ah('resume', run, '--retry', '--permissions', 'trusted', '--max-iterations', '2', expect=1)
+assert len(prompts) == 1 and 'ralph iteration 3 (retry) changed since iteration 1: prompt sha256' in err, err
+assert 'permissions' not in err.split('changed since iteration 1: ', 1)[1].split('\n', 1)[0], err
+
+# R06-01: accept rows fill record capacity without counting as agent
+# iterations. With 98 agent iterations and one accept recorded, a retry under
+# --max-iterations 100 launches once, then ends exhausted at the 100-row
+# record limit instead of writing an unreadable 101st row.
+f = Fixture()
+_, err, _ = f.ah('run', str(f.task), '--max-iterations', '1', expect=1)
+run = f.run_id(err)
+(f.tools / 'check-exit').write_text('1')
+_, err, _ = f.ah('resume', run, '--accept', expect=1)
+r = f.record(run)
+first, accept = r['iterations']
+r['iterations'] = ([first] + [dict(first, number=n, reason='continue') for n in range(2, 99)]
+                   + [dict(accept, number=99)])
+r['max_iterations'] = 98
+f.record_path(run).write_text(json.dumps(r, indent=2) + '\n')
+_, err, prompts = f.ah('resume', run, '--retry', '--max-iterations', '100', expect=1)
+assert len(prompts) == 1 and 'exhausted: the run holds 100 recorded iterations, the record limit; start a new run' in err, err
+r = f.record(run)
+assert (r['status'], len(r['iterations']), r['iterations'][-1]['reason']) == ('exhausted', 100, 'retry'), r['status']
+out, _, _ = f.ah('show', run, expect=0)
+assert f'run {run}: exhausted; 99/100 iterations' in out, out
+assert 'next: the run reached 100 recorded iterations; start a new run' in out, out
+for choice in [('--retry',), ('--accept',)]:
+    _, err, prompts = f.ah('resume', run, *choice, expect=2)
+    assert prompts == [] and 'the run reached 100 recorded iterations; start a new run' in err, (choice, err)
+
+# R06-07 counterpart: an unfinished run still re-reads FILE before launch.
+f = Fixture()
+_, err, _ = f.ah('run', str(f.task), '--max-iterations', '1', expect=1)
+run = f.run_id(err)
+f.task.unlink()
+_, err, prompts = f.ah('resume', run, '--max-iterations', '2', expect=2)
+assert prompts == [] and 'recorded prompt file: cannot open input file' in err, err
 
 # Preview reads FILE, resolves agent, route and check, and prints the bounds
 # and the iteration-1 header without state, lock, launch or write.

@@ -184,7 +184,7 @@ for line in sys.stdin:
             text = ''.join(block.get('text', '') for block in m['params']['prompt'])
             with open(cwd / 'prompts.jsonl', 'a') as log:
                 log.write(json.dumps(dict(text=text, agent=config.get('default_agent'),
-                                          home=os.environ['HOME'])) + '\n')
+                                          home=os.environ['HOME'], provider=provider)) + '\n')
             if 'EDIT-LATER' in text:
                 # An agent edit to a later step file must not change the run.
                 for step in (cwd / 'prompts').glob('3-*.md'):

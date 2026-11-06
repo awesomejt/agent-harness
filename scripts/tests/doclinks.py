@@ -13,7 +13,7 @@ code span. A target's path is resolved relative to the linking file and must
 exist as a file or a directory, following symlinks; an absolute path is reported
 as broken. A `#fragment`, alone (the same file) or after a
 `.md` path, must match an anchor in that Markdown file: an explicit
-`<a id="...">` or a heading's GitHub slug (lowercase; punctuation dropped except
+`<a id="...">` outside code or a heading's GitHub slug (lowercase; punctuation dropped except
 hyphens and underscores; each space becomes a hyphen; repeated headings take
 `-1`, `-2`, ... suffixes). Fragments are case-sensitive.
 
@@ -241,15 +241,21 @@ def heading_slug(text):
     return re.sub(r'\s', '-', text).lower()
 
 
-def anchors(text, flags):
-    """Anchors of a Markdown file: explicit `<a id=...>` plus heading slugs."""
+def anchors(text):
+    """Anchors of a Markdown file: explicit `<a id=...>` plus heading slugs.
+
+    HTML anchors come from the masked text, so an example inside a code span
+    or fenced block is no anchor; heading slugs come from the raw line, so a
+    heading's inline code keeps its text in the slug, as on GitHub.
+    """
     found = set()
     seen = {}
     lines = text.split('\n')
-    for index, line in enumerate(lines):
+    masked, flags = masked_text(text)
+    for index, (line, plain) in enumerate(zip(lines, masked.split('\n'))):
         if flags[index]:
             continue
-        for match in ANCHOR_TAG.finditer(line):
+        for match in ANCHOR_TAG.finditer(plain):
             value = match.group(1) or match.group(2)
             if value:
                 found.add(value)
@@ -284,7 +290,7 @@ def resolves(origin, target, cache):
         return False
     if resolved not in cache:
         text = resolved.read_text(encoding='utf-8', errors='replace')
-        cache[resolved] = anchors(text, fenced_flags(text.split('\n')))
+        cache[resolved] = anchors(text)
     return fragment in cache[resolved]
 
 

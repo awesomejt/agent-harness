@@ -223,6 +223,24 @@ pub struct CheckIdentity {
     pub argv_sha256: String,
 }
 
+impl CheckIdentity {
+    /// The pinned fields that differ from `recorded`; a resume refuses any
+    /// (D044/D045, Phase 6 review R06-02).
+    pub fn changed_from(&self, recorded: &CheckIdentity) -> Vec<&'static str> {
+        [
+            ("check name", self.name != recorded.name),
+            ("check program", self.program != recorded.program),
+            (
+                "check argv sha256",
+                self.argv_sha256 != recorded.argv_sha256,
+            ),
+        ]
+        .into_iter()
+        .filter_map(|(name, differs)| differs.then_some(name))
+        .collect()
+    }
+}
+
 /// The D043 verification fields.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -772,10 +790,17 @@ impl Store {
         parse(&bytes, run)
     }
 
-    /// Pretty JSON with a final newline, within the record bound.
+    /// Pretty JSON with a final newline, within the record bound. A record
+    /// the strict reader would refuse is never written (R06-01).
     fn encode<T: Stored>(&self, record: &T) -> Result<String> {
         debug_assert_eq!(T::KIND, self.kind);
         let k = self.kind;
+        if !record.consistent() {
+            return Err(io(k.say(
+                "refusing to write an inconsistent sequence record",
+                "refusing to write an inconsistent Ralph record",
+            )));
+        }
         let mut text = serde_json::to_string_pretty(record).map_err(|_| {
             io(k.say(
                 "cannot encode sequence record",

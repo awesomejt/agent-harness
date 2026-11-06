@@ -25,11 +25,7 @@ pub const MARKER: &str = "AH-RALPH-COMPLETE";
 /// trailing ASCII whitespace removed, is exactly the marker. The marker
 /// anywhere else is no claim.
 pub fn claims(text: &str) -> bool {
-    let space = |c: char| c.is_ascii_whitespace();
-    text.trim_end_matches(space)
-        .rsplit('\n')
-        .next()
-        .is_some_and(|line| line.trim_end_matches(space) == MARKER)
+    crate::progress::last_line(text) == Some(MARKER)
 }
 
 /// The previous iteration as the header reports it, from the harness's own
@@ -512,6 +508,13 @@ fn resume(args: Vec<OsString>) -> Exit {
         Ok(None) => return reject("no Ralph record with that run ID"),
         Err(failure) => return fail(failure),
     };
+    // A completed run is a no-op that needs neither FILE nor the config.
+    if original.status == RalphStatus::Completed {
+        note(format_args!(
+            "run {run} is already completed; nothing launched"
+        ));
+        return Exit::Success;
+    }
     let project = std::path::PathBuf::from(&original.project);
     let config_path = std::path::PathBuf::from(&original.config);
     // D045: FILE is re-read from the recorded path before any key lookup,
@@ -549,7 +552,7 @@ fn resume(args: Vec<OsString>) -> Exit {
         ));
     }
     // Route options resolve afresh from the current config and this
-    // invocation; the check is re-pinned and any changed identity reported.
+    // invocation; the check is re-pinned and must keep its recorded identity.
     invocation.rebase(project.clone(), config_path.clone());
     let config = match Config::open(&config_path) {
         Ok(config) => config,
@@ -566,10 +569,28 @@ fn resume(args: Vec<OsString>) -> Exit {
     if task.request.project != project {
         return reject("recorded project path no longer resolves to itself; start a new run");
     }
-    if let Err(error) = crate::single::supported(&task.request)
-        .and_then(|()| crate::sequence::identity(&task.check).map(|_| ()))
+    let pinned = match crate::single::supported(&task.request)
+        .and_then(|()| crate::sequence::identity(&task.check))
     {
-        return reject(error.0);
+        Ok(pinned) => pinned,
+        Err(error) => return reject(error.0),
+    };
+    // The definition of done binds the run (R06-02): a check whose program
+    // or argv changed since it was recorded never completes it.
+    if let Some(recorded) = record
+        .iterations
+        .iter()
+        .rev()
+        .find_map(|i| i.check.as_ref())
+    {
+        let changed = pinned.changed_from(recorded);
+        if !changed.is_empty() {
+            return reject(format_args!(
+                "run {run}: check \"{}\" changed since it was recorded ({}); restore the recorded check or start a new run; nothing launched",
+                recorded.name,
+                changed.join(", ")
+            ));
+        }
     }
     let store = match crate::state::Store::create_for(kind, root, &project) {
         Ok(store) => store,
@@ -642,9 +663,11 @@ fn iteration(
 }
 
 /// Identity fields that differ from the previous iteration. The timeout is
-/// left out: the wall bound caps it per iteration.
+/// left out: the wall bound caps it per iteration. An `accept` runs no agent
+/// turn, so only its prompt and check identity are compared (R06-05).
 fn changes(previous: &Iteration, next: &Iteration) -> Vec<&'static str> {
     let (before, after) = (previous.check.as_ref(), next.check.as_ref());
+    let accept = next.reason == IterationReason::Accept;
     [
         (
             "prompt sha256",
@@ -672,6 +695,7 @@ fn changes(previous: &Iteration, next: &Iteration) -> Vec<&'static str> {
         ("permissions", previous.permissions != next.permissions),
     ]
     .into_iter()
+    .filter(|(name, _)| !accept || name.starts_with("prompt") || name.starts_with("check"))
     .filter_map(|(name, differs)| differs.then_some(name))
     .collect()
 }
@@ -772,7 +796,21 @@ impl Session {
             iteration.reason,
             IterationReason::Resume | IterationReason::Retry | IterationReason::Accept
         );
-        if let Some(previous) = self.record.borrow().iterations.last().filter(|_| resumed) {
+        // An accept compares with the last iteration; an agent iteration with
+        // the last agent iteration, since an accept's route fields describe
+        // no agent turn.
+        let basis = {
+            let record = self.record.borrow();
+            let mut earlier = record.iterations.iter().rev();
+            if iteration.reason == IterationReason::Accept {
+                earlier.next().cloned()
+            } else {
+                earlier
+                    .find(|i| i.reason != IterationReason::Accept)
+                    .cloned()
+            }
+        };
+        if let Some(previous) = basis.as_ref().filter(|_| resumed) {
             let changed = changes(previous, &iteration);
             progress.event(format!(
                 "ralph iteration {} ({}) changed since iteration {}: {}",
@@ -909,7 +947,8 @@ fn execute(mut task: Task, session: &Session, first: IterationReason) -> Exit {
                     }
                     let exit =
                         crate::single::launch(&task.request, cancelled.clone(), &progress).await;
-                    let claim = (exit == Exit::Success).then(|| progress.claimed());
+                    let claim = (exit == Exit::Success)
+                        .then(|| progress.final_line().as_deref() == Some(MARKER));
                     if claim != Some(true) {
                         return (exit, claim);
                     }
@@ -947,12 +986,13 @@ where
     let started = tokio::time::Instant::now();
     let mut reason = first;
     loop {
-        let (counted, number, previous) = {
+        let (counted, number, previous, full) = {
             let record = session.record.borrow();
             (
                 record.counted(),
                 record.iterations.len() as u32 + 1,
                 record.iterations.last().cloned(),
+                record.iterations.len() >= crate::state::MAX_ITERATIONS,
             )
         };
         let accept = reason == IterationReason::Accept;
@@ -969,6 +1009,15 @@ where
                     "stopped by signal before iteration {number}; not launched"
                 ));
                 return session.close(Exit::Cancelled, false);
+            }
+            // The record holds at most 100 iterations, agent and accept alike
+            // (R06-01); checked before every append.
+            _ if full => {
+                note(format_args!(
+                    "exhausted: the run holds {} recorded iterations, the record limit; start a new run",
+                    crate::state::MAX_ITERATIONS
+                ));
+                return session.close(Exit::Failed, true);
             }
             // An accept runs no agent turn, so neither bound applies.
             _ if accept => task.timeout_secs,
@@ -1037,6 +1086,13 @@ where
         // The launcher's clone drops with its future, before `finish` drains.
         let (exit, claim) = launch(task, reason, progress.clone()).await;
         let (exit, decision) = session.finish(exit, claim, &progress);
+        if decision == After::Continue && claim == Some(true) {
+            // The shared gate says there is no automatic repair; for a
+            // rejected claim Ralph's loop is that repair (R06-04).
+            progress.recovery(
+                "claim rejected; Ralph continues with a bounded repair iteration unless a bound is reached",
+            );
+        }
         let check = session
             .record
             .borrow()
@@ -1292,6 +1348,19 @@ fn detail(store: &crate::state::Store, record: &RalphRecord) -> String {
                         .unwrap_or_default()
                 )
             });
+        // An accept runs no agent turn, so its resolved route policy is not
+        // the row's policy (R06-05).
+        let (route, model, fallback, permissions) = if iteration.reason == IterationReason::Accept {
+            let none = "n/a (no agent turn)";
+            (none, none, none, none)
+        } else {
+            (
+                iteration.route.as_str(),
+                iteration.model.as_str(),
+                iteration.fallback.as_deref().unwrap_or("none"),
+                iteration.permissions.as_str(),
+            )
+        };
         let _ = writeln!(
             report,
             "iteration {} {}: {status}; exit {}; agent outcome {}; claim {}; verification {verification}; prompt submitted {}; route {}; model {}; fallback {}; permissions {}; timeout {}s; prompt sha256 {}; input sha256 {}; started {}; ended {}",
@@ -1312,10 +1381,10 @@ fn detail(store: &crate::state::Store, record: &RalphRecord) -> String {
             } else {
                 "no"
             },
-            iteration.route,
-            iteration.model,
-            iteration.fallback.as_deref().unwrap_or("none"),
-            iteration.permissions,
+            route,
+            model,
+            fallback,
+            permissions,
             iteration.timeout_secs,
             iteration.prompt_sha256,
             iteration.input_sha256,
@@ -1687,5 +1756,90 @@ mod tests {
         assert_eq!(session.record.borrow().status, RalphStatus::Stopped);
         std::fs::remove_dir_all(dir).unwrap();
         std::fs::remove_dir_all(dir2).unwrap();
+    }
+
+    /// A concluded iteration of the fixture task.
+    fn concluded(task: &Task, number: u32, reason: IterationReason) -> crate::state::Iteration {
+        let mut iteration = super::iteration(task, number, reason, "x").unwrap();
+        iteration.status = if reason == IterationReason::Accept {
+            Status::Failed
+        } else {
+            iteration.agent_outcome = Some("succeeded".into());
+            iteration.claim = Some(false);
+            Status::Succeeded
+        };
+        iteration
+    }
+
+    #[test]
+    fn a_full_record_ends_exhausted_before_any_launch() {
+        // R06-01: 99 agent iterations and one accept are below the agent
+        // bound of 100 but fill the record; nothing more is appended.
+        let (dir, mut task, session) = fixture("full", 100);
+        session.record.borrow_mut().iterations = (1..=100)
+            .map(|n| {
+                let reason = if n == 50 {
+                    IterationReason::Accept
+                } else {
+                    IterationReason::Continue
+                };
+                concluded(&task, n, reason)
+            })
+            .collect();
+        assert_eq!(session.record.borrow().counted(), 99);
+        let (exit, launches) = drive(&mut task, &session, IterationReason::Retry, &[], None);
+        assert_eq!((exit, launches), (Exit::Failed, vec![]));
+        let stored: crate::state::RalphRecord =
+            session.store.read(&session.record.borrow().run).unwrap();
+        assert_eq!(
+            (stored.status, stored.iterations.len()),
+            (RalphStatus::Exhausted, 100)
+        );
+        // The store never writes a 101-iteration record its reader refuses.
+        let mut over = stored.clone();
+        over.iterations
+            .push(concluded(&task, 101, IterationReason::Continue));
+        let refused = session.store.write(&over).unwrap_err();
+        assert_eq!(
+            (refused.exit, refused.reason),
+            (
+                Exit::Failed,
+                "refusing to write an inconsistent Ralph record"
+            )
+        );
+        let unchanged: crate::state::RalphRecord = session.store.read(&stored.run).unwrap();
+        assert_eq!(unchanged, stored);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn an_accept_reports_only_prompt_and_check_changes() {
+        // R06-05: an accept's route fields describe no agent turn.
+        let (dir, task, _session) = fixture("accept-changes", 5);
+        let previous = concluded(&task, 1, IterationReason::Initial);
+        let mut next = concluded(&task, 2, IterationReason::Accept);
+        next.permissions = "trusted".into();
+        next.route = "cloud-only".into();
+        next.agent_sha256 = Some("0".repeat(64));
+        assert!(super::changes(&previous, &next).is_empty());
+        next.prompt_sha256 = "1".repeat(64);
+        next.check.as_mut().unwrap().argv_sha256 = "2".repeat(64);
+        assert_eq!(
+            super::changes(&previous, &next),
+            vec!["prompt sha256", "check argv sha256"]
+        );
+        // An agent iteration still reports its route policy.
+        next.reason = IterationReason::Retry;
+        assert_eq!(
+            super::changes(&previous, &next),
+            vec![
+                "prompt sha256",
+                "agent definition",
+                "check argv sha256",
+                "route",
+                "permissions"
+            ]
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

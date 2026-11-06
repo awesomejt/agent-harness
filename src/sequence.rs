@@ -1135,6 +1135,20 @@ fn resume(args: Vec<OsString>) -> Exit {
                 steps[start].name, gate.name
             ));
         }
+        // The recorded definition of done binds the step (R06-02).
+        let changed = match requests[0].verify.as_ref().map(identity) {
+            Some(Ok(pinned)) => pinned.changed_from(gate),
+            Some(Err(error)) => return reject(error.0),
+            None => unreachable!("the gate name matched above"),
+        };
+        if !changed.is_empty() {
+            return reject(format_args!(
+                "step {}: check \"{}\" changed since its last attempt ({}); restore the recorded check or start a new run; nothing launched",
+                steps[start].name,
+                gate.name,
+                changed.join(", ")
+            ));
+        }
     }
     let store = match crate::state::Store::create(root, &project) {
         Ok(store) => store,
