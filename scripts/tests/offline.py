@@ -40,6 +40,7 @@ SUITES = [
     ['scripts/tests/ralph.py'],
     ['scripts/tests/agent_exec_runtime.py'],
     ['scripts/tests/capabilities_runtime.py'],
+    ['scripts/tests/doclinks.py'],
 ]
 
 
