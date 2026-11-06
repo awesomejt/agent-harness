@@ -193,7 +193,7 @@ ah single "Explain the build steps in this project." --preview
 ah single "Explain the build steps in this project."
 ```
 
-The first command launches nothing. The second draws on the operator's Claude plan or usage credits. Runs are `deny` only: Claude answers from the prompt and the project `AGENTS.md` without tools, so it cannot read or edit files yet. A missing or expired login, an unavailable model or a rate limit exits 1 with no retry or fallback. A different Claude Code version, admin-managed settings or any configured setting source refuses before the prompt with exit 2 ([D048](../DECISIONS.md#2026-11-06--d048-claude-runtime-launch-preflight-and-deny-profile-single-runs)).
+The first command launches nothing. The second draws on the operator's Claude plan or usage credits. `deny` (the default) offers no tool, so Claude answers from the prompt and the project `AGENTS.md` alone. `--permissions trusted` lets Claude read, search, edit and run shell commands with host privileges and no OS sandbox. The harness grants each prompted edit or command once, and Claude Code allows project reads and read-only commands by itself. Its shell sources a snapshot of the operator's login shell (`PATH`, aliases, functions) ([D049](../DECISIONS.md#2026-11-06--d049-claude-trusted-permissions-through-the-host-prompt-path)). Named agents, sequences and Ralph are not yet supported on Claude. A missing or expired login, an unavailable model or a rate limit exits 1 with no retry or fallback. A different Claude Code version, admin-managed settings or any configured setting source refuses before the prompt with exit 2 ([D048](../DECISIONS.md#2026-11-06--d048-claude-runtime-launch-preflight-and-deny-profile-single-runs)).
 
 ### Native cloud-only (P3.2)
 
