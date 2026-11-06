@@ -10,7 +10,8 @@ Links checked are inline links and images, `[text](target)` and `![alt](target)`
 with an optional quoted title. Targets with a URL scheme (`https:`, `mailto:`,
 and so on) are skipped, as is anything inside a fenced code block or an inline
 code span. A target's path is resolved relative to the linking file and must
-exist as a file or a directory. A `#fragment`, alone (the same file) or after a
+exist as a file or a directory, following symlinks; an absolute path is reported
+as broken. A `#fragment`, alone (the same file) or after a
 `.md` path, must match an anchor in that Markdown file: an explicit
 `<a id="...">` or a heading's GitHub slug (lowercase; punctuation dropped except
 hyphens and underscores; each space becomes a hyphen; repeated headings take
@@ -267,8 +268,12 @@ def anchors(text, flags):
 def resolves(origin, target, cache):
     """True when the target's path exists and any fragment matches an anchor."""
     path, _, fragment = target.partition('#')
+    # An absolute path would be checked against the host, not ROOT, so it is broken.
+    if os.path.isabs(path):
+        return False
     resolved = Path(os.path.normpath(origin if not path else origin.parent / path))
-    if not os.path.lexists(resolved):
+    # exists() follows symlinks, so a dangling link fails like a missing file.
+    if not resolved.exists():
         return False
     if not fragment:
         return True

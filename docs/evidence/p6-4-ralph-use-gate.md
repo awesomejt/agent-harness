@@ -217,3 +217,21 @@ The repository passes with 90 tracked documents and 871 relative targets.
   from the backend, which is not billing.
 - P6.3 limits stand: no detection of a concurrent `ah single`, no persisted
   submission boundary, v1 records without migration, and no pruning command.
+
+## Review
+
+Grok's first review of PR #56 found 0 blockers, 2 concerns and 0 nits. None
+is critical or high, so no re-review is needed. Both concern
+`scripts/tests/doclinks.py` path resolution and are fixed:
+
+- An absolute target such as `/etc/passwd` was checked against the host
+  filesystem rather than ROOT, so it could pass falsely. Absolute paths are
+  now reported as broken. The repository has none.
+- `os.path.lexists` accepted a dangling symlink. The check now uses
+  `exists()`, which follows links, so a dangling link fails like a missing
+  file.
+
+A fixture confirmed both fixes (`/etc/passwd`, `/real.md` and a dangling
+link are reported; a valid symlink with an anchor passes). The repository
+still passes `doclinks.py`, and the trusted `links` check passes. The
+docstring and TESTING state both rules.
