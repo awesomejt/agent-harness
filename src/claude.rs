@@ -650,6 +650,7 @@ mod supervise {
                     let Ok(id) = validate_init(&record, &model, &request.project) else {
                         observed.violation = true;
                         progress.event("system/init did not match the preflight configuration");
+                        violation_interrupt(channel, observed).await;
                         return Outcome::Stopped;
                     };
                     session = true;
@@ -677,6 +678,7 @@ mod supervise {
                     observed.tools += 1;
                     observed.violation = true;
                     progress.event("tool or host request under deny; stopping");
+                    violation_interrupt(channel, observed).await;
                     return Outcome::Stopped;
                 }
                 Event::RateLimit(status) => {
@@ -713,6 +715,24 @@ mod supervise {
                     return Outcome::Terminal(terminal);
                 }
                 Event::Other => {}
+            }
+        }
+    }
+
+    /// Best-effort stop on a protocol violation, as on signal or deadline; the
+    /// attempt stays uncertain whatever follows, and group cleanup still runs.
+    /// Waits up to two seconds for any result, which is not trusted: the
+    /// attempt is uncertain either way.
+    async fn violation_interrupt(channel: &mut Channel, observed: &mut Observed) {
+        let stop_by = Instant::now() + Duration::from_secs(2);
+        if !interrupt(channel, observed, stop_by).await {
+            return;
+        }
+        while let Ok(Some(Ok(record))) =
+            tokio::time::timeout_at(stop_by, channel.records.recv()).await
+        {
+            if record["type"] == "result" {
+                return;
             }
         }
     }

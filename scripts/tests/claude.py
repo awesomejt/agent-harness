@@ -46,8 +46,10 @@ CASES = [
     ('malformed', 4, True, []),
     ('eof-after-submit', 4, True, []),
     ('error-result', 1, True, []),
-    ('cancel-deadline', 3, True, ['--timeout-secs', '1']),
-    ('cancel-ignored', 4, True, ['--timeout-secs', '1']),
+    # 3 s leaves the four control round-trips and the prompt well inside the
+    # deadline on a loaded runner; the fake stalls only after system/init.
+    ('cancel-deadline', 3, True, ['--timeout-secs', '3']),
+    ('cancel-ignored', 4, True, ['--timeout-secs', '3']),
     # Refused before any launch.
     ('trusted', 2, False, ['--permissions', 'trusted']),
     ('agent', 2, False, ['--agent', 'reviewer']),
@@ -138,6 +140,10 @@ for case, expected, prompted, extra in CASES:
             assert len(interrupts) == 1, case
         if case in ('tool-use', 'host-request'):
             assert 'tool or host request under deny' in p.stderr, case
+        if case in ('tool-use', 'host-request'):
+            # A violation sends a best-effort interrupt and waits up to 2 s for
+            # a result before group cleanup; the stalled fake answers it.
+            assert (project / 'interrupted').exists(), case
         if case == 'preview':
             assert 'route: native Claude Code' in p.stdout, p.stdout
             assert 'credentials: official CLI login' in p.stdout, p.stdout
@@ -165,5 +171,18 @@ with tempfile.TemporaryDirectory(prefix='ah-claude-seq-') as d:
     assert 'supports ah single only' in p.stderr, p.stderr
     assert not (base / 'argv.json').exists() and not (base / 'state').exists()
     count += 1
+    # Ralph run and resume refuse too, before any launch or record.
+    (base / 'ah.json').write_text(json.dumps(dict(version=1, mode='cloud-only',
+                                                  native=dict(target='claude', model='sonnet'),
+                                                  checks=dict(test=dict(argv=['/usr/bin/true'])))))
+    (base / 'task.md').write_text('loop task')
+    for args in (['ralph', 'run', str(base / 'task.md'), '--project', str(base), '--verify', 'test'],
+                 ['ralph', 'resume', 'r20261106T000000Z-0123abcd', '--verify', 'test']):
+        p = subprocess.run([str(BINARY)] + args, env=env, capture_output=True, text=True, timeout=30, cwd=base)
+        assert p.returncode == 2, (args, p.stderr)
+        assert not (base / 'argv.json').exists() and not (base / 'state').exists(), args
+        if args[1] == 'run':
+            assert 'supports ah single only' in p.stderr, p.stderr
+        count += 1
 
 print(f'PASS {count} Claude runtime CLI cases; preflight before prompt; deny offers no tools; no secrets echoed')
