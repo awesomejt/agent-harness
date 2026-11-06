@@ -6,7 +6,7 @@ Task: [P7.1](../../tasks/07-native-adapters.md#p7-1). Decision: [D046](../../DEC
 
 - **Real use.** The operator already drives this project with Claude Code (2.1.314) as an everyday coding agent, alongside Codex and Grok for reviews. Claude is the native CLI with the most use in this repository, so its adapter is the most likely to be exercised after it ships.
 - **Interface fit.** The official CLI has a documented non-interactive mode (`-p`) with line-delimited JSON output and input, explicit tool lists, permission modes, a host-answered permission path, model and effort flags, and per-run session persistence control. That covers the progress/terminal, permission, model/effort and isolation questions the card requires, without a third-party wrapper.
-- **Others stay deferred.** Codex (`codex-cli 0.166.0`) and Grok (`grok 1.0.70`) are installed; Gemini and Pi are not. Codex is the natural next candidate once the Claude adapter is reviewed and used (P7.6 card). No ordering is implied.
+- **Others stay deferred.** Codex (`codex-cli 0.166.0`) and Grok (`grok 1.0.70`) are installed; Gemini and Pi are not. Codex is the natural next candidate once the Claude adapter is reviewed and used; starting it (P7.3) needs a later recorded selection, one adapter at a time (D017/D046). No ordering is implied.
 
 ## Installed baseline (2026-11-05)
 
