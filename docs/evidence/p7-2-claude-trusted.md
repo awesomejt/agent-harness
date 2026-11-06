@@ -23,11 +23,11 @@ Run from disposable git directories with a cleared environment, the D048 isolati
 ## Fixture and regression results
 
 - `cargo fmt --check`, `cargo clippy --all-targets --locked -- -D warnings` and `cargo test --locked` pass. Unit tests now cover the exact trusted tool set in `system/init` (extra, missing, duplicate and non-string entries refuse), `system_tools` context only under trusted, tool-call and tool-result classification (subagent records, `server_tool_use`, unknown blocks, malformed calls and hook requests are unsupported), and the grant decision and response shape (allow echoes the input with no `updatedPermissions`).
-- `python3 scripts/tests/claude.py`: **44 cases pass**; 33 were in place before this PR. The fake now announces calls, sends `can_use_tool` prompts, waits for the harness's answer and writes a file only on a grant. New trusted cases:
+- `python3 scripts/tests/claude.py`: **46 cases pass**; 33 were in place before this PR. The fake now announces calls, sends `can_use_tool` prompts, waits for the harness's answer and writes a file only on a grant. New trusted cases:
   - exact launch flags (`--permission-prompts=host`, `--permission-prompt-tool=stdio`, the six tools), and `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` even when the operator sets `0`;
   - an exact prompt granted once, the file written, `requests 1; grants 1; tool events 4`, with JSONL counters;
-  - denials: a prompted input that differs from the announced call, a prompt for an unannounced call, a second prompt for the same call, and a prompt after the harness's interrupt (deadline cancellation, exit 3). No file is written for any of them.
-  - protocol violations (exit 4, interrupt sent, nothing written): a call outside the set, a background Bash call, a subagent record, a result with no announced call, a hook control request, and a `system/init` listing an extra tool.
+  - denials: a prompted input that differs from the announced call, a prompt for an unannounced call, a second exact prompt for a call still pending, a prompt after the call's result, and a prompt after the harness's interrupt (deadline cancellation, exit 3). No file is written for any of them.
+  - protocol violations (exit 4, interrupt sent, nothing written): a call outside the set, a background Bash call, a call ID announced twice while pending, a subagent record, a result with no announced call, a hook control request, and a `system/init` listing an extra tool.
   The earlier `trusted` refusal case is now a success case. The deny cases now report `tool call under deny` and `host request under deny`.
 - `python3 scripts/tests/offline.py`: **26/26** suites pass.
 

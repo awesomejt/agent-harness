@@ -62,6 +62,8 @@ CASES = [
     ('trusted-mismatch', 0, True, T),
     ('trusted-unknown-call', 0, True, T),
     ('trusted-repeat', 0, True, T),
+    ('trusted-double-prompt', 0, True, T),
+    ('trusted-repeat-id', 4, True, T),
     ('trusted-outside-tool', 4, True, T),
     ('trusted-background', 4, True, T),
     ('trusted-subagent', 4, True, T),
@@ -185,9 +187,12 @@ for case, expected, prompted, extra in CASES:
             assert [a['behavior'] for a in answers] == ['deny'], (case, answers)
             assert not (project / 'made.txt').exists(), case
             assert 'grants: 0' in p.stderr, (case, p.stderr)
-        if case == 'trusted-repeat':
-            assert [a['behavior'] for a in answers] == ['allow', 'deny'], answers
-            assert 'permission requests: 2; grants: 1' in p.stderr, p.stderr
+        if case in ('trusted-repeat', 'trusted-double-prompt'):
+            assert [a['behavior'] for a in answers] == ['allow', 'deny'], (case, answers)
+            assert 'permission requests: 2; grants: 1' in p.stderr, (case, p.stderr)
+            assert (project / 'made.txt').read_text() == 'made by fake', case
+        if case == 'trusted-repeat-id':
+            assert 'repeated or unbounded tool call; stopping' in p.stderr, p.stderr
         if case == 'trusted-outside-tool':
             assert 'tool call outside the trusted tool set; stopping' in p.stderr, p.stderr
         if case in ('trusted-subagent', 'trusted-hook'):

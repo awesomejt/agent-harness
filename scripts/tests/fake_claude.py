@@ -153,6 +153,11 @@ def trusted_turn():
         use('t1', 'Bash', {'command': 'sleep 60', 'run_in_background': True})
         time.sleep(0.5)
         return
+    if case == 'trusted-repeat-id':
+        use('t1', 'Read', {'file_path': str(cwd / 'user.txt')})
+        use('t1', 'Read', {'file_path': str(cwd / 'user.txt')})
+        time.sleep(0.5)
+        return
     if case == 'trusted-subagent':
         use('t1', 'Read', {'file_path': str(cwd / 'user.txt')}, parent='t0')
         time.sleep(0.5)
@@ -178,8 +183,17 @@ def trusted_turn():
         ask('q1', 'Write', 't-unknown', made)
         result('t1', 'denied', True)
     elif case == 'trusted-repeat':
+        # A prompt after the call's result: no longer pending.
         write('t1', made)
         ask('q2', 'Write', 't1', made)
+    elif case == 'trusted-double-prompt':
+        # Two exact prompts while the call is still pending: only the first is granted.
+        use('t1', 'Write', made)
+        first = ask('q1', 'Write', 't1', made)
+        ask('q2', 'Write', 't1', made)
+        if first:
+            Path(made['file_path']).write_text(made['content'])
+        result('t1', 'written' if first else 'denied', not first)
     else:
         write('t1', made)
     emit({'type': 'assistant', 'message': {'model': MODEL, 'content': [
