@@ -13,7 +13,7 @@ These documents are implementation contracts and planning records. Phase 2 imple
 | [Frameworks](FRAMEWORKS.md) | Library and example shortlist | Version/license/platform validation on adoption |
 | [Execution contract](EXECUTION.md) | Requests, lifecycle, events, outcomes, capabilities, fallback, headless execution | Transport/permissions 1; exits 2; machine records v1 (D039, P4.7); inherited capabilities (D040, P4.8) |
 | [Configuration contract](CONFIGURATION.md) | Resolution, preview, sync, secrets, canonical-agent mapping | Format/precedence 2; model groups 3; agent schema 4 |
-| [Workflow state](WORKFLOWS.md) | Sequence/Ralph recovery, context and verification contracts; D044 durable schema, records and resume (Phase 5); D045 Ralph completion, bounds and resume (P6.1) | Ralph live use gate P6.4; per-prompt mode, workflow machine records, cost budgets deferred |
+| [Workflow state](WORKFLOWS.md) | Sequence/Ralph recovery, context and verification contracts; D044 durable schema, records and resume (Phase 5); D045 Ralph completion, bounds and resume (P6.1); Ralph live use gate (P6.4) | Phase 6 review P6.5; per-prompt mode, workflow machine records, cost budgets deferred |
 | [Validation plan](TESTING.md) | Policy, adapter, lifecycle, sync, release and live acceptance evidence | Executable tests and commands as implementation appears |
 | [Operations](OPERATIONS.md) | Installation, diagnostics, data handling, troubleshooting and release expectations | Concrete install/upgrade/runbook commands and supported targets 2/4 |
 | [Phase reviews](PHASE_REVIEW.md) / [report template](../tasks/PHASE_REVIEW_TEMPLATE.md) | Whole-phase findings, remediation, verification and progression gates | Every phase must pass; reports live in docs/reviews/ |
