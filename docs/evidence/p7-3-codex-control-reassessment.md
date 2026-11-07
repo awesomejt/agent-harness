@@ -10,7 +10,7 @@ Pause implementation against this baseline rather than scheduling another identi
 
 ## Alternatives and evidence
 
-Official documentation was fetched on 2026-11-07. Documentation can describe a newer surface than the installed executable; local help/schema observations below are specifically 0.166.0. No SDK package was installed or tested.
+Official documentation was fetched on 2026-11-07. Documentation can describe a newer surface than the installed executable; local help/schema observations below are specifically 0.166.0. No SDK package was installed or tested. Stable schemas are the default production candidate. Experimental APIs are considered below, but not approved for production consumption: D053 requires a separate evidenced decision before using them. This is not a permanent exclusion; stabilization or a separately justified experimental control can be resume evidence if the full checklist is proven.
 
 | Candidate | Evidence observed | Assessment against D047/D053 |
 |---|---|---|
@@ -18,6 +18,8 @@ Official documentation was fetched on 2026-11-07. Documentation can describe a n
 | `codex exec --json` | Installed help explicitly describes `--ignore-user-config` as skipping the user config while authentication still uses CODEX_HOME. `--ignore-rules` skips user/project execpolicy rules. The [non-interactive guide](https://learn.chatgpt.com/docs/non-interactive-mode) documents JSONL progress and saved CLI authentication. | Useful isolation building blocks. Help recognition does not establish effective isolation of project settings, instructions, skills, plugins, MCP, hooks or endpoints. No demonstrated pre-turn no-tool policy or bidirectional exact host-grant interface. No exec run was submitted. |
 | Official SDK wrappers | The [SDK guide](https://learn.chatgpt.com/docs/codex-sdk) describes the Python SDK as controlling local app-server over JSON-RPC and offering its own pinned runtime. It presents TypeScript thread automation and sandbox options. | The inspected guide supplies no independent complete no-tool enforcement contract. A wrapper or its different runtime pin needs its own evidence; neither is an automatic escape from the underlying gate. No SDK adoption or change to the Rust implementation direction. |
 | App-server approval and permission callbacks | The [app-server guide](https://learn.chatgpt.com/docs/app-server) describes command/file approval callbacks and subset filesystem/network permission grants. Permission grants can last a turn or session. | These are useful scoped access mechanisms, but the inspected contract does not establish a callback before every possible tool invocation. Turn/session access cannot be silently treated as the harness's exact per-call grant. No callback was exercised. |
+| Named profiles and dynamic tools (experimental) | Fresh `--experimental` schema generation includes `ThreadStartParams.permissions` (a named profile, mutually exclusive with `sandbox`) and `dynamicTools`. The guide describes `permissionProfile/list`; its generated summary contains `id`, `allowed` and optional description. | These identify profiles allowed by requirements and caller-supplied tools, not a complete no-tool inventory or exact per-call host grant. Empty dynamic tools do not remove built-ins. No experimental RPC or thread was sent. No experimental control is selected; D053's separate evidenced decision remains required. |
+| Scoped app discovery | The app-server guide documents `app/installed` effective enabled/callable app state. | Useful app-specific inspection, not a complete inventory covering built-ins, shell, MCP and delegation. No app-discovery RPC was sent. This row does not assume the method is experimental merely because other candidates are gated. |
 | Individual capability filters | The [config reference](https://learn.chatgpt.com/docs/config-file/config-reference) describes shell/image/delegation flags, MCP per-server tool filters and code-mode namespace controls. | These controls have different scopes. No documented complete effective tool-policy/inventory boundary was established by this inspection. Do not infer blanket tool denial from an MCP filter or namespace exclusion. |
 
 The previous [feasibility report](p7-3-codex-feasibility.md) retains the hook limitations and pinned upstream tool-assembly evidence. This increment does not repeat source conclusions as binary runtime proof. An external filesystem sandbox alone would still not establish the no-tool profile, and replacing the inner coding loop or proxying subscription calls is outside the accepted design.
@@ -34,7 +36,7 @@ python3 scripts/experiments/codex_feasibility.py
 python3 scripts/tests/codex_feasibility_cases.py
 ```
 
-The experiment uses disposable synthetic HOME/CODEX_HOME and an empty project; its protocol method allowlist excludes thread/turn creation. It passed again with `GATE NOT PASSED`. All 11 malformed-protocol cases passed. Help and stable schema generation were additionally run in a disposable synthetic environment, with stdin closed and a ten-second subprocess deadline; no operator config or login files were read by that inspection. `--help` exits before any task execution. Schema generation uses `codex app-server generate-json-schema --out DIR`.
+The experiment uses disposable synthetic HOME/CODEX_HOME and an empty project; its protocol method allowlist excludes thread/turn creation. It passed again with `GATE NOT PASSED`. All 11 malformed-protocol cases passed. Help and stable schema generation were additionally run in a disposable synthetic environment, with stdin closed and a ten-second subprocess deadline; no operator config or login files were read by that inspection. `--help` exits before any task execution. Schema generation uses `codex app-server generate-json-schema --out DIR`; the review follow-up also generated `--experimental` schemas in a fresh disposable synthetic environment with the same deadline and closed stdin.
 
 SHA-256 fingerprints of stdout (help) or the generated stable `v2/NAME.json` bytes:
 
@@ -46,12 +48,14 @@ SHA-256 fingerprints of stdout (help) or the generated stable `v2/NAME.json` byt
 | `ThreadStartResponse` | `c655daa1616548f6b3b0960acee9dcfefa8aba5965ec4fc636c84ee840a8626a` |
 | `TurnStartParams` | `49e53282f327c25e7b39d97afacd038ef10ad5c4fb0431608b354d3a7bf6bcea` |
 | `ConfigReadResponse` | `69a32e3d84e16045802dff8abf01770d759ebc758965c3258a30ea4a93159fce` |
+| Experimental `ThreadStartParams` | `80a40a7fac15b4bf70efb7f893fb353acc0a0d30c68f54aee4f01923deca85de` |
+| Experimental `PermissionProfileListResponse` | `4a290b5b9d47c2fc671033e22754671161bc563027ba387e861bd935398f0def` |
 
-The response reports model/provider, cwd, approval policy/reviewer, sandbox, disabled plugin IDs and instruction sources; it does not list all effective tools. No model-dependent exposure was observed because no thread was created. These hashes identify inspected surfaces, not proof of end-to-end enforcement.
+The stable `ThreadStartResponse` schema reports model/provider, cwd, approval policy/reviewer, sandbox, disabled plugin IDs and instruction sources; it does not list all effective tools. No model-dependent exposure was observed because no thread was created. These hashes identify inspected surfaces, not proof of end-to-end enforcement.
 
 ## Evidence required to resume
 
-A focused follow-up must identify a supported, versioned mechanism and then prove all of the following before any model work:
+A focused follow-up must identify a supported, versioned mechanism and then prove all of the following before any model work. A stabilized permission-profile/control surface can qualify for reassessment, but its name or stability alone does not prove the gate. An experimental candidate also requires D053's separate evidenced decision before consumption:
 
 1. `deny` prevents every model-accessible tool from executing. A complete effective policy/inventory or equivalently evidenced enforcement boundary must cover built-ins, hosted tools, MCP/apps, plugins, delegation and dynamically supplied tools. Prompt instructions and after-the-fact events are insufficient.
 2. Operator CLI authentication remains owned by the official executable, while uncontrolled user/project configuration, rules, instruction sources, skills, plugins, hooks, MCP and endpoint overrides cannot widen the harness plan. Synthetic sentinels must demonstrate the effective boundary without inspecting/copying login stores.
