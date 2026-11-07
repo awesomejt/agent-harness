@@ -15,6 +15,8 @@ import json
 import os
 from pathlib import Path
 import shutil
+import socket
+import threading
 import subprocess
 import tempfile
 
@@ -124,7 +126,7 @@ CASES = [
     ('agent-empty-preview', 0, False, T + ['--agent', 'empty', '--preview']),
     # Refused before any launch.
     ('agent-big', 2, False, T + ['--agent', 'big']),
-    ('local-first', 2, False, ['--mode', 'local-first', '--model', 'local']),
+    ('local-first-missing-key', 2, False, ['--mode', 'local-first', '--model', 'local']),
     ('slash', 2, False, []),
     ('preview', 0, False, ['--preview']),
     ('missing-runtime', 2, False, []),
@@ -159,6 +161,8 @@ for case, expected, prompted, extra in CASES:
                'ANTHROPIC_API_KEY': 'poison', 'ANTHROPIC_BASE_URL': 'http://poison',
                'CLAUDE_CODE_USE_BEDROCK': 'poison', 'CLAUDE_CONFIG_DIR': 'poison',
                'CLAUDE_CODE_DISABLE_BACKGROUND_TASKS': '0'}
+        if case == 'local-first-missing-key':
+            env.pop('LOCAL_KEY')
         prompt = '/review now' if case == 'slash' else 'claude task'
         args = [str(BINARY), 'single', prompt, '--project', str(project)] + extra
         if '--timeout-secs' not in extra:
@@ -171,7 +175,7 @@ for case, expected, prompted, extra in CASES:
         assert (project / 'user.txt').read_text() == 'preserve dirty user content', case
         assert (project / 'prompted').exists() == prompted, case
         launched = (project / 'argv.json').exists()
-        assert launched == (case not in ('agent-big', 'agent-preview', 'agent-empty-preview', 'local-first', 'slash', 'preview',
+        assert launched == (case not in ('agent-big', 'agent-preview', 'agent-empty-preview', 'local-first-missing-key', 'slash', 'preview',
                                          'missing-runtime')), case
         if launched:
             argv = json.loads((project / 'argv.json').read_text())
@@ -315,6 +319,7 @@ def workflow(cases, config=None):
     base = Path(d).resolve()
     (base / 'bin').mkdir()
     (base / 'bin/claude').symlink_to(FAKE)
+    (base / 'bin/opencode').symlink_to(ROOT / 'scripts/tests/fake_opencode.py')
     project = base / 'project'
     (project / 'steps').mkdir(parents=True)
     (project / 'case').write_text(cases[0])
@@ -328,11 +333,11 @@ def workflow(cases, config=None):
                          checks=dict(test=dict(argv=['/usr/bin/true'])))
     (base / 'ah.json').write_text(json.dumps(cfg))
     env = {'PATH': f'{base}/bin:/usr/bin:/bin', 'HOME': str(base), 'XDG_STATE_HOME': str(base / 'state'),
-           'ANTHROPIC_API_KEY': 'poison'}
+           'ANTHROPIC_API_KEY': 'poison', 'LOCAL_KEY': 'SECRET_LOCAL_KEY'}
 
     def ah(*args):
         # Resume takes project and config from the record.
-        config = ['--config', str(base / 'ah.json')] if args[1] == 'run' else []
+        config = ['--config', str(base / 'ah.json')] if args[0] == 'single' or args[1] == 'run' else []
         return subprocess.run([str(BINARY), *args, *config],
                               env=env, capture_output=True, text=True, timeout=60, cwd=project)
     return base, project, ah
@@ -452,16 +457,206 @@ assert p.returncode == 0, p.stderr
 assert len(launched(project)) == 2 and record(base, 'ralph')['status'] == 'completed'
 count += 1
 
-# Local-first with a claude target stays refused for workflows, before any
-# launch or record (D046/D048).
-base, project, ah = workflow(['success'], dict(
-    version=1, mode='local-first', model='local', native=dict(target='claude', model='sonnet'),
-    litellm=dict(api_base='http://127.0.0.1:9/v1', api_key_env='LOCAL_KEY')))
-for args in (['sequence', 'run', str(project / 'steps'), '--project', str(project)],
-             ['ralph', 'run', str(project / 'task.md'), '--project', str(project), '--verify', 'test']):
-    p = ah(*args)
-    assert p.returncode == 2, (args, p.stderr)
-    assert launched(project) == [] and not (base / 'state').exists(), args
+# Local-first (D052) preserves D034: only an unreachable pre-submission
+# TCP probe permits Claude; all outcomes after either runtime starts are final.
+class Listener:
+    def __init__(self):
+        self.sock = socket.socket()
+        self.sock.bind(('127.0.0.1', 0))
+        self.sock.listen(8)
+        self.connections = 0
+        self.received = b''
+        self.closed = False
+        self.thread = threading.Thread(target=self.serve, daemon=True)
+        self.thread.start()
+
+    def serve(self):
+        while True:
+            try:
+                conn, _ = self.sock.accept()
+            except OSError:
+                return
+            if self.closed:
+                conn.close()
+                return
+            self.connections += 1
+            conn.settimeout(2)
+            try:
+                self.received += conn.recv(4096)
+            except OSError:
+                pass
+            conn.close()
+
+    def close(self):
+        # macOS rejects shutdown() on a listening socket. Wake accept explicitly
+        # and join the listener before closing its descriptor.
+        self.closed = True
+        with socket.create_connection(self.sock.getsockname(), timeout=2):
+            pass
+        self.thread.join(timeout=3)
+        assert not self.thread.is_alive()
+        self.sock.close()
+
+    @property
+    def endpoint(self):
+        return f'http://127.0.0.1:{self.sock.getsockname()[1]}/v1'
+
+
+def closed_endpoint():
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1', 0))
+        return f'http://127.0.0.1:{sock.getsockname()[1]}/v1'
+
+
+def fallback_config(endpoint):
+    return dict(version=1, mode='local-first', model='local',
+                native=dict(target='claude', model='sonnet'),
+                litellm=dict(api_base=endpoint, api_key_env='LOCAL_KEY'),
+                checks=dict(test=dict(argv=['/usr/bin/true'])))
+
+
+def unchanged(project):
+    assert (project / 'user.txt').read_text() == 'preserve dirty user content'
+    for name in ('opencode.json', '.ah-opencode-owner.json', '.opencode', '.ah-opencode-agents.json'):
+        assert not (project / name).exists(), name
+
+
+unreachable = closed_endpoint()
+for case, expected, extra in [
+    ('success', 0, []),
+    ('trusted', 0, T),
+    ('agent-reviewer', 0, T + ['--agent', 'reviewer']),
+    ('version', 2, []),
+    ('error-result', 1, []),
+    ('eof-after-submit', 4, []),
+    ('cancel-deadline', 3, ['--timeout-secs', '3']),
+    ('cancel-ignored', 4, ['--timeout-secs', '3']),
+]:
+    base, project, ah = workflow([case], fallback_config(unreachable))
+    if case.startswith('agent-'):
+        (project / 'agents').mkdir()
+        # Exercise models.native precedence independently of the local override.
+        text = AGENT_FILES['reviewer'].replace('capacity:', 'models: {native: sonnet}\ncapacity:')
+        (project / 'agents/reviewer.md').write_text(text)
+        cfg = fallback_config(unreachable)
+        cfg['native']['model'] = 'opus'
+        (base / 'ah.json').write_text(json.dumps(cfg))
+    p = ah('single', 'fallback task', '--project', str(project), '--output', 'jsonl',
+           '--model', 'primary-override', *extra)
+    assert p.returncode == expected, (case, p.stderr, p.stdout)
+    rec = json.loads(p.stdout.splitlines()[-1])
+    assert len(rec['attempts']) == 2 and rec['fallback'] is True, rec
+    local, native = rec['attempts']
+    assert local['runtime'] == 'opencode' and local['model'] == 'ah-litellm/primary-override', rec
+    assert local['launched'] is False and local['prompt_submitted'] is False, rec
+    assert native['runtime'] == 'claude' and native['model'] == 'sonnet', rec
+    assert native['route'] == 'local-first fallback' and native['attempt'] == 2, rec
+    assert native['prompt_submitted'] == (case != 'version'), rec
+    assert native['grants'] == (1 if case == 'trusted' else 0), rec
+    assert len(launched(project)) == 1 and not (project / 'launch-routes').exists(), rec
+    assert '--model=sonnet' in launched(project)[0], launched(project)
+    if case == 'agent-reviewer':
+        assert '--tools=Glob,Grep,Read' in launched(project)[0], launched(project)
+    if case != 'version':
+        assert prompts(project) == ['fallback task'], prompts(project)
+    assert 'SECRET_LOCAL_KEY' not in p.stdout + p.stderr
+    unchanged(project)
     count += 1
 
-print(f'PASS {count} Claude runtime CLI cases; preflight before prompt; deny offers no tools; trusted grants each exact prompt once; roles narrow tools and map effort; workflows launch one fresh session per step or iteration; no secrets echoed')
+# Preview requires no login, launch, probe or state. Report the fallback's
+# runtime, model, login prerequisite and body-size refusal before execution.
+listener = Listener()
+for case in ('success', 'agent-big', 'agent-effort'):
+    base, project, ah = workflow([case], fallback_config(listener.endpoint))
+    extra = []
+    if case.startswith('agent-'):
+        name = 'big' if case == 'agent-big' else 'effortful'
+        (project / 'agents').mkdir()
+        (project / f'agents/{name}.md').write_text(AGENT_FILES[name])
+        extra = ['--agent', name]
+    p = ah('single', 'task', '--project', str(project), '--preview', *extra)
+    assert p.returncode == 0, p.stderr
+    assert 'native Claude Code fallback' in p.stdout and 'claude/sonnet' in p.stdout, p.stdout
+    assert 'official CLI login required' in p.stdout, p.stdout
+    if case == 'agent-big':
+        assert 'execution refused: agent body exceeds 128 KiB' in p.stdout, p.stdout
+    if case != 'success':
+        q = ah('single', 'task', '--project', str(project), *extra)
+        assert q.returncode == 2, q.stderr
+    assert launched(project) == [] and not (project / 'launch-routes').exists()
+    assert listener.connections == 0 and not (base / 'state').exists()
+    unchanged(project)
+    count += 1
+
+# Missing Claude is a setup refusal after the eligible probe, never a retry.
+base, project, ah = workflow(['success'], fallback_config(unreachable))
+(base / 'bin/claude').unlink()
+p = ah('single', 'task', '--project', str(project))
+assert p.returncode == 2 and 'Claude Code missing' in p.stderr, p.stderr
+assert launched(project) == [] and not (project / 'launch-routes').exists()
+unchanged(project)
+count += 1
+
+# Reachable LiteLLM launches OpenCode only, including known failure, uncertain
+# submission and preflight rejection. Never fall back after the probe.
+for case, expected in [('success', 0), ('session-model', 1), ('rpc-error', 4), ('version', 2)]:
+    base, project, ah = workflow([case], fallback_config(listener.endpoint))
+    p = ah('single', 'task', '--project', str(project), '--timeout-secs', '15')
+    assert p.returncode == expected, (case, p.stderr)
+    assert launched(project) == [], (case, p.stderr)
+    assert 'fallback not eligible after the reachability check' in p.stderr, p.stderr
+    count += 1
+assert listener.received == b'' and listener.connections == 4
+listener.close()
+
+# A valid --no-sync local route is preserved byte for byte when the endpoint
+# subsequently becomes unreachable and Claude runs. Existing disk config must
+# validate before probing even though the fallback will not load it.
+listener = Listener()
+base, project, ah = workflow(['success'], fallback_config(listener.endpoint))
+p = ah('single', 'task', '--project', str(project), '--timeout-secs', '15')
+assert p.returncode == 0 and launched(project) == [], p.stderr
+saved = {name: (project / name).read_bytes() for name in ('opencode.json', '.ah-opencode-owner.json')}
+listener.close()
+p = ah('single', 'task', '--project', str(project), '--no-sync', '--timeout-secs', '15')
+assert p.returncode == 0 and len(launched(project)) == 1, p.stderr
+assert all((project / name).read_bytes() == content for name, content in saved.items())
+count += 1
+
+# --no-sync still validates the local route before probing, even when the
+# endpoint is unreachable; it must not use fallback to bypass invalid routing.
+base, project, ah = workflow(['success'], fallback_config(unreachable))
+p = ah('single', 'task', '--project', str(project), '--no-sync')
+assert p.returncode == 2 and launched(project) == [], p.stderr
+unchanged(project)
+count += 1
+
+# Both workflows use the same coordinator and persist the Claude fallback
+# identity and submission evidence; interrupted effects require explicit retry.
+base, project, ah = workflow(['success', 'eof-after-submit', 'success'], fallback_config(unreachable))
+p = ah('sequence', 'run', str(project / 'steps'), '--project', str(project))
+assert p.returncode == 4 and len(launched(project)) == 2, p.stderr
+rec = record(base, 'sequences')
+for step in rec['steps']:
+    a = step['attempts'][0]
+    assert a['route'] == 'local-first' and a['fallback'] == 'claude/sonnet', a
+    assert [b['prompt_submitted'] for b in a['backends']] == [False, True], a
+p = ah('sequence', 'resume', rec['run'])
+assert p.returncode == 2 and len(launched(project)) == 2, p.stderr
+p = ah('sequence', 'resume', rec['run'], '--retry')
+assert p.returncode == 0 and len(launched(project)) == 3, p.stderr
+unchanged(project)
+count += 1
+
+base, project, ah = workflow(['claim'], fallback_config(unreachable))
+p = ah('ralph', 'run', str(project / 'task.md'), '--project', str(project), '--verify', 'test')
+assert p.returncode == 0, p.stderr
+rec = record(base, 'ralph')
+i = rec['iterations'][0]
+assert rec['status'] == 'completed' and i['fallback'] == 'claude/sonnet', rec
+assert [b['prompt_submitted'] for b in i['backends']] == [False, True], rec
+assert i['verification']['status'] == 'passed' and len(launched(project)) == 1, rec
+unchanged(project)
+count += 1
+
+print(f'PASS {count} Claude runtime CLI cases; preflight, permissions, roles, workflows and conservative local-first fallback; no secrets echoed')

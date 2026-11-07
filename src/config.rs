@@ -405,9 +405,8 @@ impl Config {
                 "model group reference is not defined in litellm.groups",
             ))
     }
-    /// The selected route's key reference. Only the OpenCode native target
-    /// can be the local-first fallback until Claude single runs are accepted
-    /// (D046/D048).
+    /// The selected route's key reference. Claude uses its official CLI login;
+    /// a local-first primary still requires the LiteLLM key (D052).
     fn key_name(&self, mode: &str) -> Result<Option<&str>> {
         let local = self.litellm.as_ref().map(|v| v.api_key_env.as_str());
         let native = self.native.as_ref();
@@ -419,16 +418,11 @@ impl Config {
                 .map(|n| n.api_key_env.as_deref())
                 .ok_or(Invalid("cloud-only requires native configuration")),
             "local-first" => {
-                let (Some(native), Some(local)) = (native, local) else {
+                let (Some(_), Some(local)) = (native, local) else {
                     return Err(Invalid(
                         "local-first requires litellm and native configuration",
                     ));
                 };
-                if native.target != "opencode" {
-                    return Err(Invalid(
-                        "local-first fallback supports only native target opencode",
-                    ));
-                }
                 Ok(Some(local))
             }
             _ => Err(Invalid(UNSUPPORTED_MODE)),
@@ -966,6 +960,11 @@ impl Invocation {
                     agent.unwrap_or_else(|| native.model.clone()),
                     native.api_key_env.clone(),
                     source,
+                    if native.target == "claude" {
+                        RuntimeKind::Claude
+                    } else {
+                        RuntimeKind::OpenCode
+                    },
                 )
             });
         let route_agent = agent_model(mode == "cloud-only");
@@ -1005,7 +1004,7 @@ impl Invocation {
         };
         for name in key_name
             .iter()
-            .chain(fallback.as_ref().and_then(|(_, key, _)| key.as_ref()))
+            .chain(fallback.as_ref().and_then(|(_, key, _, _)| key.as_ref()))
         {
             if key_lookup(name).is_none_or(|key| key.is_empty()) {
                 return Err(Invalid(MISSING_KEY));
@@ -1083,7 +1082,7 @@ impl Invocation {
             fallback: None,
             verify,
         };
-        if let Some((model, api_key_env, model_source)) = fallback {
+        if let Some((model, api_key_env, model_source, runtime)) = fallback {
             resolved.fallback = Some(Box::new(Resolved {
                 mode: Mode::CloudOnly,
                 sources: Sources {
@@ -1096,7 +1095,7 @@ impl Invocation {
                 proxy_groups: Vec::new(),
                 api_base: None,
                 api_key_env,
-                runtime: RuntimeKind::OpenCode,
+                runtime,
                 permissions: resolved.permissions,
                 timeout_secs: resolved.timeout_secs,
                 no_sync: resolved.no_sync,

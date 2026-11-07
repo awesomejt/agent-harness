@@ -1277,10 +1277,13 @@ fn claude_target_uses_the_existing_login_and_reads_no_key() {
 }
 
 #[test]
-fn claude_target_rejects_keys_fallback_and_groups() {
+fn claude_target_rejects_keys_and_groups() {
     for (input, message) in [
         (
-            CLAUDE.replace("\"sonnet\"", "\"sonnet\",\"api_key_env\":\"ANTHROPIC_API_KEY\""),
+            CLAUDE.replace(
+                "\"sonnet\"",
+                "\"sonnet\",\"api_key_env\":\"ANTHROPIC_API_KEY\"",
+            ),
             "native target claude uses the existing official CLI login; api_key_env is unsupported",
         ),
         (
@@ -1295,12 +1298,6 @@ fn claude_target_rejects_keys_fallback_and_groups() {
             CLAUDE.replace("claude", "codex"),
             "native target must be opencode (built-in API-key provider) or claude (official CLI login)",
         ),
-        (
-            CLAUDE
-                .replace("cloud-only", "local-first")
-                .replace("\"version\":1", "\"version\":1,\"model\":\"m\",\"litellm\":{\"api_base\":\"http://127.0.0.1:9/v1\",\"api_key_env\":\"LOCAL_KEY\"}"),
-            "local-first fallback supports only native target opencode",
-        ),
     ] {
         assert_eq!(
             Config::read(input.as_bytes()).err(),
@@ -1308,26 +1305,64 @@ fn claude_target_rejects_keys_fallback_and_groups() {
             "{input}"
         );
     }
-    let both = CLAUDE.replace(
-        "\"version\":1",
-        "\"version\":1,\"litellm\":{\"api_base\":\"http://127.0.0.1:9/v1\",\"api_key_env\":\"LOCAL_KEY\"}",
-    );
-    let fallback = invocation(&["single", "task", "--mode", "local-first", "--model", "m"])
-        .resolve(
-            Config::read(both.as_bytes()).unwrap(),
-            |_| Some("local".into()),
-            NeverRead,
-        );
-    assert_eq!(
-        fallback.err(),
-        Some(Invalid(
-            "local-first fallback supports only native target opencode"
-        ))
-    );
     let group = invocation(&["single", "task", "--model", "group:coder"]).resolve(
         Config::read(CLAUDE.as_bytes()).unwrap(),
         |_| None,
         NeverRead,
     );
     assert!(group.is_err());
+}
+
+#[test]
+fn claude_fallback_resolves_runtime_without_reading_native_credentials() {
+    use awesomejt_agent_harness::config::RuntimeKind;
+    let both = CLAUDE.replace(
+        "\"version\":1",
+        "\"version\":1,\"litellm\":{\"api_base\":\"http://127.0.0.1:9/v1\",\"api_key_env\":\"LOCAL_KEY\"}",
+    );
+    let r = invocation(&[
+        "single",
+        "task",
+        "--mode",
+        "local-first",
+        "--model",
+        "m",
+        "--permissions",
+        "trusted",
+    ])
+    .resolve(
+        Config::read(both.as_bytes()).unwrap(),
+        |name| {
+            assert_eq!(name, "LOCAL_KEY");
+            Some("local".into())
+        },
+        NeverRead,
+    )
+    .unwrap();
+    assert_eq!(r.runtime, RuntimeKind::OpenCode);
+    assert_eq!(r.runtime_model(), "ah-litellm/m");
+    let f = r.fallback.as_deref().unwrap();
+    assert_eq!(f.runtime, RuntimeKind::Claude);
+    assert_eq!(f.record_model(), "claude/sonnet");
+    assert_eq!(f.sources.model, Source::Config);
+    assert_eq!(f.mode, Mode::CloudOnly);
+    assert!(f.api_key_env.is_none() && f.api_base.is_none() && f.fallback.is_none());
+    assert_eq!(f.project, r.project);
+    assert_eq!(f.prompt, r.prompt);
+    assert_eq!(f.permissions, r.permissions);
+    assert_eq!(f.instructions, r.instructions);
+    assert_eq!(f.timeout_secs, r.timeout_secs);
+    assert!(
+        invocation(&[
+            "single",
+            "--prompt-file",
+            "-",
+            "--mode",
+            "local-first",
+            "--model",
+            "m"
+        ])
+        .resolve(Config::read(both.as_bytes()).unwrap(), |_| None, NeverRead)
+        .is_err()
+    );
 }
