@@ -57,6 +57,8 @@ v2/ThreadStartResponse.json c655daa1616548f6b3b0960acee9dcfefa8aba5965ec4fc636c8
 v2/TurnStartParams.json     49e53282f327c25e7b39d97afacd038ef10ad5c4fb0431608b354d3a7bf6bcea
 ```
 
+For drift checks, the full stable tree contains **321 JSON files**. Its manifest SHA-256 is `54cb39a2995ae15626c237bf36e706a732594548cc1c501934f1eeaca320f99a`. The manifest uses every `*.json` recursively, sorted lexicographically by POSIX relative path, with each UTF-8 line exactly `FILE_SHA256`, two spaces, relative path, and a trailing newline. Hash the concatenated lines as UTF-8. Absolute temporary-directory names are excluded. The experimental `v2/ThreadStartParams.json` SHA-256 is `80a40a7fac15b4bf70efb7f893fb353acc0a0d30c68f54aee4f01923deca85de`; it anchors the `dynamicTools` comparison above. These fingerprints support re-evaluation, not runtime schema validation.
+
 ## Non-inference protocol probe
 
 One app-server child was launched in an empty temporary directory with a cleared environment containing only the operator's `HOME`, `PATH`, `TMPDIR`, `USER`, `LOGNAME` when present, plus `RUST_LOG=off`. Real HOME retained CLI-owned login/config as D047 permits; this discovery probe **does not claim configuration isolation**. The parent used a fresh process group, a 45-second outer deadline, captured/discarded stderr and a final group kill for any remaining descendants. Only the following protocol messages were sent, in order (one JSON object per line, waiting for each request's response):
@@ -87,4 +89,4 @@ After feasibility passes: narrow launch/preflight/events/deny PR; trusted permis
 
 ## Validation
 
-Selection checks: installed help/version/login, stable and experimental schema generation/comparison, non-inference handshake/model-list with bounded cleanup, relative Markdown links and whitespace checks. No production code changed, so Rust/offline runtime suites are not rerun for this documentation increment. Required Grok review and merge remain part of the Git workflow; PROJECT.md records the final PR outcome.
+Selection checks: installed help/version/login, stable and experimental schema generation/comparison, non-inference handshake/model-list with bounded cleanup, relative Markdown links and whitespace checks. No production code changed, so Rust/offline runtime suites are not rerun for this documentation increment. [PR #67](https://github.com/awesomejt/agent-harness/pull/67) received Grok review under the operator's account: 0 blockers, 0 concerns, 1 nit. The nit requested broader schema fingerprints; the full stable-tree manifest and experimental thread-start fingerprint above address it. Relative-link and whitespace checks pass again. No critical/high finding and no re-review required. Selection closeout is effective on merge; P7.3 adapter acceptance remains open.
