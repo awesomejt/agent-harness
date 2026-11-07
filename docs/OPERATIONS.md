@@ -186,6 +186,8 @@ uninstall performs no automatic project cleanup.
 
 ### Native Claude cloud-only (P7.2)
 
+Supported from current source on macOS 27.0.1 arm64; the published alpha.2 binary predates this adapter. Build with `cargo build --release --locked` and use `target/release/ah`. The [capability matrix](FRAMEWORKS.md#p72-claude-capability-matrix) lists tested behavior and limits, with [final acceptance evidence](evidence/p7-2-claude-acceptance.md).
+
 Install Claude Code 2.1.314 with its official installer so `claude` is on an absolute PATH entry, then log in with `claude` itself. The harness uses that existing login and never handles it ([D047](../DECISIONS.md#2026-11-06--d047-native-adapters-use-the-operators-existing-official-cli-login)). Use the [Claude configuration](CONFIGURATION.md#native-claude-runtime-p72--d048) and run:
 
 ```bash

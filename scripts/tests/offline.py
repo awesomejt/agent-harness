@@ -4,7 +4,7 @@
 Entries come from the "Rust and release checks" block of docs/TESTING.md in the
 order they appear there, including each single_runtime.py variant with its flag,
 then the sequence, named-role execution and inherited-capability suites that the
-block omits. scripts/tests/roles_live.py is excluded because it contacts live
+block omits. roles_live.py and claude_live.py are excluded because they contact live
 providers, and scripts/experiments/ is excluded because it is historical
 regression tooling. Each entry is the argument list after python3; every entry
 runs with the repository root as the working directory. Written by the P5.4
