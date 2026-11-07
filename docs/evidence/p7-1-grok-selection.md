@@ -65,8 +65,8 @@ The next focused experiment must remain no-inference until effective controls pa
 4. For any later advertised trusted or read-only role, establish exact per-operation host decisions, default-deny behavior and canonical tool-set narrowing. Refuse unsupported roles/profiles before submission. If no-tool denial cannot be proven, refuse the runtime entirely (D047).
 5. Subsequent production PRs own launch/config selection, event/terminal and source-attributed usage mapping, model/effort, canonical agents/project AGENTS.md, cancellation/descendant cleanup, workflows and the one pre-submission fallback. Preserve D030/D031/D034/D039; no automatic replay after possible submission. Version pin and fixture/live acceptance remain required before claiming support.
 
-P7.6 requires all four accepted adapters, including the paused Codex target; P7.7 is the later holistic phase gate. This selection does not close either. PROJECT.md alone owns mutable status. The feasibility task can continue in Codex on this host; switching development platforms is not required.
+P7.6 requires all four accepted adapters, including the paused Codex target; P7.7 is the later holistic phase gate. This selection does not close either. PROJECT.md alone owns mutable status. The Grok P7.4 feasibility task can continue on this host using the Codex development app; switching development platforms is not required.
 
 ## Validation
 
-Six installed help/version commands passed with the isolation/deadline described above. Relative Markdown links and whitespace checks are required before merge; review/closeout is recorded in PROJECT.md. No production or dependency changes: Rust/runtime suites and billable live runs are not repeated for this selection.
+Six installed help/version commands passed with the isolation/deadline described above. All six recorded stdout fingerprints reproduced on a second pass. Relative Markdown links and whitespace checks pass; Grok review/closeout is recorded in PROJECT.md. No production or dependency changes: Rust/runtime suites and billable live runs are not repeated for this selection.
