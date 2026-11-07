@@ -346,7 +346,7 @@ fn start(args: Vec<OsString>) -> Exit {
     if invocation.preview() {
         return preview(&task, &file, &config_path);
     }
-    if let Err(error) = crate::single::workflow_supported(&task.request) {
+    if let Err(error) = crate::single::supported(&task.request) {
         return reject(error.0);
     }
     let project = task.request.project.clone();
@@ -575,7 +575,7 @@ fn resume(args: Vec<OsString>) -> Exit {
     if task.request.project != project {
         return reject("recorded project path no longer resolves to itself; start a new run");
     }
-    let pinned = match crate::single::workflow_supported(&task.request)
+    let pinned = match crate::single::supported(&task.request)
         .and_then(|()| crate::sequence::identity(&task.check))
     {
         Ok(pinned) => pinned,
@@ -656,8 +656,8 @@ fn iteration(
         agent_sha256: request.agent.as_ref().map(|a| a.sha256().to_owned()),
         check: Some(crate::sequence::identity(&task.check)?),
         route: crate::sequence::route(request).to_owned(),
-        model: request.runtime_model(),
-        fallback: request.fallback.as_ref().map(|f| f.runtime_model()),
+        model: request.record_model(),
+        fallback: request.fallback.as_ref().map(|f| f.record_model()),
         permissions: crate::sequence::permissions(request).to_owned(),
         timeout_secs: request.timeout_secs,
         agent_outcome: None,
@@ -1448,7 +1448,7 @@ fn preview(task: &Task, file: &Path, config: &Path) -> Exit {
         Ok(_) => "none".to_owned(),
         Err(error) => format!("refused: {}", error.0),
     };
-    let refusal = match crate::single::workflow_supported(request) {
+    let refusal = match crate::single::supported(request) {
         Ok(()) => String::new(),
         Err(error) => format!("execution refused: {}\n", error.0),
     };
@@ -1473,7 +1473,7 @@ fn preview(task: &Task, file: &Path, config: &Path) -> Exit {
             .as_ref()
             .map_or("none".to_owned(), |a| format!("\"{}\"", a.name())),
         crate::sequence::route(request),
-        request.runtime_model(),
+        request.record_model(),
         crate::sequence::permissions(request),
         task.check.name,
         task.check.program,

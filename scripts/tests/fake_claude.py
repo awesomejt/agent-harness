@@ -8,7 +8,10 @@ aborted result after an interrupt. With `--permission-prompts=host` (trusted) it
 announces tool calls, sends `can_use_tool` prompts, waits for the harness's
 answer and records it in `permissions.jsonl`, writing a file only on a grant.
 `get_settings` echoes `--effort` (else the model default, `medium`).
-The project's `case` file selects a deviation.
+The project's `case` file selects a deviation. A workflow run launches once per
+step or iteration: each launch appends its argv to `launches.jsonl`, and an
+optional `cases` file (a JSON list) selects that launch's case by index, the
+last entry repeating. Case `claim` ends the response with the Ralph marker.
 Records argv and every stdin line in the project; the test wrapper records the environment.
 """
 import json
@@ -22,6 +25,14 @@ case = (cwd / 'case').read_text().strip()
 VERSION = '2.1.314'
 MODEL = 'claude-sonnet-5-5'
 (cwd / 'argv.json').write_text(json.dumps(sys.argv[1:]))
+launches = cwd / 'launches.jsonl'
+index = len(launches.read_text().splitlines()) if launches.exists() else 0
+with open(launches, 'a') as f:
+    f.write(json.dumps(sys.argv[1:]) + '\n')
+if (cwd / 'cases').exists():
+    cases = json.loads((cwd / 'cases').read_text())
+    case = cases[min(index, len(cases) - 1)]
+FINAL = 'done\nAH-RALPH-COMPLETE' if case == 'claim' else 'fake response\nfinal line'
 log = open(cwd / 'stdin.jsonl', 'a')
 TRUSTED = '--permission-prompts=host' in sys.argv
 TOOLS = next((a.split('=', 1)[1] for a in sys.argv if a.startswith('--tools=')), '')
@@ -212,8 +223,12 @@ def trusted_turn():
         write('t1', made)
     emit({'type': 'assistant', 'message': {'model': MODEL, 'content': [
         {'type': 'text', 'text': 'fake response'}]}})
+    if case == 'error-result':
+        emit({'type': 'result', 'subtype': 'error_during_execution', 'is_error': True,
+              'stop_reason': None, 'result': 'SECRET_PROVIDER_ERROR', 'total_cost_usd': 0.001})
+        return
     emit({'type': 'result', 'subtype': 'success', 'is_error': False, 'stop_reason': 'end_turn',
-          'result': 'fake response\nfinal line', 'total_cost_usd': 0.0123, 'session_id': 'sid',
+          'result': FINAL, 'total_cost_usd': 0.0123, 'session_id': 'sid',
           'num_turns': 3, 'permission_denials': []})
 
 
@@ -253,7 +268,7 @@ def turn(text):
               'stop_reason': None, 'result': 'SECRET_PROVIDER_ERROR', 'total_cost_usd': 0.001})
         return
     emit({'type': 'result', 'subtype': 'success', 'is_error': False, 'stop_reason': 'end_turn',
-          'result': 'fake response\nfinal line', 'total_cost_usd': 0.0123, 'session_id': 'sid',
+          'result': FINAL, 'total_cost_usd': 0.0123, 'session_id': 'sid',
           'num_turns': 1, 'permission_denials': []})
 
 

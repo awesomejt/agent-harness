@@ -176,6 +176,8 @@ Machine output keeps the D039 v1 schema: `attempt.started` carries `runtime: "cl
 
 Named roles ([D050](../DECISIONS.md#2026-11-06--d050-claude-named-roles-as-a-narrowed-tool-set-appended-body-and-verified-effort)) keep every check above. `--agent NAME` appends the role body with `--append-system-prompt` after the `AGENTS.md` file. The offered set is the invocation intersected with the role: none under `deny`; under `trusted`, `read` → `Read`, `search` → `Glob`/`Grep`, `edit` → `Edit`/`Write`, `execute` → `Bash`. An empty set launches as `deny`, and `system/init` must list exactly the offered set. A role whose ceiling is below `trusted` has every host prompt denied (Claude Code prompts for its read/search tools only outside the project). A non-default `effort` passes `--effort=LEVEL`, and `get_settings` must report that level before the prompt (exit 2 otherwise). The body is not read back: no control request exposes the system prompt.
 
+Sequences and Ralph ([D051](../DECISIONS.md#2026-11-06--d051-claude-sequences-and-ralph-as-fresh-single-runs-with-runtime-named-records)) launch one such single run per step or iteration, each with its own preflight, session, grants and deadline; nothing else carries over. Their records and previews name the model `claude/MODEL`; the launch argument and `attempt.started` keep the bare model.
+
 ## P4.8 inherited capabilities (D040)
 
 The [P4.8 capability matrix](evidence/p4-8-inherited-capabilities.md) is versioned against OpenCode 2.2.5 and records each capability as tested, unsupported or unverified.

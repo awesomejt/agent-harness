@@ -6,12 +6,15 @@ Cases cover the pre-submission control preflight, the submission boundary,
 system/init checks, deny-profile tool refusal, trusted host-prompt grants
 (exact, once, never after an interrupt) and trusted protocol violations,
 named roles (intersected tools, appended body, effort, ceiling-denied prompts),
-terminal mapping, interrupt cancellation, machine output, preview, and refusals
-that must not launch.
+terminal mapping, interrupt cancellation, machine output, preview, refusals
+that must not launch, and sequences and Ralph (one fresh session per step or
+iteration, records, retry and no replay).
 """
+import atexit
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 
@@ -304,35 +307,161 @@ for case, expected, prompted, extra in CASES:
             assert 'Claude Code missing' in p.stderr
         count += 1
 
-# Sequences and Ralph refuse the Claude runtime before any launch or record.
-with tempfile.TemporaryDirectory(prefix='ah-claude-seq-') as d:
+# Sequences and Ralph (D051): each step or iteration is one fresh Claude
+# single run with its own preflight; records name the runtime model.
+def workflow(cases, config=None):
+    d = tempfile.mkdtemp(prefix='ah-claude-wf-')
+    atexit.register(shutil.rmtree, d, True)
     base = Path(d).resolve()
     (base / 'bin').mkdir()
     (base / 'bin/claude').symlink_to(FAKE)
-    (base / 'case').write_text('success')
-    (base / 'steps').mkdir()
-    (base / 'steps/1-a.md').write_text('step')
-    (base / 'ah.json').write_text(json.dumps(dict(version=1, mode='cloud-only',
-                                                  native=dict(target='claude', model='sonnet'))))
-    env = {'PATH': f'{base}/bin:/usr/bin:/bin', 'HOME': str(base), 'XDG_STATE_HOME': str(base / 'state')}
-    p = subprocess.run([str(BINARY), 'sequence', 'run', str(base / 'steps'), '--project', str(base)],
-                       env=env, capture_output=True, text=True, timeout=30)
-    assert p.returncode == 2, p.stderr
-    assert 'supports ah single only' in p.stderr, p.stderr
-    assert not (base / 'argv.json').exists() and not (base / 'state').exists()
-    count += 1
-    # Ralph run and resume refuse too, before any launch or record.
-    (base / 'ah.json').write_text(json.dumps(dict(version=1, mode='cloud-only',
-                                                  native=dict(target='claude', model='sonnet'),
-                                                  checks=dict(test=dict(argv=['/usr/bin/true'])))))
-    (base / 'task.md').write_text('loop task')
-    for args in (['ralph', 'run', str(base / 'task.md'), '--project', str(base), '--verify', 'test'],
-                 ['ralph', 'resume', 'r20261106T000000Z-0123abcd', '--verify', 'test']):
-        p = subprocess.run([str(BINARY)] + args, env=env, capture_output=True, text=True, timeout=30, cwd=base)
-        assert p.returncode == 2, (args, p.stderr)
-        assert not (base / 'argv.json').exists() and not (base / 'state').exists(), args
-        if args[1] == 'run':
-            assert 'supports ah single only' in p.stderr, p.stderr
-        count += 1
+    project = base / 'project'
+    (project / 'steps').mkdir(parents=True)
+    (project / 'case').write_text(cases[0])
+    (project / 'cases').write_text(json.dumps(cases))
+    (project / 'user.txt').write_text('preserve dirty user content')
+    (project / 'steps/1-first.md').write_text('first step')
+    (project / 'steps/2-second.md').write_text('second step')
+    (project / 'task.md').write_text('loop task')
+    # The config (and so the check) stays outside the project (P6.4 guidance).
+    cfg = config or dict(version=1, mode='cloud-only', native=dict(target='claude', model='sonnet'),
+                         checks=dict(test=dict(argv=['/usr/bin/true'])))
+    (base / 'ah.json').write_text(json.dumps(cfg))
+    env = {'PATH': f'{base}/bin:/usr/bin:/bin', 'HOME': str(base), 'XDG_STATE_HOME': str(base / 'state'),
+           'ANTHROPIC_API_KEY': 'poison'}
 
-print(f'PASS {count} Claude runtime CLI cases; preflight before prompt; deny offers no tools; trusted grants each exact prompt once; roles narrow tools and map effort; no secrets echoed')
+    def ah(*args):
+        # Resume takes project and config from the record.
+        config = ['--config', str(base / 'ah.json')] if args[1] == 'run' else []
+        return subprocess.run([str(BINARY), *args, *config],
+                              env=env, capture_output=True, text=True, timeout=60, cwd=project)
+    return base, project, ah
+
+
+def launched(project):
+    path = project / 'launches.jsonl'
+    return [json.loads(l) for l in path.read_text().splitlines()] if path.exists() else []
+
+
+def prompts(project):
+    lines = [json.loads(l) for l in (project / 'stdin.jsonl').read_text().splitlines()]
+    return [l['message']['content'] for l in lines if l['type'] == 'user']
+
+
+def record(base, kind):
+    return json.loads(next((base / f'state/agent-harness/{kind}').glob('*.json')).read_text())
+
+
+# A two-step deny sequence: two launches, each with the full preflight.
+base, project, ah = workflow(['success'])
+p = ah('sequence', 'run', str(project / 'steps'), '--project', str(project), '--timeout-secs', '15')
+assert p.returncode == 0, p.stderr
+assert launched(project) == [EXPECTED_ARGS, EXPECTED_ARGS], launched(project)
+assert prompts(project) == ['first step', 'second step'], prompts(project)
+assert p.stdout == 'fake response\nfinal line\nfake response\nfinal line\n', p.stdout
+lines = [json.loads(l) for l in (project / 'stdin.jsonl').read_text().splitlines()]
+subtypes = [l['request']['subtype'] for l in lines if l['type'] == 'control_request']
+assert subtypes == ['initialize', 'get_settings', 'mcp_status', 'get_context_usage'] * 2, subtypes
+rec = record(base, 'sequences')
+assert rec['status'] == 'completed' and [s['status'] for s in rec['steps']] == ['succeeded'] * 2, rec
+for step in rec['steps']:
+    attempt = step['attempts'][0]
+    assert attempt['model'] == 'claude/sonnet' and attempt['route'] == 'cloud-only', attempt
+    assert attempt['permissions'] == 'deny' and attempt['fallback'] is None, attempt
+    assert attempt['backends'] == [{'attempt': 1, 'launched': True, 'prompt_submitted': True,
+                                    'backend_stop': 'end_turn', 'cleanup_confirmed': True,
+                                    'grants': 0, 'tool_events': 0}], attempt
+for secret in SECRETS:
+    assert secret not in p.stdout + p.stderr + json.dumps(rec), secret
+count += 1
+
+# Trusted: step 1 is granted its write; step 2 fails after submission and
+# stops the run. Bare resume refuses; --retry launches a fresh session.
+base, project, ah = workflow(['trusted', 'error-result', 'trusted'])
+p = ah('sequence', 'run', str(project / 'steps'), '--project', str(project), *T, '--timeout-secs', '15')
+assert p.returncode == 1, p.stderr
+assert launched(project) == [TRUSTED_ARGS, TRUSTED_ARGS], launched(project)
+assert (project / 'made.txt').read_text() == 'made by fake'
+rec = record(base, 'sequences')
+assert [s['status'] for s in rec['steps']] == ['succeeded', 'failed'], rec
+assert rec['steps'][0]['attempts'][0]['backends'][0]['grants'] == 1, rec
+assert rec['steps'][1]['attempts'][0]['backends'][0]['prompt_submitted'] is True, rec
+run = rec['run']
+p = ah('sequence', 'resume', run, *T, '--timeout-secs', '15')
+assert p.returncode == 2 and len(launched(project)) == 2, p.stderr
+p = ah('sequence', 'resume', run, '--retry', *T, '--timeout-secs', '15')
+assert p.returncode == 0, p.stderr
+assert launched(project) == [TRUSTED_ARGS] * 3 and prompts(project)[-1] == 'second step'
+rec = record(base, 'sequences')
+assert rec['status'] == 'completed', rec
+assert [a['reason'] for a in rec['steps'][1]['attempts']] == ['initial', 'retry'], rec
+count += 1
+
+# An uncertain step (EOF after submission) stops the run with exit 4 and
+# never replays; the record keeps the submitted attempt.
+base, project, ah = workflow(['success', 'eof-after-submit'])
+p = ah('sequence', 'run', str(project / 'steps'), '--project', str(project), '--timeout-secs', '15')
+assert p.returncode == 4, p.stderr
+assert len(launched(project)) == 2, launched(project)
+rec = record(base, 'sequences')
+assert [s['status'] for s in rec['steps']] == ['succeeded', 'uncertain'], rec
+count += 1
+
+# Preview names the runtime model and no refusal, and launches nothing.
+base, project, ah = workflow(['success'])
+p = ah('sequence', 'run', str(project / 'steps'), '--project', str(project), '--preview')
+assert p.returncode == 0, p.stderr
+assert 'model claude/sonnet' in p.stdout and 'execution refused' not in p.stdout, p.stdout
+assert launched(project) == [] and not (base / 'state').exists()
+count += 1
+
+# Ralph: a backend success without a claim continues; the second iteration
+# claims and the pinned check passes, completing the run.
+base, project, ah = workflow(['success', 'claim'])
+p = ah('ralph', 'run', str(project / 'task.md'), '--project', str(project), '--verify', 'test',
+       '--max-iterations', '3', '--timeout-secs', '15')
+assert p.returncode == 0, p.stderr
+assert launched(project) == [EXPECTED_ARGS, EXPECTED_ARGS], launched(project)
+sent = prompts(project)
+assert len(sent) == 2 and all(t.endswith('loop task') for t in sent), sent
+assert 'AH-RALPH-COMPLETE' in sent[0], sent[0]
+rec = record(base, 'ralph')
+assert rec['status'] == 'completed', rec
+assert [i['claim'] for i in rec['iterations']] == [False, True], rec
+assert rec['iterations'][1]['verification']['status'] == 'passed', rec
+assert all(i['model'] == 'claude/sonnet' for i in rec['iterations']), rec
+for i in rec['iterations']:
+    usage = i['backends'][0]['usage']
+    assert usage['source'] == 'claude-stream-json-result', i
+    assert usage['session_cost'] == {'amount': 0.0123, 'currency': 'USD'}, i
+count += 1
+
+# A Ralph iteration cancelled at its deadline stops the run (exit 3); resume
+# needs --retry, which launches one fresh iteration that completes.
+base, project, ah = workflow(['cancel-deadline', 'claim'])
+p = ah('ralph', 'run', str(project / 'task.md'), '--project', str(project), '--verify', 'test',
+       '--timeout-secs', '3')
+assert p.returncode == 3, p.stderr
+assert (project / 'interrupted').exists() and len(launched(project)) == 1
+rec = record(base, 'ralph')
+assert rec['status'] == 'stopped' and rec['iterations'][0]['status'] == 'cancelled', rec
+p = ah('ralph', 'resume', rec['run'], '--verify', 'test', '--timeout-secs', '15')
+assert p.returncode == 2 and len(launched(project)) == 1, p.stderr
+p = ah('ralph', 'resume', rec['run'], '--retry', '--verify', 'test', '--timeout-secs', '15')
+assert p.returncode == 0, p.stderr
+assert len(launched(project)) == 2 and record(base, 'ralph')['status'] == 'completed'
+count += 1
+
+# Local-first with a claude target stays refused for workflows, before any
+# launch or record (D046/D048).
+base, project, ah = workflow(['success'], dict(
+    version=1, mode='local-first', model='local', native=dict(target='claude', model='sonnet'),
+    litellm=dict(api_base='http://127.0.0.1:9/v1', api_key_env='LOCAL_KEY')))
+for args in (['sequence', 'run', str(project / 'steps'), '--project', str(project)],
+             ['ralph', 'run', str(project / 'task.md'), '--project', str(project), '--verify', 'test']):
+    p = ah(*args)
+    assert p.returncode == 2, (args, p.stderr)
+    assert launched(project) == [] and not (base / 'state').exists(), args
+    count += 1
+
+print(f'PASS {count} Claude runtime CLI cases; preflight before prompt; deny offers no tools; trusted grants each exact prompt once; roles narrow tools and map effort; workflows launch one fresh session per step or iteration; no secrets echoed')
