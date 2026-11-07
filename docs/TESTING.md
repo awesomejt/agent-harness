@@ -51,6 +51,7 @@ python3 scripts/tests/native.py
 python3 scripts/tests/native_runtime.py
 python3 scripts/tests/claude.py
 python3 scripts/tests/codex_feasibility_cases.py
+python3 scripts/tests/grok_feasibility_cases.py
 python3 scripts/tests/agents_runtime.py
 python3 scripts/tests/agent_emission_runtime.py
 python3 scripts/tests/local_first.py
@@ -99,3 +100,6 @@ After phase evidence is prepared, execute the explicit phase-review task using [
 
 
 P7.3's opt-in `python3 scripts/experiments/codex_feasibility.py` checks installed Codex 0.166.0 configuration/schema observations using synthetic HOME/CODEX_HOME and no credentials, thread or model turn. Exit 0 reproduces the observations; it does not pass the production permission gate (D054). Its malformed-protocol regression suite, `codex_feasibility_cases.py`, uses a fake executable and runs in `offline.py` without installed Codex or network. See [feasibility evidence](evidence/p7-3-codex-feasibility.md).
+
+
+P7.4's opt-in `python3 scripts/experiments/grok_feasibility.py` reproduces installed Grok 1.0.70 inspect/ACP initialization observations in disposable synthetic HOME/GROK_HOME. Only `initialize` is allowed: no authentication, session creation or model prompt. It bounds each child to ten seconds and two MiB of combined output, sanitizes failures and kills process groups. Initialization can write support/log/index files and migrate synthetic config; this is not network-free or production isolation evidence. Exit 0 reproduces observations with the production gate explicitly unpassed (D057). `python3 scripts/tests/grok_feasibility_cases.py` exercises fake inspect/protocol failures, output/deadline limits, descendant cleanup and the RPC allowlist without installed Grok or network; it is included in `offline.py`. See [feasibility evidence](evidence/p7-4-grok-feasibility.md).
