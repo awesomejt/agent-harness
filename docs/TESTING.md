@@ -50,6 +50,7 @@ python3 scripts/tests/single_runtime.py --refuse
 python3 scripts/tests/native.py
 python3 scripts/tests/native_runtime.py
 python3 scripts/tests/claude.py
+python3 scripts/tests/codex_feasibility_cases.py
 python3 scripts/tests/agents_runtime.py
 python3 scripts/tests/agent_emission_runtime.py
 python3 scripts/tests/local_first.py
@@ -95,3 +96,6 @@ Use G IDs for goals, F IDs for feature dispositions, AC IDs for milestone accept
 ## Holistic phase acceptance
 
 After phase evidence is prepared, execute the explicit phase-review task using [PHASE_REVIEW.md](PHASE_REVIEW.md). Review the accumulated phase and its integration with earlier baselines, not just the final PR. Record every finding, correction and verification; reassess integrated behavior after fixes. The phase remains open until no unresolved finding and all required PR reviews/merges are complete. Successor task dependencies must reference the accepted phase-review gate.
+
+
+P7.3's opt-in `python3 scripts/experiments/codex_feasibility.py` checks installed Codex 0.166.0 configuration/schema observations using synthetic HOME/CODEX_HOME and no credentials, thread or model turn. Exit 0 reproduces the observations; it does not pass the production permission gate (D054). Its malformed-protocol regression suite, `codex_feasibility_cases.py`, uses a fake executable and runs in `offline.py` without installed Codex or network. See [feasibility evidence](evidence/p7-3-codex-feasibility.md).
