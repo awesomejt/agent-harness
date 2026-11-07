@@ -4,7 +4,7 @@ Instructions for AI coding agents working on the `agent-harness` repository.
 
 ## Project purpose
 
-`agent-harness` is a single-entry-point CLI that orchestrates existing AI agent tools (OpenCode, Pi, Claude, Codex, Grok, Gemini, …) and a LiteLLM proxy.
+`agent-harness` is a single-entry-point CLI that orchestrates existing AI agent tools (OpenCode, Pi, Claude, Codex, Grok, Antigravity, …) and a LiteLLM proxy.
 
 It enforces operational modes (`local-only`, `cloud-only`, `local-first`) so cloud subscription CLIs are only invoked when ToS permits, while LiteLLM handles local models, open-weight subscriptions, and OpenRouter.
 

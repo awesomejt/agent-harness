@@ -1,5 +1,7 @@
 # P7.1 evidence — Gemini selection and readiness
 
+**Superseded for future work by D061:** the operator replaced the Gemini CLI requirement with Antigravity CLI. See the [current assessment](p7-1-antigravity-readiness.md). This report preserves the earlier observations; its Gemini installation/selection steps are no longer the project plan.
+
 2026-11-07. Entry: merged PR #72, `12c4f1b`. Task: [P7.1](../../tasks/07-native-adapters.md#p7-1). Decision: [D059](../../DECISIONS.md#2026-11-07--d059-select-gemini-for-readiness-with-installed-controls-still-gated).
 
 ## Disposition and boundary

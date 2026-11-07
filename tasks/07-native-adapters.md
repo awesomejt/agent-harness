@@ -43,12 +43,14 @@ P7.3 is delivered in focused increments. First record target/interface selection
 - **Contract:** [docs/EXECUTION.md](../docs/EXECUTION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
 <a id="p7-5"></a>
-## P7.5 — Gemini native adapter
+## P7.5 — Antigravity native adapter
+
+D061 replaces the former Gemini CLI target at the same stable task ID. First prove installed `agy acp` permission/isolation controls using the [readiness assessment](../docs/evidence/p7-1-antigravity-readiness.md); selection and help discovery do not satisfy adapter acceptance. Historical Gemini evidence remains historical.
 
 - **Depends on:** [P7.1](07-native-adapters.md#p7-1)
-- **Deliverable and boundary:** For Gemini, deliver narrow PRs for supported launch/authentication, progress/terminal mapping, model/effort, cancellation and constrained agent mapping. Include capability/setup docs as part of this adapter, not only at Phase 7 closeout.
+- **Deliverable and boundary:** For Antigravity, deliver narrow PRs for supported launch/authentication, progress/terminal mapping, model/effort, cancellation and constrained agent mapping. Include capability/setup docs as part of this adapter, not only at Phase 7 closeout.
 - **Acceptance evidence:** Fixture/policy/lifecycle tests plus one live project task and enforced constrained-role evidence. Unsupported features/version/platform limits are documented before advertising support.
-- **Decision/readiness gate:** Activation gate: Gemini is the currently selected target from P7.1 or a later recorded selection. Reuse official authentication; no token scraping or prohibited proxying.
+- **Decision/readiness gate:** Activation gate: Antigravity is the currently selected target from P7.1 or a later recorded selection. Reuse official authentication; no token scraping or prohibited proxying.
 - **Contract:** [docs/EXECUTION.md](../docs/EXECUTION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
 <a id="p7-6"></a>
