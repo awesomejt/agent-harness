@@ -32,3 +32,7 @@ The first trial's backend-reported cost was USD 0.0087298. These are runtime cos
 ## Remaining acceptance
 
 This is fallback smoke and offline failure-policy evidence, not final P7.2 acceptance. The next increment consolidates live coding and enforced constrained-role evidence across the accepted Claude surface, capability/setup documentation and limitations. Native adapter selection stays on Claude until that closeout is reviewed and merged. Phase 7 portfolio acceptance still requires the other three adapters and P7.6/P7.7.
+
+## PR review closeout
+
+[PR #65](https://github.com/awesomejt/agent-harness/pull/65) received one automated Grok review, posted under the operator's account: 0 blockers, 1 concern and 1 nit. The concern adds an explicit assertion that preview reports the OpenCode primary's unsupported-effort refusal; the existing execute/refusal/no-probe checks remain. The nit updates `Invocation::resolve`'s credential comment to distinguish a Claude login from an OpenCode native key. The 78-case Claude suite and formatting checks pass after these changes. Neither finding is critical/high, so no re-review is requested under the Git workflow and the operator's instruction. Completion takes effect on merge; P7.2 final acceptance remains open.

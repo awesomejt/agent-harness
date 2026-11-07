@@ -887,7 +887,8 @@ impl Invocation {
     /// Checks configuration and credentials before consuming potentially blocking
     /// stdin. The lookup result is checked for nonempty content and immediately
     /// dropped; the resolved request stores only the environment name. Local-first
-    /// checks both route keys: its fallback target must be usable before launch.
+    /// checks the LiteLLM key and, for an OpenCode fallback, the native key;
+    /// a Claude fallback uses the official CLI login without a key lookup.
     /// A `--verify` check also uses the lookup for `PATH` to pin its program.
     pub fn resolve(
         self,
