@@ -106,10 +106,12 @@ class Child:
                 os.killpg(self.child.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-            self.child.wait(timeout=2)
-            self.selector.close()
-            self.child.stdout.close()
-            self.child.stderr.close()
+            try:
+                self.child.wait(timeout=2)
+            finally:
+                self.selector.close()
+                self.child.stdout.close()
+                self.child.stderr.close()
 
 
 def validate_init(result):
@@ -204,8 +206,13 @@ def main():
             print('PASS: initialize-only ' + label + ' model=' + expected
                   + '; no top-level/meta tools inventory', flush=True)
         migration = b'\n[marketplace]\ndefault_skills_installs_purged = true\n'
-        check(user.read_bytes() == before_init + migration and not local.exists())
-        print('PASS: startup appended the synthetic marketplace migration flag', flush=True)
+        # Initialization can start background work. Do not require a write to
+        # settle before its process group is stopped; accept only the original
+        # bytes or the one specifically observed migration, never other edits.
+        after_init = user.read_bytes()
+        check(after_init in (before_init, before_init + migration) and not local.exists())
+        print('PASS: synthetic config unchanged or only the observed marketplace '
+              'migration; migration_seen=' + str(after_init != before_init), flush=True)
         check(instructions.read_bytes() == originals[instructions])
         check(not (grok_home / 'auth.json').exists())
         # Initialization writes support/log/index files under synthetic GROK_HOME.
