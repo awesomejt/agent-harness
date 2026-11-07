@@ -113,19 +113,6 @@ pub(crate) fn supported(request: &crate::config::Resolved) -> Result<(), crate::
     crate::opencode::prompt_supported(&request.prompt)
 }
 
-/// Sequences and Ralph (D044/D045) reuse `supported` per step and add this
-/// gate: the Claude runtime is accepted for single runs first (D048).
-pub(crate) fn workflow_supported(
-    request: &crate::config::Resolved,
-) -> Result<(), crate::config::Invalid> {
-    if request.runtime == crate::config::RuntimeKind::Claude {
-        return Err(crate::config::Invalid(
-            "the Claude runtime supports ah single only; sequences and Ralph are not yet supported",
-        ));
-    }
-    supported(request)
-}
-
 /// One validated request through route policy, the D034 fallback and the D043
 /// gate, under its own deadline. A sequence step is exactly one such call.
 #[cfg(target_os = "macos")]

@@ -1129,4 +1129,13 @@ impl Resolved {
             self.model
         )
     }
+
+    /// Model as workflow records and previews name it (D051): the OpenCode
+    /// runtime model, or `claude/MODEL` so a record names its runtime.
+    pub fn record_model(&self) -> String {
+        if self.runtime == RuntimeKind::Claude {
+            return format!("claude/{}", self.model);
+        }
+        self.runtime_model()
+    }
 }

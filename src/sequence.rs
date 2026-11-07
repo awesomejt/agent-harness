@@ -282,7 +282,7 @@ fn resolve_all(
         },
     )?;
     for (step, request) in steps.iter().zip(&requests).filter(|_| launch) {
-        if let Err(error) = crate::single::workflow_supported(request) {
+        if let Err(error) = crate::single::supported(request) {
             return Err(reject(format_args!("step {}: {}", step.name, error.0)));
         }
         // Surfaces non-UTF-8 record paths before any lock or write.
@@ -456,8 +456,8 @@ fn attempt(
         agent_sha256: request.agent.as_ref().map(|a| a.sha256().to_owned()),
         check,
         route: route(request).to_owned(),
-        model: request.runtime_model(),
-        fallback: request.fallback.as_ref().map(|f| f.runtime_model()),
+        model: request.record_model(),
+        fallback: request.fallback.as_ref().map(|f| f.record_model()),
         permissions: permissions(request).to_owned(),
         timeout_secs: request.timeout_secs,
         agent_outcome: None,
@@ -1433,7 +1433,7 @@ fn preview(steps: &[Step], requests: &[Resolved], folder: &Path, config: &Path) 
             Ok(_) => "none".to_owned(),
             Err(error) => format!("refused: {}", error.0),
         };
-        let refusal = match crate::single::workflow_supported(request) {
+        let refusal = match crate::single::supported(request) {
             Ok(()) => String::new(),
             Err(error) => format!("; execution refused: {}", error.0),
         };
@@ -1450,7 +1450,7 @@ fn preview(steps: &[Step], requests: &[Resolved], folder: &Path, config: &Path) 
                 .agent
                 .as_ref()
                 .map_or("none".to_owned(), |a| format!("\"{}\"", a.name())),
-            request.runtime_model(),
+            request.record_model(),
             request
                 .verify
                 .as_ref()

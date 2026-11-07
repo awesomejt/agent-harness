@@ -1398,6 +1398,15 @@ mod tests {
     }
 
     #[test]
+    fn workflow_records_name_the_claude_runtime() {
+        // D051: launches use the bare model; records and previews prefix it.
+        let r = request("deny", None);
+        assert_eq!(r.runtime_model(), "sonnet");
+        assert_eq!(r.record_model(), "claude/sonnet");
+        assert!(crate::single::supported(&r).is_ok());
+    }
+
+    #[test]
     fn named_roles_intersect_tools_and_map_effort_and_body() {
         // No role: deny offers nothing; trusted offers the whole fixed set.
         assert!(tools(&request("deny", None)).is_empty());
