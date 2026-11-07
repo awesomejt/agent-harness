@@ -80,7 +80,7 @@ Add a thin outer loop with fresh context per iteration, filesystem progress, a v
 
 **Depends on:** Phase 4; may run independently of Phases 5–6. **Goal:** extend G8/G5.
 
-Choose the first target from observed needs, then deliver Claude, Codex, Grok, and Gemini one adapter at a time. Each adapter must cover official authentication, runtime launch, events, model selection, cancellation, constraints, and name-based agent mapping. Verify provider integration rules at implementation time.
+Choose the first target from observed needs, then deliver Claude, Codex, Grok, and Antigravity one adapter at a time. Each adapter must cover official authentication, runtime launch, events, model selection, cancellation, constraints, and name-based agent mapping. Verify provider integration rules at implementation time.
 
 **Exit evidence per adapter:** capability matrix, fixtures, lifecycle/policy tests, one live project task, and docs. Unsupported features are explicit. No single milestone must wait for all four providers.
 

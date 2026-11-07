@@ -23,7 +23,7 @@ Rust is the accepted harness language. Deliver `ah` as prebuilt platform binarie
 | G5 | Portable named agents | Markdown + YAML definitions map by name; primary and specialized roles carry supported model/tool/permission constraints. | Phase 4, expanded in 7–8 |
 | G6 | Ordered execution | A folder of prompts runs in deterministic order with defined failure, context, and restart behavior. | Phase 5 |
 | G7 | Bounded iterative execution | Ralph uses fresh agent context per iteration, durable filesystem state, an explicit completion signal, and limits. | Phase 6 |
-| G8 | Multiple runtimes | OpenCode first; native Claude, Codex, Grok, Gemini and Pi added with documented capability differences. | Phases 7–8 |
+| G8 | Multiple runtimes | OpenCode first; native Claude, Codex, Grok, Antigravity and Pi added with documented capability differences. | Phases 7–8 |
 | G9 | Optional resource-aware operation | Where supported, expose quota/cooldown information and optional scheduling without overriding mode policy. | Phase 9; demand-driven |
 
 ## Feature coverage and supporting contracts
