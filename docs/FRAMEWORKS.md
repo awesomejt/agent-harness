@@ -105,3 +105,8 @@ The [supported Grok control assessment](evidence/p7-4-grok-control-assessment.md
 ## P7.5 Gemini readiness
 
 [D059](../DECISIONS.md#2026-11-07--d059-select-gemini-for-readiness-with-installed-controls-still-gated) selects Gemini as the next readiness/feasibility candidate after the Grok pause. The official `gemini --acp` interface is preferred; published 0.67.0 metadata is a candidate only because no Gemini executable is on this session's PATH. [Readiness evidence](evidence/p7-1-gemini-readiness.md) records official authentication/interface sources and the installed-control questions. D047 requires operator installation/login; complete no-tool enforcement and login-preserving isolation remain unproven. No production Gemini target or model work is authorized. Codex/Grok stay paused; Claude/OpenCode support is unchanged. Installed discovery/feasibility is next once setup is available, or independent P8.1 decisions may proceed.
+
+
+## P8.1 Pi integration decision
+
+[D060](../DECISIONS.md#2026-11-07--d060-select-pi-rpc-for-litellm-first-feasibility) selects caller-owned Pi RPC for initial **LiteLLM local-only** feasibility. The [decision and capability matrix](evidence/p8-1-pi-integration.md) records pinned source, the renamed official package, canonical-role/skill/effort mapping, exact host-grant requirements and terminal semantics. Pi subscription-provider clients are not selected as official native CLI replacements. Pi is absent from PATH; no installed controls or production support are claimed. P8.2 first proves isolated startup, complete deny and effective routing without inference; trusted permissions require a separately proven bridge. P8.3–P8.5 retain live acceptance, workflow parity and holistic review gates.
