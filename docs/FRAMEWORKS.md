@@ -97,3 +97,6 @@ The [supported-control reassessment](evidence/p7-3-codex-control-reassessment.md
 
 
 The [Grok feasibility experiment](evidence/p7-4-grok-feasibility.md) (D057) now reproduces inspect and initialization-only behavior on installed 1.0.70. Agent-level model selection reaches ACP initialization; top-level model selection does not. Neither inspected view proves complete no-tool enforcement, and startup mutates synthetic user support/config state. Production permission/isolation remains unproven: P7.4 stays unchecked and no Grok runtime is exposed. A specific supported-control assessment of profiles/tool mappings and configuration-source isolation precedes launch or model work; D047's CLI-owned login boundary remains binding.
+
+
+The [supported Grok control assessment](evidence/p7-4-grok-control-assessment.md) (D058) examines profile/toolConfig semantics, ACP propagation and configuration-source/login alternatives. Synthetic empty overlays retain permission/MCP sources, and an empty-tool profile initializes without establishing effective session restrictions. Grok implementation is now paused pending specific new control evidence; P7.4 remains unaccepted. A new P7.1 selection/readiness assessment is required before activating Gemini; independent Pi P8.1 remains available. Existing Claude/OpenCode support is unchanged.
