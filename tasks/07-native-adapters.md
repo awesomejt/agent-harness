@@ -25,6 +25,8 @@ Adapter tasks share the core dependency but are activated one at a time by a rec
 <a id="p7-3"></a>
 ## P7.3 — Codex native adapter
 
+P7.3 is delivered in focused increments. First record target/interface selection and the installed schema/handshake baseline. Then prove effective tool restrictions and isolation while retaining official login before implementing production launch or submitting any model turn. Launch/events, trusted permissions, named roles/model/effort, workflows, fallback and live acceptance may each need separate PRs. Selection alone does not satisfy this card's acceptance evidence; [PROJECT.md](../PROJECT.md) owns current selection and status.
+
 - **Depends on:** [P7.1](07-native-adapters.md#p7-1)
 - **Deliverable and boundary:** For Codex, deliver narrow PRs for supported launch/authentication, progress/terminal mapping, model/effort, cancellation and constrained agent mapping. Include capability/setup docs as part of this adapter, not only at Phase 7 closeout.
 - **Acceptance evidence:** Fixture/policy/lifecycle tests plus one live project task and enforced constrained-role evidence. Unsupported features/version/platform limits are documented before advertising support.
