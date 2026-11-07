@@ -56,11 +56,14 @@ class Server:
             while b'\n' in self.buffer:
                 line, self.buffer = self.buffer.split(b'\n', 1)
                 message = json.loads(line)
+                check(isinstance(message, dict), 'malformed protocol message')
                 check(not ('id' in message and 'method' in message),
                       'unexpected server request; no approval response sent')
                 if message.get('id') == identifier:
                     check('error' not in message, 'discovery RPC rejected (details withheld)')
-                    return message['result']
+                    result = message['result']
+                    check(isinstance(result, dict), 'malformed discovery result')
+                    return result
             for key, _ in self.selector.select(min(.2, max(0, deadline - time.monotonic()))):
                 data = os.read(key.fileobj.fileno(), 65536)
                 if not data:
@@ -108,6 +111,7 @@ def read_config(executable, project, env, overrides):
 
 def capture(command, project, env):
     # Used only for bounded installed help/parser/schema commands, never inference.
+    # The file-size check is post-exit, not a live disk cap or an arbitrary-binary sandbox.
     with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
         child = subprocess.Popen(command, cwd=project, env=env, stdin=subprocess.DEVNULL,
                                  stdout=out, stderr=err, start_new_session=True)
@@ -195,5 +199,6 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (RuntimeError, OSError, ValueError, KeyError, subprocess.TimeoutExpired):
+    except (RuntimeError, OSError, ValueError, KeyError, TypeError, AttributeError,
+            subprocess.TimeoutExpired):
         raise SystemExit('Codex feasibility probe failed; raw protocol/diagnostics withheld')
