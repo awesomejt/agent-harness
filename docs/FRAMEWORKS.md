@@ -100,3 +100,8 @@ The [Grok feasibility experiment](evidence/p7-4-grok-feasibility.md) (D057) now 
 
 
 The [supported Grok control assessment](evidence/p7-4-grok-control-assessment.md) (D058) examines profile/toolConfig semantics, ACP propagation and configuration-source/login alternatives. Synthetic empty overlays retain permission/MCP sources, and an empty-tool profile initializes without establishing effective session restrictions. Grok implementation is now paused pending specific new control evidence; P7.4 remains unaccepted. A new P7.1 selection/readiness assessment is required before activating Gemini; independent Pi P8.1 remains available. Existing Claude/OpenCode support is unchanged.
+
+
+## P7.5 Gemini readiness
+
+[D059](../DECISIONS.md#2026-11-07--d059-select-gemini-for-readiness-with-installed-controls-still-gated) selects Gemini as the next readiness/feasibility candidate after the Grok pause. The official `gemini --acp` interface is preferred; published 0.67.0 metadata is a candidate only because no Gemini executable is on this session's PATH. [Readiness evidence](evidence/p7-1-gemini-readiness.md) records official authentication/interface sources and the installed-control questions. D047 requires operator installation/login; complete no-tool enforcement and login-preserving isolation remain unproven. No production Gemini target or model work is authorized. Codex/Grok stay paused; Claude/OpenCode support is unchanged. Installed discovery/feasibility is next once setup is available, or independent P8.1 decisions may proceed.
