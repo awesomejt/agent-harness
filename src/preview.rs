@@ -103,8 +103,12 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
         (true, None) => "local-only",
         _ => "cloud-only",
     };
-    let route = if r.fallback.is_some() {
-        "LiteLLM primary; configured native OpenCode fallback"
+    let route = if let Some(native) = &r.fallback {
+        if native.runtime == crate::config::RuntimeKind::Claude {
+            "LiteLLM primary; configured native Claude Code fallback"
+        } else {
+            "LiteLLM primary; configured native OpenCode fallback"
+        }
     } else if local {
         "LiteLLM only"
     } else if claude {
@@ -148,12 +152,31 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
     };
     let fallback = match &r.fallback {
         Some(native) => format!(
-            "configured native {} ({}; key reference present), at most once and only when execution's TCP reachability check finds LiteLLM unreachable before launch; no fallback after the local attempt starts",
-            native.runtime_model(),
+            "configured native {} ({}; {}), at most once and only when execution's TCP reachability check finds LiteLLM unreachable before launch; no fallback after the local attempt starts",
+            native.record_model(),
             // D037 precedence: the agent's native model, else native.model.
             match native.sources.model {
                 Source::Agent => "agent models.native",
                 _ => "native.model",
+            },
+            if native.runtime == crate::config::RuntimeKind::Claude {
+                format!(
+                    "official CLI login required (never read by harness); {}{}",
+                    match discover_runtime("claude") {
+                        Some(path) =>
+                            format!("Claude Code discovered {path:?}; version unverified"),
+                        None => format!(
+                            "Claude Code missing; install {} on an absolute PATH entry",
+                            crate::claude::VERSION
+                        ),
+                    },
+                    match crate::claude::supported(native) {
+                        Ok(()) => String::new(),
+                        Err(error) => format!("; execution refused: {}", error.0),
+                    }
+                )
+            } else {
+                "key reference present".to_owned()
             }
         ),
         None => "disabled".to_owned(),

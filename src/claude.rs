@@ -2,8 +2,8 @@
 //! executable in print mode with stream-json input and output, on the
 //! operator's existing official login (D047). The harness owns launch,
 //! environment, deadline and cleanup; Claude Code owns the inner loop. It runs
-//! cloud-only single attempts: `deny` offers no tool (D048); `trusted` offers
-//! a fixed built-in set and answers each host permission prompt with one
+//! native single attempts (cloud-only or local-first fallback): `deny` offers
+//! no tool (D048); `trusted` offers a fixed built-in set and answers each host permission prompt with one
 //! request-bound allow-once grant (D049). A named role narrows that set to
 //! its own tools, appends its body to the system prompt and maps its effort
 //! to `--effort` (D050).

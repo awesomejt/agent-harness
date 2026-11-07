@@ -110,7 +110,12 @@ pub(crate) fn supported(request: &crate::config::Resolved) -> Result<(), crate::
     {
         crate::opencode::supports(agent)?;
     }
-    crate::opencode::prompt_supported(&request.prompt)
+    crate::opencode::prompt_supported(&request.prompt)?;
+    // Both runtime capability sets must hold before any network check or write.
+    if let Some(native) = request.fallback.as_deref() {
+        supported(native)?;
+    }
+    Ok(())
 }
 
 /// One validated request through route policy, the D034 fallback and the D043
