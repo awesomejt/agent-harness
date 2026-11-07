@@ -67,9 +67,9 @@ Read-only GitHub API/raw source and versioned npm metadata requests, plus PATH o
 
 | Pinned path | SHA-256 |
 |---|---|
-| `package.json` | `e9c967b05f1135093ae1475813ffcc87ac8d33a01f4b49c4744c364d8b4314b3` |
-| `docs/rpc.md` | `54e29df00e080c962df4fbb516dc441a9ce6805287bea61d45f3c99f92078446` |
-| `docs/extensions.md` | `d59f4ded8e49275120c8379dbeabb847267efd36e15fc21f6189026d0fbf8f22` |
-| `src/cli/args.ts` | `7db79597928e0ae100fdcaf41d6fbd9c5b841744a9f87c4745e3ad0863435e29` |
+| `packages/coding-agent/package.json` | `e9c967b05f1135093ae1475813ffcc87ac8d33a01f4b49c4744c364d8b4314b3` |
+| `packages/coding-agent/docs/rpc.md` | `54e29df00e080c962df4fbb516dc441a9ce6805287bea61d45f3c99f92078446` |
+| `packages/coding-agent/docs/extensions.md` | `d59f4ded8e49275120c8379dbeabb847267efd36e15fc21f6189026d0fbf8f22` |
+| `packages/coding-agent/src/cli/args.ts` | `7db79597928e0ae100fdcaf41d6fbd9c5b841744a9f87c4745e3ad0863435e29` |
 
 Relative Markdown links and whitespace checks are required before PR closeout. No production Rust/dependency changes; Rust/runtime suites and billable model calls are not needed for this decision task. Installed/live claims remain explicitly unverified. PR review/merge results belong in PROJECT.md.
