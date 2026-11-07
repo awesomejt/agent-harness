@@ -43,3 +43,9 @@ Supported scope and limits are explicit in the [capability matrix](../FRAMEWORKS
 ## Next boundary
 
 On merge, P7.2 is complete. The next work is a recorded target selection for **one** of P7.3 Codex, P7.4 Grok or P7.5 Gemini, based on real-use need and installed integration readiness. None is implicitly activated here. No operating-system switch is required by this closeout; each selected adapter must establish its own supported interface/version and platform evidence. P7.6 portfolio audit waits for all four adapters, then P7.7 is the mandatory holistic Phase 7 review. Phase 7 remains open and optional Phase 9 work stays gated.
+
+## PR review closeout
+
+[PR #66](https://github.com/awesomejt/agent-harness/pull/66) received one completed automated Grok review, posted under the operator's account: **0 blockers, 2 concerns, 1 nit**. All three are addressed: the driver checks for its built binary before any runtime probe or fixture setup, explicitly checks that fallback attempt 1 is OpenCode, and reports failed runs with role/mode/exit, stdout byte count and at most 1,200 characters of the harness's own diagnostics (raw provider stderr remains withheld). Targeted injected failures verify missing-build early refusal, mislabeled-primary rejection and the diagnostic bound.
+
+All four live cases pass again after these changes (cloud-only reviewer/coder: 8.0/6.1 s; local-first reviewer/coder: 13.7/11.8 s). The reviewed rerun has the same effects and counters as the table above except fallback coder tool events are 10 rather than 8; grants remain 2/2 and only `calc.py` changes. Python compilation, documentation links and whitespace checks pass. Rust and the offline runner's behavior are unchanged since the successful 134-test and 26-suite checks, so those suites were not repeated. No critical/high finding required a fix; no additional review is requested under the Git workflow and operator instruction. Acceptance takes effect on merge.

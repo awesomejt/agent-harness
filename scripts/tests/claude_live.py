@@ -37,17 +37,22 @@ def run(project, config, role, mode, prompt):
          '--mode', mode, '--agent', role, '--permissions', 'trusted', '--timeout-secs', '120',
          '--output', 'jsonl'], capture_output=True, text=True, timeout=135,
         env={**os.environ, 'AH_P72_UNUSED_KEY': 'synthetic-unused-key', 'PYTHONDONTWRITEBYTECODE': '1'})
+    # ah withholds raw provider stderr; show only a bounded tail of its own
+    # diagnostics and the stdout size, never raw response/account content.
+    assert result.returncode == 0, (role, mode, result.returncode,
+                                   f'stdout bytes: {len(result.stdout.encode())}', result.stderr[-1200:])
     records = [json.loads(line) for line in result.stdout.splitlines()]
     assert records and all(r['v'] == 1 for r in records)
     assert [r['seq'] for r in records] == list(range(len(records)))
     assert sum(r['type'] == 'result' for r in records) == 1
     final = records[-1]
-    assert result.returncode == 0 and final['type'] == 'result', (role, result.returncode)
+    assert final['type'] == 'result'
     assert final['outcome'] == 'succeeded' and final['exit'] == 0
     assert MARKER in final['response'], 'project instruction marker missing'
     attempts = final['attempts']
     assert len(attempts) == (2 if mode == 'local-first' else 1)
     if mode == 'local-first':
+        assert attempts[0]['runtime'] == 'opencode'
         assert not attempts[0]['launched'] and not attempts[0]['prompt_submitted']
     last = attempts[-1]
     assert last['runtime'] == 'claude' and last['runtime_version'] == '2.1.314'
@@ -78,6 +83,7 @@ def run(project, config, role, mode, prompt):
 
 
 def main():
+    assert BINARY.is_file(), f'missing {BINARY}; run cargo build --locked'
     assert subprocess.check_output(['claude', '--version'], text=True).startswith('2.1.314 ')
     with tempfile.TemporaryDirectory(prefix='ah-p72-live-') as tmp:
         base = Path(tmp)
