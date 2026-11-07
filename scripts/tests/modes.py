@@ -257,6 +257,18 @@ for mode in MODES:
         count += 1
 print('PASS --no-sync keeps effective validation in every mode', flush=True)
 
+# D052: a Claude fallback is valid without a native key. When LiteLLM is
+# reachable it still runs only OpenCode; all decoy native CLIs stay untouched.
+before = listener.connections
+code, err, s = run('success', config('local-first', REACHABLE,
+                                    native=dict(target='claude', model='sonnet')),
+                   env_drop=['NATIVE_KEY'])
+assert code == 0 and s['launched'] == ['local'], (code, err)
+assert_records(s['records'], 'local', REACHABLE, 'AH_RUNTIME_API_KEY')
+assert listener.settle(before, 1) == 1
+count += 1
+print('PASS Claude fallback selection retains the OpenCode primary without a native key', flush=True)
+
 # Invalid fallback/route configuration rejects before any runtime, probe or input.
 native = dict(target='opencode', model='fixture', api_key_env='NATIVE_KEY')
 REQUIRES = 'local-first requires litellm and native configuration'
@@ -266,7 +278,6 @@ invalid = [
     ('local-first without native', config('local-first', REACHABLE, native=None), (), (), REQUIRES),
     ('local-first without litellm', config('local-first', REACHABLE, litellm=None, model='fixture'), (), (), REQUIRES),
     ('local-first native target', config('local-first', REACHABLE, native={**native, 'target': 'codex'}), (), (), 'native target must be opencode'),
-    ('local-first claude target', config('local-first', REACHABLE, native={k: v for k, v in native.items() if k != 'api_key_env'} | {'target': 'claude'}), (), (), 'local-first fallback supports only native target opencode'),
     ('local-first native group model', config('local-first', REACHABLE, native={**native, 'model': 'group:coder'}), (), (), 'model must be a 1–128 byte identifier'),
     ('local-first native proxy field', config('local-first', REACHABLE, native={**native, 'api_base': REACHABLE}), (), (), 'strict version-1 JSON schema'),
     ('local-first native key missing', config('local-first', REACHABLE), (), ['NATIVE_KEY'], KEY),
