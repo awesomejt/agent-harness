@@ -52,6 +52,7 @@ python3 scripts/tests/native_runtime.py
 python3 scripts/tests/claude.py
 python3 scripts/tests/codex_feasibility_cases.py
 python3 scripts/tests/grok_feasibility_cases.py
+python3 scripts/tests/antigravity_feasibility_cases.py
 python3 scripts/tests/agents_runtime.py
 python3 scripts/tests/agent_emission_runtime.py
 python3 scripts/tests/local_first.py
@@ -103,3 +104,6 @@ P7.3's opt-in `python3 scripts/experiments/codex_feasibility.py` checks installe
 
 
 P7.4's opt-in `python3 scripts/experiments/grok_feasibility.py` reproduces installed Grok 1.0.70 inspect/ACP initialization observations in disposable synthetic HOME/GROK_HOME. Only `initialize` is allowed: no authentication, session creation or model prompt. It bounds each child to ten seconds and two MiB of combined output, sanitizes failures and kills process groups. Initialization can write support/log/index files and migrate synthetic config; this is not network-free or production isolation evidence. Exit 0 reproduces observations with the production gate explicitly unpassed (D057). `python3 scripts/tests/grok_feasibility_cases.py` exercises fake inspect/protocol failures, output/deadline limits, descendant cleanup and the RPC allowlist without installed Grok or network; it is included in `offline.py`. See [feasibility evidence](evidence/p7-4-grok-feasibility.md).
+
+
+P7.5’s opt-in `python3 scripts/experiments/antigravity_feasibility.py` reproduces installed Antigravity 1.5.3 startup and initialize-only observations on macOS. It copies only the executable into disposable state, checks an OS containment profile (network denial, operator-home data-read denial and writes confined to scratch), clears the child environment, and bounds each process to ten seconds/two MiB with group cleanup and sanitized failures. No authentication, session or model RPC is allowed. This experiment does not establish login-preserving production isolation or complete tool denial. The offline `antigravity_feasibility_cases.py` suite covers malformed responses, forbidden RPCs, output/time limits and descendant cleanup; `offline.py` includes it. See [evidence](evidence/p7-5-antigravity-feasibility.md).
