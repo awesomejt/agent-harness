@@ -82,6 +82,17 @@ def main():
             with patch.object(probe, 'TIMEOUT', 1):
                 refuses(lambda: probe.capture([sys.executable, '-c', code], root, env))
             assert not alive(int(pidfile.read_text())), 'descendant survived cleanup'
+        # Use real process discovery: start_new_session has no terminal. A
+        # simulated signal denial must not turn a live group into a gone group.
+        if sys.platform == 'darwin':
+            child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'],
+                                     start_new_session=True)
+            try:
+                with patch.object(probe.os, 'killpg', side_effect=PermissionError):
+                    refuses(lambda: probe.signal_group(child.pid, 9))
+            finally:
+                os.killpg(child.pid, 9)
+                child.wait(timeout=2)
         # Main's sanitized failure path must never expose subprocess diagnostics.
         result = subprocess.run([sys.executable, str(path), '--agy', '/nonexistent/agy'],
                                 capture_output=True, text=True, timeout=5)

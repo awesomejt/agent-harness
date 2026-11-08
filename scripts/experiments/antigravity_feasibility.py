@@ -43,7 +43,7 @@ def signal_group(pid, sig):
     except PermissionError:
         # macOS can report EPERM for a just-disappeared orphan group. Ignore it
         # only after ps confirms there are no members; live groups still fail.
-        result = subprocess.run(['/bin/ps', '-g', str(pid), '-o', 'stat='],
+        result = subprocess.run(['/bin/ps', '-x', '-g', str(pid), '-o', 'stat='],
                                 capture_output=True, timeout=2)
         check(result.returncode == 1 and not result.stdout.strip() and not result.stderr.strip())
 
@@ -125,6 +125,15 @@ def profile(root, operator_home):
             '(deny file-read-data (subpath ' + json.dumps(str(operator_home)) + '))')
 
 
+def containment_checks(read_target, write_target):
+    return ('import pathlib,socket; '
+            + 'ops=[lambda: socket.socket().bind(("127.0.0.1",0)), '
+            + 'lambda: pathlib.Path(' + repr(str(read_target)) + ').read_bytes(), '
+            + 'lambda: pathlib.Path(' + repr(str(write_target)) + ').write_text("x")]; '
+            + '\nfor op in ops:\n try: op()\n except PermissionError: pass'
+            + '\n else: raise RuntimeError("containment failed")\n')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--agy', default='agy', help='installed official CLI; never downloaded')
@@ -145,18 +154,16 @@ def main():
         env = {'HOME': str(home), 'TMPDIR': str(root), 'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
                'NO_COLOR': '1', 'TERM': 'dumb', 'LANG': 'C'}
         sandbox = ['/usr/bin/sandbox-exec', '-p', profile(root, Path.home())]
-        # Check the containment with harmless operations before starting ACP.
-        # Reading the installed executable tests the protected home path without
-        # selecting any operator configuration or credential file.
-        with tempfile.TemporaryDirectory(prefix='ah-agy-fence-') as fence:
-            checks = ('import pathlib,socket; '
-                      + 'ops=[lambda: socket.socket().bind(("127.0.0.1",0)), '
-                      + 'lambda: pathlib.Path(' + repr(str(Path(installed).resolve())) + ').read_bytes(), '
-                      + 'lambda: pathlib.Path(' + repr(str(Path(fence) / 'write')) + ').write_text("x")]; '
-                      + '\nfor op in ops:\n try: op()\n except PermissionError: pass'
-                      + '\n else: raise RuntimeError("containment failed")\n')
-            capture([*sandbox, sys.executable, '-c', checks], project, env)
-        print('PASS: network bind, operator-home binary read and outside write denied', flush=True)
+        # A synthetic home sentinel makes the denial test independent of both
+        # the installed binary and caller Python locations. Only the parent
+        # creates/removes this fixture; sandboxed children cannot read it.
+        with tempfile.TemporaryDirectory(prefix='.ah-agy-read-', dir=Path.home()) as protected:
+            read_target = Path(protected) / 'sentinel'
+            read_target.write_text('AH_READ_DENIAL_SENTINEL')
+            with tempfile.TemporaryDirectory(prefix='ah-agy-fence-') as fence:
+                checks = containment_checks(read_target, Path(fence) / 'write')
+                capture([*sandbox, '/usr/bin/python3', '-B', '-c', checks], project, env)
+        print('PASS: network bind, operator-home data read and outside write denied', flush=True)
         def run(args, data=None):
             return capture([*sandbox, str(executable), *args], project, env, data)
         out, err = run(['--version'])
