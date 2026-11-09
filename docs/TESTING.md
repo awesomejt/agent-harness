@@ -53,6 +53,7 @@ python3 scripts/tests/claude.py
 python3 scripts/tests/codex_feasibility_cases.py
 python3 scripts/tests/grok_feasibility_cases.py
 python3 scripts/tests/antigravity_feasibility_cases.py
+python3 scripts/tests/pi_feasibility_cases.py
 python3 scripts/tests/agents_runtime.py
 python3 scripts/tests/agent_emission_runtime.py
 python3 scripts/tests/local_first.py
@@ -107,3 +108,5 @@ P7.4's opt-in `python3 scripts/experiments/grok_feasibility.py` reproduces insta
 
 
 P7.5’s opt-in `python3 scripts/experiments/antigravity_feasibility.py` reproduces installed Antigravity 1.5.3 startup and initialize-only observations on macOS. It copies only the executable into disposable state, checks an OS containment profile (network denial, operator-home data-read denial and writes confined to scratch), clears the child environment, and bounds each process to ten seconds/two MiB with group cleanup and sanitized failures. No authentication, session or model RPC is allowed. This experiment does not establish login-preserving production isolation or complete tool denial. The offline `antigravity_feasibility_cases.py` suite covers malformed responses, forbidden RPCs, output/time limits and descendant cleanup; `offline.py` includes it. See [evidence](evidence/p7-5-antigravity-feasibility.md).
+
+P8.2’s opt-in `scripts/experiments/pi_feasibility.py` requires explicit installed release and Node paths; see the [exact reproduction and limits](evidence/p8-2-pi-feasibility.md). It copies and fingerprints runtime code, uses private state/allowlisted environment under verified macOS containment and allows only retry/compaction-disable plus state RPCs. No prompt or real credentials are used. The offline `pi_feasibility_cases.py` suite validates protocol/inventory/route refusals, input allowlisting, runtime fingerprints, output/deadline bounds and descendant cleanup; it joins `offline.py`. Empty inventories at startup do not close effective-control or production acceptance gates.

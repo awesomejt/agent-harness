@@ -30,6 +30,7 @@ SUITES = [
     ['scripts/tests/codex_feasibility_cases.py'],
     ['scripts/tests/grok_feasibility_cases.py'],
     ['scripts/tests/antigravity_feasibility_cases.py'],
+    ['scripts/tests/pi_feasibility_cases.py'],
     ['scripts/tests/agents_runtime.py'],
     ['scripts/tests/agent_emission_runtime.py'],
     ['scripts/tests/local_first.py'],
