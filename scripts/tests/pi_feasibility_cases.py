@@ -42,6 +42,23 @@ def validate(records=VALID, report=REPORT):
 
 def main():
     validate()
+    controls = {'retryEnabled': False, 'compactionEnabled': False, 'providerRetries': 0,
+                'settingsSentinel': 'private', 'keySource': 'environment',
+                'authOk': True, 'authOverrides': False,
+                'available': ['ah-feasibility/ah-no-inference']}
+    probe.validate_controls({'controls': controls})
+    for key, value in [('retryEnabled', True), ('compactionEnabled', True),
+                       ('providerRetries', False), ('providerRetries', 7),
+                       ('settingsSentinel', 'project'), ('keySource', 'stored'),
+                       ('authOk', False), ('authOverrides', True),
+                       ('available', ['unexpected/model'])]:
+        refuses(lambda: probe.validate_controls({'controls': {**controls, key: value}}))
+    for report in [None, [], {}, {'controls': None}]:
+        refuses(lambda: probe.validate_controls(report))
+    probe.validate_controls({'controls': {**controls, 'keySource': 'stored'}}, stored_auth=True)
+    probe.validate_controls({'controls': {**controls, 'retryEnabled': True,
+        'compactionEnabled': True, 'providerRetries': 7, 'settingsSentinel': 'project'}},
+        project_trusted=True)
     refuses(lambda: probe.unique_object([('id', 'first'), ('id', 'second')]))
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
@@ -77,6 +94,11 @@ def main():
     probe.validate(encode(VALID), encode([{**REPORT, 'skills': ['skill:inert'],
                    'templates': ['inert']}]), resources_loaded=True)
     refuses(lambda: probe.validate(encode(VALID), encode([REPORT]), resources_loaded=True))
+    unsafe_records = copy.deepcopy(VALID)
+    unsafe_records[-1]['data']['autoCompactionEnabled'] = True
+    unsafe_report = {**REPORT, 'sentinelLoaded': True}
+    refuses(lambda: probe.validate(encode(unsafe_records), encode([unsafe_report])))
+    probe.validate(encode(unsafe_records), encode([unsafe_report]), project_trusted=True)
     for out, err in [(b'not-json', encode([REPORT])), (encode(VALID), b''),
                      (encode(VALID), encode([REPORT, REPORT]))]:
         refuses(lambda: probe.validate(out, err))
