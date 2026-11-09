@@ -1,5 +1,7 @@
 # Project execution plan
 
+The [subscription action plan](SUBSCRIPTION_ACTION_PLAN.md) records the proposed adjustments after D066/D067. Its first work package reconciles this baseline and the Phase 7 portfolio; existing dependencies remain effective until a successor decision and contract changes are accepted. PROJECT.md owns current work status.
+
 Planning baseline: 2026-11-01. This turns the phase roadmap into executable work; it does not begin implementation or adopt deferred libraries. [SPECIFICATION.md](SPECIFICATION.md) owns requirements/AC01–AC11, [IMPLEMENTATION.md](IMPLEMENTATION.md) owns phase exit criteria, [PROJECT.md](../PROJECT.md) owns status, and [tasks/](../tasks/README.md) owns per-task dependencies and evidence.
 
 ## Milestones and dependencies
