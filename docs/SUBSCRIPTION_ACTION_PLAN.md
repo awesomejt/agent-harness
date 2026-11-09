@@ -1,6 +1,6 @@
 # Subscription direction: action plan
 
-Recorded 2026-11-09 from the operator's planning session. Reviewed baseline: `5af7411` (PR #80). Read this alongside [D066/D067](../DECISIONS.md#2026-11-08--d067-re-scope-around-included-subscription-usage), the [subscription findings](evidence/p7-subscription-rescope.md) and the [provider terms check](evidence/p7-native-terms-check.md).
+Recorded 2026-11-09 from the operator's planning session. Reviewed baseline: `5af7411` (PR #80). Read this alongside [D066](../DECISIONS.md#2026-11-08--d066-block-antigravity-on-consumer-plan-terms)/[D067](../DECISIONS.md#2026-11-08--d067-re-scope-around-included-subscription-usage), the [subscription findings](evidence/p7-subscription-rescope.md) and the [provider terms check](evidence/p7-native-terms-check.md).
 
 ## Purpose and authority
 
