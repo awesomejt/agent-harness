@@ -56,7 +56,22 @@ def requests():
         for ident, command in COMMANDS)
 
 
-def validate(stdout, stderr, resources_loaded=False):
+def validate_controls(report, project_trusted=False, stored_auth=False):
+    """Check this synthetic fixture; unsafe states require explicit positive-control expectations."""
+    check(isinstance(report, dict))
+    controls = report.get('controls')
+    check(isinstance(controls, dict))
+    check(controls.get('retryEnabled') is project_trusted)
+    check(controls.get('compactionEnabled') is project_trusted)
+    check(type(controls.get('providerRetries')) is int
+          and controls['providerRetries'] == (7 if project_trusted else 0))
+    check(controls.get('settingsSentinel') == ('project' if project_trusted else 'private'))
+    check(controls.get('keySource') == ('stored' if stored_auth else 'environment'))
+    check(controls.get('authOk') is True and controls.get('authOverrides') is False)
+    check(controls.get('available') == ['ah-feasibility/ah-no-inference'])
+
+
+def validate(stdout, stderr, resources_loaded=False, project_trusted=False):
     messages = [json.loads(line, object_pairs_hook=unique_object) for line in stdout.splitlines() if line.strip()]
     check(len(messages) == 3)
     reports = [json.loads(line, object_pairs_hook=unique_object) for line in stderr.splitlines() if line.strip()]
@@ -65,7 +80,8 @@ def validate(stdout, stderr, resources_loaded=False):
     check(isinstance(report, dict) and report.get('type') == 'ah_inventory')
     check(report.get('active') == [] and report.get('mcp') == [])
     check(report.get('all') == [])
-    check(report.get('sentinelLoaded') is False)
+    check(report.get('sentinelLoaded') is project_trusted)
+    check(report.get('sentinels') == (['AH_UNPLANNED_SYSTEM'] if project_trusted else []))
     check(report.get('skills') == (['skill:inert'] if resources_loaded else []))
     check(report.get('templates') == (['inert'] if resources_loaded else []))
     for message, (ident, command) in zip(messages, COMMANDS):
@@ -75,7 +91,7 @@ def validate(stdout, stderr, resources_loaded=False):
     state = messages[-1].get('data')
     check(isinstance(state, dict))
     check(state.get('isStreaming') is False and state.get('isCompacting') is False
-          and state.get('autoCompactionEnabled') is False
+          and state.get('autoCompactionEnabled') is project_trusted
           and type(state.get('messageCount')) is int and state['messageCount'] == 0
           and type(state.get('pendingMessageCount')) is int and state['pendingMessageCount'] == 0
           and 'sessionFile' not in state)
@@ -168,6 +184,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--release', required=True, type=Path, help='managed 1.5.0 release directory')
     parser.add_argument('--node', required=True, type=Path, help='tested Node 24.14.0 executable')
+    parser.add_argument('--effective-controls', action='store_true',
+                        help='also prove settings trust and synthetic credential precedence; no inference')
     args = parser.parse_args()
     check(sys.platform == 'darwin' and Path('/usr/bin/sandbox-exec').is_file())
     package = args.release / 'node_modules/@earendil-works/pi-coding-agent'
@@ -225,7 +243,7 @@ def main():
                               + json.dumps(str(marker)) + ', "unexpected"); '
                               + 'export default function() {}')
         (state / 'settings.json').write_text(json.dumps({
-            'cacheWarming': 'off', 'compaction': {'enabled': False},
+            'defaultModel': 'private', 'cacheWarming': 'off', 'compaction': {'enabled': False},
             'retry': {'enabled': False, 'provider': {'maxRetries': 0}}}))
         (state / 'models.json').write_text(json.dumps({'providers': {'ah-feasibility': {
             'baseUrl': 'http://127.0.0.1:9/v1', 'api': 'openai-completions',
@@ -233,11 +251,23 @@ def main():
         extension = root / 'inventory.mjs'
         extension.write_text("""export default function(pi) {
   pi.on('tool_call', () => ({block: true, reason: 'No inference feasibility only'}));
-  pi.on('session_start', (_event, ctx) => {
+  pi.on('session_start', async (_event, ctx) => {
+    const settings = pi.getSettings();
+    const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
+    const controls = {retryEnabled:settings.retry?.enabled,
+      compactionEnabled:settings.compaction?.enabled,
+      providerRetries:settings.retry?.provider?.maxRetries, settingsSentinel:settings.defaultModel,
+      authOk:auth.ok, authOverrides:!!auth.baseUrl || !!Object.keys(auth.headers ?? {}).length,
+      keySource:typeof auth.apiKey !== 'string' || auth.apiKey.length === 0 ? 'unset' :
+        auth.apiKey === process.env.AH_FAKE_KEY ? 'environment' :
+        auth.apiKey === 'synthetic-stored-canary' ? 'stored' : 'unexpected',
+      available:ctx.modelRegistry.getAvailable().map(m=>m.provider+'/'+m.id).sort()};
     process.stdout.write(JSON.stringify({type:'ah_inventory',
-      active:pi.getActiveTools(), all:pi.getAllTools().map(t=>t.name).sort(),
+      controls, active:pi.getActiveTools(), all:pi.getAllTools().map(t=>t.name).sort(),
       skills:pi.getCommands().filter(c=>c.source==='skill').map(c=>c.name).sort(),
       templates:pi.getCommands().filter(c=>c.source==='prompt').map(c=>c.name).sort(),
+      sentinels:['HOME','PARENT','PROJECT','SYSTEM','STATE','SKILL','TEMPLATE']
+        .map(s=>'AH_UNPLANNED_'+s).filter(s=>ctx.getSystemPrompt().includes(s)),
       mcp:pi.getMcpServers(), sentinelLoaded:ctx.getSystemPrompt().includes('AH_UNPLANNED')})+'\\n');
   });
 }
@@ -246,8 +276,47 @@ def main():
                  '--no-extensions', '--no-mcp', '--no-skills', '--no-prompt-templates',
                  '--no-themes', '--no-context-files', '--provider', 'ah-feasibility',
                  '--model', 'ah-no-inference', '-e', str(extension)]
+        if args.effective_controls:
+            flags.append('--no-approve')
+            project_settings = project / '.pi/settings.json'
+            project_settings.write_text(json.dumps({'defaultModel': 'project', 'cacheWarming': 'idle',
+                'compaction': {'enabled': True},
+                'retry': {'enabled': True, 'provider': {'maxRetries': 7}}}))
         out, err = run(flags, requests())
         validate(out, err)
+        if args.effective_controls:
+            validate_controls(json.loads(err))
+            # The extension's merged settings are not the cache-warming getter:
+            # that getter deliberately consults only the private/global layer.
+            cache_probe = root / 'cache-control.mjs'
+            manager = cli.parents[1] / 'core/settings-manager.js'
+            cache_probe.write_text('import {SettingsManager} from ' + json.dumps(manager.as_uri())
+                + '; const s=SettingsManager.create(process.cwd(),process.env.PI_CODING_AGENT_DIR,'
+                + '{projectTrusted:true}); console.log(JSON.stringify({merged:s.getSettings().cacheWarming,'
+                + 'effective:s.getCacheWarmingMode()}));')
+            cache_out, cache_err = capture([*sandbox, str(node), str(cache_probe)], project, env)
+            check(not cache_err and json.loads(cache_out) == {'merged': 'idle', 'effective': 'off'})
+            # Trust explicitly enabled only in contained no-inference positive control.
+            trusted_flags = ['--approve' if f == '--no-approve' else f for f in flags]
+            trusted_out, trusted_err = run(trusted_flags, requests())
+            # Project settings can override RPC writes to the private settings layer.
+            validate(trusted_out, trusted_err, project_trusted=True)
+            validate_controls(json.loads(trusted_err), project_trusted=True)
+            auth_file = state / 'auth.json'
+            auth_file.write_text(json.dumps({'ah-feasibility':
+                {'type': 'api_key', 'key': 'synthetic-stored-canary'}}))
+            auth_out, auth_err = run(flags, requests())
+            validate(auth_out, auth_err)
+            validate_controls(json.loads(auth_err), stored_auth=True)
+            auth_file.unlink()
+            restored_out, restored_err = run(flags, requests())
+            validate(restored_out, restored_err)
+            validate_controls(json.loads(restored_err))
+            check(project_settings.read_text() == json.dumps({'defaultModel': 'project', 'cacheWarming': 'idle',
+                'compaction': {'enabled': True},
+                'retry': {'enabled': True, 'provider': {'maxRetries': 7}}}))
+            print('PASS: --no-approve excludes project settings/SYSTEM; trusted positive control detects override; private cache warming stays off', flush=True)
+            print('PASS: synthetic stored auth overrides configured environment key; removal restores key and sole available model', flush=True)
         # Positive controls bind detection to the actual loaded command inventory.
         # With no read/bash tools Pi does not advertise skills in its prompt.
         control_out, control_err = run([flag for flag in flags if flag not in
@@ -259,7 +328,7 @@ def main():
         print('PASS: active tools=[], configured tools=[], MCP=[]; inert context absent; discovery canaries unloaded', flush=True)
         print('PASS: skill/template inventories empty; positive loading control detected', flush=True)
         print('PASS: correlated disable retry/compaction and idle synthetic model state; no session file', flush=True)
-        print('GATE OPEN: effective resource/settings/credential inventory, route capture and adversarial tool enforcement remain; no prompt sent', flush=True)
+        print('GATE OPEN: complete resource/provider inventory, trapped HTTP route and adversarial tool enforcement remain; no prompt sent', flush=True)
 
 
 if __name__ == '__main__':
