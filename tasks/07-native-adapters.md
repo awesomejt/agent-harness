@@ -30,7 +30,7 @@ P7.3 is delivered in focused increments. First record target/interface selection
 - **Depends on:** [P7.1](07-native-adapters.md#p7-1)
 - **Deliverable and boundary:** For Codex, deliver narrow PRs for supported launch/authentication, progress/terminal mapping, model/effort, cancellation and constrained agent mapping. Include capability/setup docs as part of this adapter, not only at Phase 7 closeout.
 - **Acceptance evidence:** Fixture/policy/lifecycle tests plus one live project task and enforced constrained-role evidence. Unsupported features/version/platform limits are documented before advertising support.
-- **Decision/readiness gate:** Activation gate: Codex is the currently selected target from P7.1 or a later recorded selection. Reuse official authentication; no token scraping or prohibited proxying. Deprioritized by [D067](../DECISIONS.md#2026-11-08--d067-re-scope-around-included-subscription-usage): OpenCode or Pi on the ChatGPT plan is the preferred OpenAI path; this adapter stays paused under D055 and is not retired.
+- **Decision/readiness gate:** Reactivation gate under D068: explicitly select Codex, satisfy its original control/terms evidence and deliver a separately reviewed increment; historical P7.1 selection alone does not reactivate it. Reuse official authentication; no token scraping or prohibited proxying. Deprioritized by [D067](../DECISIONS.md#2026-11-08--d067-re-scope-around-included-subscription-usage): OpenCode or Pi on the ChatGPT plan is the preferred OpenAI path; this adapter stays paused under D055 and is not retired.
 - **Contract:** [docs/EXECUTION.md](../docs/EXECUTION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
 <a id="p7-4"></a>
@@ -39,7 +39,7 @@ P7.3 is delivered in focused increments. First record target/interface selection
 - **Depends on:** [P7.1](07-native-adapters.md#p7-1)
 - **Deliverable and boundary:** For Grok, deliver narrow PRs for supported launch/authentication, progress/terminal mapping, model/effort, cancellation and constrained agent mapping. Include capability/setup docs as part of this adapter, not only at Phase 7 closeout.
 - **Acceptance evidence:** Fixture/policy/lifecycle tests plus one live project task and enforced constrained-role evidence. Unsupported features/version/platform limits are documented before advertising support.
-- **Decision/readiness gate:** Activation gate: Grok is the currently selected target from P7.1 or a later recorded selection. Reuse official authentication; no token scraping or prohibited proxying. [D067](../DECISIONS.md#2026-11-08--d067-re-scope-around-included-subscription-usage) keeps SuperGrok use first-party while xAI has no statement on third-party ACP clients; the adapter stays paused under D058.
+- **Decision/readiness gate:** Reactivation gate under D068: explicitly select Grok, satisfy its original control/terms evidence and deliver a separately reviewed increment; historical P7.1 selection alone does not reactivate it. Reuse official authentication; no token scraping or prohibited proxying. [D067](../DECISIONS.md#2026-11-08--d067-re-scope-around-included-subscription-usage) keeps SuperGrok use first-party while xAI has no statement on third-party ACP clients; the adapter stays paused under D058.
 - **Contract:** [docs/EXECUTION.md](../docs/EXECUTION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
 <a id="p7-5"></a>
@@ -52,7 +52,7 @@ D061 replaces the former Gemini CLI target at the same stable task ID. First pro
 - **Depends on:** [P7.1](07-native-adapters.md#p7-1)
 - **Deliverable and boundary:** For Antigravity, deliver narrow PRs for supported launch/authentication, progress/terminal mapping, model/effort, cancellation and constrained agent mapping. Include capability/setup docs as part of this adapter, not only at Phase 7 closeout.
 - **Acceptance evidence:** Fixture/policy/lifecycle tests plus one live project task and enforced constrained-role evidence. Unsupported features/version/platform limits are documented before advertising support.
-- **Decision/readiness gate:** Activation gate: Antigravity is the currently selected target from P7.1 or a later recorded selection. Reuse official authentication; no token scraping or prohibited proxying. Blocked: D066's terms condition and D063's control gate must both be met.
+- **Decision/readiness gate:** Reactivation gate under D068: explicitly select Antigravity, satisfy its original control/terms evidence and deliver a separately reviewed increment; historical P7.1 selection alone does not reactivate it. Reuse official authentication; no token scraping or prohibited proxying. Blocked: D066's terms condition and D063's control gate must both be met.
 - **Contract:** [docs/EXECUTION.md](../docs/EXECUTION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
 <a id="p7-8"></a>
