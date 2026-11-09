@@ -7,18 +7,18 @@ This record collects what the operator and this session established on 2026-11-0
 ## Operator constraints (settled)
 
 1. **No metered API spend** unless the usage is covered by an allowance or credit included in a subscription. Unpredictable API bills are the problem to avoid.
-2. **A hard stop beats overage.** A "usage limit reached" error is acceptable; an unexpected bill is not. Overage switches stay off: OpenAI's "Allow other apps to use credits after reaching your usage limit" and OpenCode Go's **Extra Usage**.
-3. **Subscription routes are for runs the operator starts on their own account.** Nothing that lets other people trigger runs on a subscription login, such as a Hermes bot that others can prompt. Every provider's terms bar making the account available to others.
-4. **Gemini is a hard pass for now.** The consumer Google login is blocked by D066. Google AI Pro's $10/month Google Cloud credit ([Developer Program FAQ](https://developers.google.com/profile/help/benefits)) sits on a normal Cloud billing account, and no hard spend cap was confirmed. The operator also wants to protect a Google account that holds a lot of their other data.
+2. **A hard stop beats overage.** A "usage limit reached" error is acceptable; an unexpected bill is not. Overage switches stay off: OpenAI's "Allow other apps to use credits after reaching your usage limit" ([Sign in with ChatGPT](https://learn.chatgpt.com/docs/sign-in-with-chatgpt)) and OpenCode Go's **Extra Usage** ([Go docs](https://opencode.ai/docs/console/go/)).
+3. **Subscription routes are for runs the operator starts on their own account.** Nothing that lets other people trigger runs on a subscription login, such as a Hermes bot that others can prompt. Every provider's terms bar making the account available to others: [Anthropic](https://www.anthropic.com/legal/consumer-terms), [OpenAI](https://openai.com/policies/terms-of-use/), [xAI](https://x.ai/legal/terms-of-service); quoted in the [terms check](p7-native-terms-check.md).
+4. **Gemini is a hard pass for now.** The consumer Google login is blocked by D066 ([Antigravity FAQ](https://antigravity.google/docs/faq/)). Google AI Pro's $10/month Google Cloud credit ([Developer Program FAQ](https://developers.google.com/profile/help/benefits)) sits on a normal Cloud billing account, and no hard spend cap was confirmed. The operator also wants to protect a Google account that holds a lot of their other data.
 
 ## Subscription inventory
 
 | Subscription | Included usage | How the harness may use it | Status |
 |---|---|---|---|
-| Claude (Pro/Max) | Plan limits; no API credits | Official `claude` CLI only (P7.2, D047) | Accepted adapter. Operator accepts the terms position in D067, with a re-check date. |
+| Claude (Pro/Max) | Plan limits; no API credits | Official `claude` CLI only (P7.2, D047; [Claude Code legal and compliance](https://code.claude.com/docs/en/legal-and-compliance)) | Accepted adapter. Operator accepts the terms position in D067, with a re-check date. |
 | ChatGPT (Plus/Pro) | Codex/ChatGPT plan limits | OpenCode or Pi via [Sign in with ChatGPT](https://learn.chatgpt.com/docs/sign-in-with-chatgpt), which officially lists both | Preferred OpenAI path. Harness support is not built: OpenCode `cloud-only` accepts only an API key today, and D060 excluded Pi subscription clients. The `codex` adapter (P7.3) stays paused. |
 | OpenCode Go ($10/month individual) | Per-model monthly allowances (below) | OpenCode or Pi as native clients; possibly LiteLLM (open question) | Not wired. Placement is open. |
-| SuperGrok | One weekly pool across Grok products ([Grok FAQ](https://docs.x.ai/grok/faq)) | None from the harness for now. First-party Grok Build and Grok Bot PR review only | P7.4 stays paused (D058). xAI has no statement either way on third-party ACP clients. |
+| SuperGrok | One weekly pool across Grok products ([Grok FAQ](https://docs.x.ai/grok/faq)) | None from the harness for now. First-party Grok Build and Grok Bot PR review only ([Build overview](https://docs.x.ai/build/overview), [terms](https://x.ai/legal/terms-of-service)) | P7.4 stays paused (D058). xAI has no statement either way on third-party ACP clients. |
 | Google AI Pro | Consumer limits plus $10/month Cloud credit | None | Blocked (D066); Gemini excluded by constraint 4. |
 | Local models | No provider limit | LiteLLM (D002) | Working today. |
 
@@ -91,7 +91,7 @@ P7.6/P7.7 are defined over four native targets. Antigravity is blocked (D066). C
 
 ## Related: GitHub-native workflow
 
-The operator's current workflow runs first-party agents through GitHub: Claude or Codex do the work and open a PR, and Grok Bot reviews it. Claude and Codex also accept tasks remotely from their mobile apps. Every step stays inside each provider's own product, on subscription allowances, so it raises none of the third-party-client questions above. It complements the harness: GitHub-native agents for unattended or away-from-desk work, and `ah` for local, repeatable project loops with enforced permissions and local fallback. This is an observation, not a feature commitment.
+The operator's current workflow runs first-party agents through GitHub: Claude or Codex do the work and open a PR, and Grok Bot reviews it. Claude and Codex also accept tasks remotely from their mobile apps. No provider sources were checked for this section; re-read each provider's own product terms before extending it. Every step stays inside each provider's own product, on subscription allowances, so it raises none of the third-party-client questions above. It complements the harness: GitHub-native agents for unattended or away-from-desk work, and `ah` for local, repeatable project loops with enforced permissions and local fallback. This is an observation, not a feature commitment.
 
 ## Validation
 
