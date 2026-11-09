@@ -81,6 +81,7 @@ def validate(stdout, stderr, resources_loaded=False, project_trusted=False):
     check(report.get('active') == [] and report.get('mcp') == [])
     check(report.get('all') == [])
     check(report.get('sentinelLoaded') is project_trusted)
+    check(report.get('sentinels') == (['AH_UNPLANNED_SYSTEM'] if project_trusted else []))
     check(report.get('skills') == (['skill:inert'] if resources_loaded else []))
     check(report.get('templates') == (['inert'] if resources_loaded else []))
     for message, (ident, command) in zip(messages, COMMANDS):
@@ -257,13 +258,16 @@ def main():
       compactionEnabled:settings.compaction?.enabled,
       providerRetries:settings.retry?.provider?.maxRetries, settingsSentinel:settings.defaultModel,
       authOk:auth.ok, authOverrides:!!auth.baseUrl || !!Object.keys(auth.headers ?? {}).length,
-      keySource:auth.apiKey === process.env.AH_FAKE_KEY ? 'environment' :
+      keySource:typeof auth.apiKey !== 'string' || auth.apiKey.length === 0 ? 'unset' :
+        auth.apiKey === process.env.AH_FAKE_KEY ? 'environment' :
         auth.apiKey === 'synthetic-stored-canary' ? 'stored' : 'unexpected',
       available:ctx.modelRegistry.getAvailable().map(m=>m.provider+'/'+m.id).sort()};
     process.stdout.write(JSON.stringify({type:'ah_inventory',
       controls, active:pi.getActiveTools(), all:pi.getAllTools().map(t=>t.name).sort(),
       skills:pi.getCommands().filter(c=>c.source==='skill').map(c=>c.name).sort(),
       templates:pi.getCommands().filter(c=>c.source==='prompt').map(c=>c.name).sort(),
+      sentinels:['HOME','PARENT','PROJECT','SYSTEM','STATE','SKILL','TEMPLATE']
+        .map(s=>'AH_UNPLANNED_'+s).filter(s=>ctx.getSystemPrompt().includes(s)),
       mcp:pi.getMcpServers(), sentinelLoaded:ctx.getSystemPrompt().includes('AH_UNPLANNED')})+'\\n');
   });
 }

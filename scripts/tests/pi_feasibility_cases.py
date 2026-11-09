@@ -14,7 +14,7 @@ path = Path(__file__).resolve().parents[1] / 'experiments/pi_feasibility.py'
 spec = importlib.util.spec_from_file_location('pi_probe', path)
 probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)
-REPORT = {'type': 'ah_inventory', 'active': [], 'all': [], 'mcp': [], 'skills': [], 'templates': [], 'sentinelLoaded': False}
+REPORT = {'type': 'ah_inventory', 'active': [], 'all': [], 'mcp': [], 'skills': [], 'templates': [], 'sentinelLoaded': False, 'sentinels': []}
 STATE = {'isStreaming': False, 'isCompacting': False, 'autoCompactionEnabled': False,
          'messageCount': 0, 'pendingMessageCount': 0, 'model': {
              'provider': 'ah-feasibility', 'id': 'ah-no-inference',
@@ -50,6 +50,7 @@ def main():
     for key, value in [('retryEnabled', True), ('compactionEnabled', True),
                        ('providerRetries', False), ('providerRetries', 7),
                        ('settingsSentinel', 'project'), ('keySource', 'stored'),
+                       ('keySource', 'unset'), ('keySource', 'unexpected'),
                        ('authOk', False), ('authOverrides', True),
                        ('available', ['unexpected/model'])]:
         refuses(lambda: probe.validate_controls({'controls': {**controls, key: value}}))
@@ -96,9 +97,13 @@ def main():
     refuses(lambda: probe.validate(encode(VALID), encode([REPORT]), resources_loaded=True))
     unsafe_records = copy.deepcopy(VALID)
     unsafe_records[-1]['data']['autoCompactionEnabled'] = True
-    unsafe_report = {**REPORT, 'sentinelLoaded': True}
+    unsafe_report = {**REPORT, 'sentinelLoaded': True, 'sentinels': ['AH_UNPLANNED_SYSTEM']}
     refuses(lambda: probe.validate(encode(unsafe_records), encode([unsafe_report])))
     probe.validate(encode(unsafe_records), encode([unsafe_report]), project_trusted=True)
+    for sentinels in [[], ['AH_UNPLANNED_PROJECT'], ['AH_UNPLANNED_SYSTEM', 'AH_UNPLANNED_HOME']]:
+        refuses(lambda: probe.validate(encode(unsafe_records),
+            encode([{**unsafe_report, 'sentinels': sentinels}]), project_trusted=True))
+    refuses(lambda: validate(report={**REPORT, 'sentinels': ['AH_UNPLANNED_SYSTEM']}))
     for out, err in [(b'not-json', encode([REPORT])), (encode(VALID), b''),
                      (encode(VALID), encode([REPORT, REPORT]))]:
         refuses(lambda: probe.validate(out, err))
