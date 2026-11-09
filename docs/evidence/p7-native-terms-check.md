@@ -1,10 +1,10 @@
 # Phase 7 evidence — provider terms for harness-driven native CLIs
 
-2026-11-08. Entry: `6b5dd12` (merged PR #79). Tasks: [P7.2](../../tasks/07-native-adapters.md#p7-2), [P7.3](../../tasks/07-native-adapters.md#p7-3), [P7.4](../../tasks/07-native-adapters.md#p7-4), [P7.5](../../tasks/07-native-adapters.md#p7-5). Decision: [D066](../../DECISIONS.md#2026-11-08--d066-block-antigravity-on-consumer-plan-terms).
+2026-11-08. Entry: `6b5dd12` (merged PR #79). Tasks: [P7.2](../../tasks/07-native-adapters.md#p7-2), [P7.3](../../tasks/07-native-adapters.md#p7-3), [P7.4](../../tasks/07-native-adapters.md#p7-4), [P7.5](../../tasks/07-native-adapters.md#p7-5). Decisions: [D066](../../DECISIONS.md#2026-11-08--d066-block-antigravity-on-consumer-plan-terms), [D067](../../DECISIONS.md#2026-11-08--d067-re-scope-around-included-subscription-usage). Subscription re-scope findings: [p7-subscription-rescope.md](p7-subscription-rescope.md).
 
 ## Question and method
 
-For each committed native adapter, what does the provider's current official wording say about **driving its official CLI, signed in with a consumer or subscription login, from a third-party orchestrator or protocol client** such as `ah`? The harness launches the unmodified official CLI as a local subprocess for the operator's own use, and the CLI owns login (D001/D047).
+For each committed native adapter, plus the operator's OpenCode Go subscription (added later the same day), what does the provider's current official wording say about **driving its official CLI, signed in with a consumer or subscription login, from a third-party orchestrator or protocol client** such as `ah`? The harness launches the unmodified official CLI as a local subprocess for the operator's own use, and the CLI owns login (D001/D047).
 
 Every source below was read on 2026-11-08 from the provider's own domain, except the one forum thread, which is labelled as such. Quotations are short excerpts, not the whole text. **This record quotes and compares sources. It makes no legal conclusion and no account-specific entitlement claim.** Provider pages change without notice; re-read them before relying on this record.
 
@@ -15,11 +15,12 @@ No CLI was run, no login, session or inference occurred, and no credential was r
 | Adapter | Login form in scope | Most specific official statement found | Looks like Antigravity's FAQ? |
 |---|---|---|---|
 | Antigravity (P7.5) | Google AI Pro consumer login | FAQ: wrapping `agy` in third-party agents or applications "is not supported under consumer plans"; third-party access can lead to suspension | **Yes — this is the source case.** Blocked by D066. |
-| Claude Code (P7.2) | Claude Pro/Max/Ultra login | Legal page: OAuth is for "ordinary use of Claude Code"; developers of products and Agent SDK users "should use API key authentication"; it does not "prevent an end user from signing in to the unmodified Claude Code binary with their own Claude subscription" | **Partly.** No "not supported" statement for wrapping, but automated-access and Agent SDK wording leaves the harness case unaddressed. Open question, not a block. |
-| Codex (P7.3) | ChatGPT plan login | Auth docs recommend API keys "for programmatic Codex CLI workflows" and "as the recommended default for automation"; Terms of Use bar programmatic Output extraction | **Partly.** No explicit statement on third-party clients with plan login. Open question; already paused by D055. |
+| Claude Code (P7.2) | Claude Pro/Max/Ultra login | Legal page: OAuth is for "ordinary use of Claude Code"; developers of products and Agent SDK users "should use API key authentication"; it does not "prevent an end user from signing in to the unmodified Claude Code binary with their own Claude subscription" | **Partly.** No "not supported" statement for wrapping, but automated-access and Agent SDK wording leaves the harness case unaddressed. No block; D067 records the operator's acceptance with a re-check date. |
+| Codex / OpenAI (P7.3) | ChatGPT Plus/Pro login | [Sign in with ChatGPT](https://learn.chatgpt.com/docs/sign-in-with-chatgpt): in supported apps, Plus and Pro subscribers "can also choose to use their ChatGPT plan for AI requests"; the page lists OpenClaw, OpenCode and Pi. Auth docs still recommend API keys "as the recommended default for automation" | **No.** OpenAI officially allows plan use in listed third-party apps. A third-party orchestrator driving the `codex` CLI itself is still not addressed. |
+| OpenCode Go (not a P7 adapter) | Go subscription API key | [Go docs](https://opencode.ai/docs/console/go/): "designed for OpenCode and other coding agents that produce similar types of requests"; lists validated clients including Pi, Hermes, Claude Code and Codex | **No.** Use in other coding agents is documented, with client conditions. |
 | Grok (P7.4) | SuperGrok / X Premium login | Build docs describe ACP "in other apps" and headless "integration into other apps"; terms bar credential sharing; AUP bars "using bots to access" | **No explicit statement either way** on subscription login under a third-party ACP client. Open question; already paused by D058. |
 
-Only Antigravity has an official statement that names this setup and says it is unsupported on consumer plans.
+Only Antigravity has an official statement that names this setup and says it is unsupported on consumer plans. OpenAI and OpenCode Go are the only ones with official statements allowing subscription use in third-party coding tools.
 
 ## Antigravity (Google)
 
@@ -58,7 +59,7 @@ The FAQ text is the same as the wording the operator's session recorded earlier 
 
 **[Run Claude Code programmatically](https://code.claude.com/docs/en/headless)** describes `claude -p` as using "the Agent SDK via the CLI" for "scripts and CI/CD". Its `--bare` example says to set an API key "because bare mode doesn't use your subscription login".
 
-**Comparison.** The legal page explicitly allows the end user to sign in to the unmodified binary with their own subscription, and it forbids intermediating credentials. The harness does neither of the forbidden things: P7.2 runs the unmodified `claude` binary for the operator alone, and the CLI owns login. The legal page also says ordinary usage of "Claude Code and the Agent SDK" is assumed, which mentions programmatic use alongside plan limits. Still, the sources leave a gap. They do not say whether `claude -p` under a plan login, launched by a personal orchestrator, counts as "ordinary, individual usage" or as automated access the provider "explicitly permit[s]". There is no statement like Antigravity's saying wrapping is unsupported. **Flag: partly similar. Record as an open question for the operator.** This check does not change the accepted P7.2 status. The [P7.1 Claude selection](p7-1-claude-selection.md) (2026-11-05) recorded the same plan-login boundary.
+**Comparison.** The legal page explicitly allows the end user to sign in to the unmodified binary with their own subscription, and it forbids intermediating credentials. The harness does neither of the forbidden things: P7.2 runs the unmodified `claude` binary for the operator alone, and the CLI owns login. The legal page also says ordinary usage of "Claude Code and the Agent SDK" is assumed, which mentions programmatic use alongside plan limits. Still, the sources leave a gap. They do not say whether `claude -p` under a plan login, launched by a personal orchestrator, counts as "ordinary, individual usage" or as automated access the provider "explicitly permit[s]". There is no statement like Antigravity's saying wrapping is unsupported. **Flag: partly similar.** P7.2 is an accepted adapter running on a plan login today, so the gap is not hypothetical. [D067](../../DECISIONS.md#2026-11-08--d067-re-scope-around-included-subscription-usage) records the operator's explicit choice: accept the P7.2 plan-login use for runs the operator starts on their own account, never triggered by other people, with a dated re-check. This check does not change the accepted P7.2 status. The [P7.1 Claude selection](p7-1-claude-selection.md) (2026-11-05) recorded the same plan-login boundary.
 
 ## Codex (OpenAI)
 
@@ -74,7 +75,15 @@ The FAQ text is the same as the wording the operator's session recorded earlier 
 
 **[OpenAI Terms of Use](https://openai.com/policies/terms-of-use/)** (effective January 1, 2026) prohibit you to "Automatically or programmatically extract data or Output" and to "circumvent any rate limits or restrictions". They prohibit sharing account credentials or making the account available to others, and allow suspension or termination for breach.
 
-**Comparison.** OpenAI documents app-server for rich clients and product integrations, and it recommends API keys for automation. It has no explicit statement on a third-party client driving Codex with a ChatGPT plan login, either allowing or forbidding it. The Terms of Use clause on programmatic Output extraction is general, and none of these sources apply it to Codex. **Flag: partly similar (an API key is recommended for automation; plan-login orchestration is not addressed). Open question.** P7.3 is already paused under D055 for control reasons.
+**[Sign in with ChatGPT](https://learn.chatgpt.com/docs/sign-in-with-chatgpt)** (no page date; read 2026-11-08, after the first version of this record):
+
+- "In supported apps, eligible ChatGPT Plus and Pro subscribers can also choose to use their ChatGPT plan for AI requests."
+- "App usage counts toward your existing plan limits." The plan "uses your Codex / ChatGPT work usage included in your plan."
+- The page lists open-source integrations including OpenClaw, OpenCode and Pi.
+- A setting, "Allow other apps to use credits after reaching your usage limit", lets apps spend credits beyond the plan limit. D067 keeps it off.
+- The page lists no personal-use, automation or resale restrictions.
+
+**Comparison.** *Corrected 2026-11-08.* The first version of this record missed the Sign in with ChatGPT page and called OpenAI "partly similar". OpenAI officially lets listed third-party coding tools, including OpenCode and Pi, use a ChatGPT plan. That is the opposite of Google's consumer-plan position. OpenAI still recommends API keys for automation, and its sources do not directly address a third-party orchestrator driving the `codex` CLI on a plan login. The Terms of Use clause on programmatic Output extraction is general, and none of these sources apply it to Codex. **Flag: not like Antigravity.** D067 makes OpenCode/Pi on the ChatGPT plan the preferred OpenAI path. P7.3 stays paused under D055.
 
 ## Grok (xAI / SpaceXSI)
 
@@ -82,16 +91,34 @@ The FAQ text is the same as the wording the operator's session recorded earlier 
 
 **[Headless and scripting](https://docs.x.ai/build/cli/headless-scripting)** (read 2026-11-08): "Use ACP when you want IDE or tool integration rather than a terminal session." Its ACP example "assumes `grok` is already authenticated locally, or `XAI_API_KEY` is set", so it accepts either a cached login or an API key. It has no terms or unsupported-use statements.
 
-**[Consumer Terms of Service](https://x.ai/legal/terms-of-service)** (last updated October 27, 2026; read 2026-11-08 in a browser because the plain fetch returned 403): "You may not share your account credentials or make your account available to anyone else". The terms cover "Agentic Actions" such as code execution and modifying files, and they make the user responsible for them. They allow suspension or termination at xAI's discretion for breach of the Terms or the Acceptable Use Policy. They say nothing specific about third-party clients or Grok Build.
+**[Consumer Terms of Service](https://x.ai/legal/terms-of-service)** (last updated October 27, 2026; the page names the provider "SpaceX Super Intelligence LLC (“SpaceXSI”)", which is the current operator of Grok, not a typo; read 2026-11-08 in a browser because the plain fetch returned 403): "You may not share your account credentials or make your account available to anyone else". The terms cover "Agentic Actions" such as code execution and modifying files, and they make the user responsible for them. They allow suspension or termination at xAI's discretion for breach of the Terms or the Acceptable Use Policy. They say nothing specific about third-party clients or Grok Build.
 
 **[Acceptable Use Policy](https://x.ai/legal/acceptable-use-policy)** (read 2026-11-08) lists "using bots to access" the Service among examples of detrimentally affecting it. The list also includes copying, reselling and reverse engineering. It says not to "circumvent safeguards".
 
 **Comparison.** xAI's own Build docs describe ACP use "in other apps" and headless "integration into other apps", and do not limit this to API-key accounts. The general AUP wording on "using bots to access" is not applied to Grok Build in any source found. No official statement says subscription login is unsupported under a third-party ACP client. **Flag: no Antigravity-like statement found. Open question.** Third-party GitHub and community pages disagree about how the terms apply; none is an official source, and none is relied on here. P7.4 is already paused under D058 for control reasons.
 
+## OpenCode Go (OpenCode)
+
+Not a Phase 7 native adapter. It is the operator's metered-but-capped subscription for hosted open-weight (and some closed) models. It is included here because D067 inventories every current subscription.
+
+**[OpenCode Go docs](https://opencode.ai/docs/console/go/)** (no terms-of-service link on the page; read 2026-11-08):
+
+- Go is "designed for OpenCode and other coding agents that produce similar types of requests." The page has setup guides for Claude Code, Codex, Hermes, Pi and Raycast.
+- **Validated clients:** Hermes, Claude Code, Codex, ZCode, Pi, jcode and Kilo Code CLI. Most need a minimum version; future compatibility is not guaranteed.
+- **Known problematic clients:** DeepSeek Harness, GitHub Copilot Chat, Kimi Code and MiMo Code, because of missing or incomplete session support.
+- **Client conditions:** send typical coding-agent traffic; identify with the client's own user agent, "not a generic SDK or HTTP-library name"; send a stable session ID in `x-opencode-session`. Proxies should preserve that header. "Traffic is monitored for abuse that degrades the experience for other users."
+- **Limits:** per-model monthly dollar allowances at the listed prices, with 5-hour (20%), weekly (50%) and monthly (100%) windows. At the limit, requests stop unless **Extra Usage** (pay-as-you-go from a credit balance) is turned on. It is off by default except on Go Teams.
+
+**Comparison.** Use from other coding agents is explicitly documented. **Flag: not like Antigravity.** The client conditions matter for routing: OpenCode and Pi are native clients, and a LiteLLM route would have to keep the session header and send an acceptable user agent (see [re-scope findings](p7-subscription-rescope.md)).
+
 ## Consequences
 
 - **Antigravity:** D066 blocks P7.5 on consumer-plan terms as well as the D063 control gate.
-- **Claude, Codex, Grok:** no source found says this setup is unsupported. Each has general automated-access, API-key-preference or credential wording that its own sources do not apply to a personal local orchestrator using the official CLI. D066 records these as open questions. It adds no new block and does not change P7.2's acceptance. Before resuming Codex or Grok, and when the operator chooses for Claude, re-read the sources above. Where the operator wants certainty, ask the provider in writing.
+- **Claude:** D067 records the operator's acceptance of P7.2's plan-login use, limited to operator-started runs, with a dated re-check.
+- **OpenAI:** officially allows plan use in listed third-party tools (OpenCode, Pi). D067 prefers that path over the `codex` adapter.
+- **Grok:** no official statement either way. Subscription use stays first-party (Grok Build, Grok Bot) under D067. Re-read the sources before resuming P7.4.
+- **OpenCode Go:** use in other coding agents is documented, subject to the client conditions above.
+- Where the operator wants certainty, ask the provider in writing.
 - No adapter's sources permit sharing, copying or intermediating credentials. D047 already forbids all three.
 
 ## Validation
