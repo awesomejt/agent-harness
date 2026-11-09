@@ -1,6 +1,6 @@
 # Project execution plan
 
-The [subscription action plan](SUBSCRIPTION_ACTION_PLAN.md) records the proposed adjustments after D066/D067. Its first work package reconciles this baseline and the Phase 7 portfolio; existing dependencies remain effective until a successor decision and contract changes are accepted. PROJECT.md owns current work status.
+D068 implements work package 1 of the [subscription action plan](SUBSCRIPTION_ACTION_PLAN.md): the Phase 7 selected portfolio is existing OpenCode/LiteLLM, Claude and separately gated OpenCode ChatGPT-plan/Go routes. Codex/Grok remain deferred and Antigravity blocked outside mandatory closure. Pi stays independent; F27/F28 stay candidates. PROJECT.md owns current work status; historical phase order below remains traceable.
 
 Planning baseline: 2026-11-01. This turns the phase roadmap into executable work; it does not begin implementation or adopt deferred libraries. [SPECIFICATION.md](SPECIFICATION.md) owns requirements/AC01–AC11, [IMPLEMENTATION.md](IMPLEMENTATION.md) owns phase exit criteria, [PROJECT.md](../PROJECT.md) owns status, and [tasks/](../tasks/README.md) owns per-task dependencies and evidence.
 
@@ -21,8 +21,12 @@ flowchart TD
     Sequence --> R5[P5.6 - holistic phase review]
     R5 --> Ralph[Phase 6 - Ralph evidence]
     Ralph --> R6[P6.5 - holistic phase review]
-    R4 --> Native[Phase 7 - all committed adapters]
-    Native --> R7[P7.7 - holistic portfolio review]
+    R4 --> Native[Phase 7 - selected local and subscription routes]
+    Native --> Integrated[P7.13 - integrated portfolio acceptance]
+    R5 --> Integrated
+    R6 --> Integrated
+    Integrated --> Audit[P7.6 - portfolio audit]
+    Audit --> R7[P7.7 - holistic portfolio review]
     R4 --> Pi[Phase 8 - Pi single-run milestone]
     Pi --> PiParity[Phase 8 - workflow parity evidence]
     R6 --> PiParity
@@ -33,7 +37,7 @@ flowchart TD
     Schedule -->|selected scope| R9
 ```
 
-Quota now requires the full Phase 7 review P7.7 plus demand and a relevant non-spending usage path; D018 supersedes the earlier first-completed-adapter shortcut. Phase 8 initial single-run support may ship after core MVP; complete workflow parity waits for Phase 6. Quota/ranking and scheduling are independent optional increments; neither blocks core workflows.
+Quota requires the selected-portfolio Phase 7 review P7.7 under D068 plus demand and a relevant non-spending usage path; D018 supersedes the earlier first-completed-adapter shortcut. Phase 8 initial single-run support may ship after core MVP; complete workflow parity waits for Phase 6. Quota/ranking and scheduling are independent optional increments; neither blocks core workflows.
 
 ## Recommended order and PR boundaries
 
@@ -45,25 +49,21 @@ Quota now requires the full Phase 7 review P7.7 plus demand and a relevant non-s
 | Core MVP | P4.1 → P4.2 → P4.3 → P4.7/P4.8 → P4.4 → P4.5 → P4.6 → P4.9 | Agent schema/emitter/constraints; machine output and capability documentation; role acceptance; release support; AC01–AC11 closeout. |
 | Sequences | P5.5 → P5.1 → P5.2 → P5.3 → P5.4 → P5.6 | Trusted checks (first, per the Phase 4 review and D043); state/context decision; ordered execution; durable resume; interrupted live task. |
 | Ralph | P6.1 → P6.2 → P6.3 → P6.4 → P6.5 | Completion contract; iteration coordinator; verification/bounds; real completion/non-completion/recovery. |
-| Native portfolio | P7.1 → selected P7.2/P7.3/P7.4/P7.5, one at a time → P7.6 → P7.7 | Each adapter may have launch/events, permissions/mapping and acceptance PRs. Docs and live evidence ship with each adapter. Portfolio closure waits for all four. |
+| Local/subscription portfolio | P7.8 → P7.9 → P7.10 → P7.11/P7.12 → P7.13 → P7.6 → P7.7 | Separate pinned ChatGPT/Go feasibility, then explicit routes in evidence-selected order. Existing local/Claude regression and workflow acceptance P7.13 require P5.6/P6.5. Paused P7.3–P7.5 retain gates outside closure. |
 | Pi | P8.1 → P8.2 → P8.3; then P8.4 after P6.5 → P8.5 | Integration decision; adapter; primary/specialized live use; later common-workflow regression. |
 | Optional resources | P9.1 → P9.2 if selected; P9.3 independently after P5.6; P9.4 evidence then P9.5 review per selected increment | After P7.7 for quota, or P5.6 for scheduling, demand decision first. P9.5 reviews the entire selected increment set; newly selected work reopens the gate without forcing other optional scope. |
 
-A slash between P2.7/P2.8 or P4.7/P4.8 denotes sibling tasks that are both required; a slash between native-adapter IDs denotes target choices activated one at a time. It does not authorize simultaneous agents or impose a provider order. Default work-in-progress limit is one active implementation task/PR. Tightly coupled work may share a PR with prerequisite evidence produced before consumption; broad cards should be split into small PRs rather than one phase-sized change. Task IDs remain stable even when work order differs from numeric order.
+A slash between P2.7/P2.8 or P4.7/P4.8 denotes sibling tasks that are both required; the slash between P7.11/P7.12 denotes separately required routes delivered one at a time in evidence-selected order. It does not authorize simultaneous agents or impose a provider order. Default work-in-progress limit is one active implementation task/PR. Tightly coupled work may share a PR with prerequisite evidence produced before consumption; broad cards should be split into small PRs rather than one phase-sized change. Task IDs remain stable even when work order differs from numeric order.
 
 ## Phase review gates
 
 Every phase includes an explicit whole-phase review after acceptance evidence is assembled. Use [PHASE_REVIEW.md](PHASE_REVIEW.md), record all findings/fixes/verification in docs/reviews/, and keep the phase open until no unresolved finding remains and required review/fix PRs merge. These reviews are additional to individual PR reviews. Successor dependencies consume accepted review tasks, not only prior live demonstrations.
 
-## Immediate ready queue
+## Current execution entry point
 
-0. **Prerequisite: P0.13.** Complete the holistic scope/design/task-plan review and accept its report before implementation.
-1. **Then: P1.1.** Create the minimal Rust package and record package/toolchain/target choices. Scope excludes agent-loop implementation, provider expansion and later command skeletons.
-2. **Next: P1.6.** Specify/test permission handling before a live integration call.
-3. **Then: P1.2.** Prove the OpenCode transport in a disposable project against an existing LiteLLM alias.
-4. Complete the reuse/lifecycle evidence and P1.5 acceptance preparation, then pass P1.7 holistic review; only then start Phase 2's config and usable run.
+After P7.8 scope reconciliation merges, start P7.9: fresh official OpenCode ChatGPT integration assessment, explicit version selection and a contained no-inference control plan before installed checks. No login-store reads/copies or authentication/session/model calls are authorized by this planning increment. P7.10 assesses dedicated Go separately; P7.11/P7.12 finalize consuming contracts before production and bounded live acceptance. If feasibility fails, record the blocker and a separate alternative decision rather than weakening the gate.
 
-At this planning baseline, no implementation task is active; PROJECT.md owns subsequent current-work status. Service availability, CLI versions and credentials are unverified external prerequisites, not diagnosed failures. Phase 1 records actual observations and follows up before declaring live compatibility. Optional feature candidates remain outside this queue.
+P7.13 requires accepted P5.6/P6.5 and both route acceptances; it feeds P7.6/P7.7. Pi's P8.2 continuation remains independent under D060/D065 and is not required for portfolio closure. Physical locality and extended fallback require later candidate-promotion decisions (F28 before F27). Optional Phase 9 work still requires explicit demand; P9.1 waits for P7.7 and a supported non-spending usage path, P9.3 for P5.6. See PROJECT.md for mutable status.
 
 ## Decision gates
 
@@ -75,6 +75,7 @@ At this planning baseline, no implementation task is active; PROJECT.md owns sub
 | Agent/machine interface | Canonical schema/destinations, supported constraints and output version | P4.1/P4.3/P4.7 |
 | Durable state | Version/location/concurrency/retention/trust and resume behavior | P5.1/P5.5 |
 | Iterative execution | Completion verification and hard iteration/time bounds | P6.1 |
+| Subscription routes | Pinned feasibility/control evidence, explicit provider/auth/schema design, account-control limits and separate live gate | P7.9–P7.12; CONFIGURATION.md / EXECUTION.md before consumption |
 | New runtime/resource increment | Selected target/use case plus supported integration and constraints | P7.1/P8.1; explicit Phase 9 demand selection |
 
 These gates reference the deferred decision register in DECISIONS.md. Do not resolve every later choice now. If experiment evidence requires a design change, record the decision and update contracts/dependencies before proceeding.

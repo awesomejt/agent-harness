@@ -8,6 +8,8 @@ Make the next milestone dependable local and subscription-backed execution throu
 
 This document records the proposed work order, decision gates and acceptance evidence for future sessions. It does not supersede accepted decisions, change phase dependencies, authorize provider probes or inference, promote feature candidates, or declare new runtime support. Step 1 must reconcile the canonical contracts before consuming implementation starts. [PROJECT.md](../PROJECT.md) remains the only mutable task-status board; [DECISIONS.md](../DECISIONS.md) owns accepted decisions.
 
+D068 implements step 1 through P7.8 and the aligned canonical contracts/task cards. Its finite Phase 7 exit covers local/Claude and explicit OpenCode ChatGPT/Go, with paused targets outside closure. Steps 2–3 and integrated acceptance map to P7.9–P7.13. Steps 4–5 remain candidate design work outside that exit gate; D034 remains binding. This original work-order record is retained; PROJECT.md owns execution status.
+
 ## Constraints to carry forward
 
 - Prefer a hard usage-limit stop to overage. No metered API spend unless covered by an included subscription allowance or credit. Keep OpenAI's post-limit credit use and Go Extra Usage disabled; never silently substitute a metered provider.

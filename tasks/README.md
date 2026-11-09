@@ -13,7 +13,7 @@ This directory plans work on agent-harness. It is not the runtime queue/state us
 | 4 | [Core MVP](04-core-mvp.md) | Named constrained agents, automation and declared binary support |
 | 5 | [Sequences](05-sequences.md) | Ordered steps, verification and durable recovery |
 | 6 | [Ralph](06-ralph.md) | Fresh-context bounded iterations |
-| 7 | [Native adapters](07-native-adapters.md) | One additional provider at a time |
+| 7 | [Local/subscription portfolio](07-native-adapters.md) | Existing local/Claude plus explicit OpenCode ChatGPT/Go; paused targets outside mandatory closure (D068) |
 | 8 | [Pi](08-pi.md) | Early single-run adapter, then workflow parity after Phase 6 |
 | 9 | [Optional resource awareness](09-resource-awareness.md) | Demand-selected quota/ranking/scheduling increments |
 
@@ -39,12 +39,12 @@ This directory plans work on agent-harness. It is not the runtime queue/state us
 
 Every phase file ends with a phase-review card; individual PR approvals do not satisfy this task by themselves. Follow [docs/PHASE_REVIEW.md](../docs/PHASE_REVIEW.md) and the [report template](PHASE_REVIEW_TEMPLATE.md). Review the whole integrated phase, record findings and verify every correction before an accepted pass. Reports live in docs/reviews/; status remains in PROJECT.md.
 
-The review IDs are P0.13, P1.7, P2.9, P3.6, P4.9, P5.6, P6.5, P7.7, P8.5 and P9.5. Cross-phase consumers depend on these gates rather than the old evidence-preparation tasks. Phase 9 reviews are repeated for newly selected scope; unselected increments are not forced into the review. Quota work now waits for full Phase 7 review, superseding the former first-adapter shortcut under D018.
+The review IDs are P0.13, P1.7, P2.9, P3.6, P4.9, P5.6, P6.5, P7.7, P8.5 and P9.5. Cross-phase consumers depend on these gates rather than the old evidence-preparation tasks. Phase 9 reviews are repeated for newly selected scope; unselected increments are not forced into the review. Quota work waits for the selected-portfolio Phase 7 review (D068), superseding the former first-adapter shortcut under D018.
 
 ## Evidence and changes
 
 Use a compact record: task ID, date, commit/PR, test commands/results, tested versions/target, live route/model/task when required, observed outcome, limitations and follow-ups. Keep logs/fixtures sanitized; do not commit credentials or full private transcripts.
 
-Goals G1–G9, features F01–F26 and acceptance AC01–AC11 remain defined in docs/SPECIFICATION.md and docs/FEATURE_REVIEW.md. Decision IDs Dxxx live in DECISIONS.md. Task cards trace execution; they do not redefine scope or freeze future schemas. Native session fork, plugins, recipes and other candidates are not tasks merely because upstream tools offer them.
+Goals G1–G9, features F01–F28 and acceptance AC01–AC11 remain defined in docs/SPECIFICATION.md and docs/FEATURE_REVIEW.md. Decision IDs Dxxx live in DECISIONS.md. Task cards trace execution; they do not redefine scope or freeze future schemas. Native session fork, plugins, recipes and other candidates are not tasks merely because upstream tools offer them.
 
 For a genuinely new task, use [TEMPLATE.md](TEMPLATE.md), allocate a stable ID in PROJECT.md and add explicit dependencies/evidence. Existing cards are the initial plan for 59 remaining implementation/review tasks across Phases 1–9, plus the Phase 0 baseline review; no implementation is marked complete by this planning pass.
