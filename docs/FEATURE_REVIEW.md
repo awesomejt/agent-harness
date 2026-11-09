@@ -49,6 +49,8 @@ These projects are examples of feature families, not endorsements of every authe
 | F24 | Headless/CI operation and explicit unanswered-permission behavior | Committed / validate 1–2, package 4 | G2/G5; P1.6, P1.3, P2.4, P4.7 |
 | F25 | Platform binaries, version/capability diagnostics, install/upgrade guidance | Committed / 2, 4 | G1/G8; P2.5, P2.7, P4.5; provider auto-install and silent self-update Excluded |
 | F26 | Parallel teams, distributed execution, hosted UI, remote messaging | Excluded from current roadmap | Revisit only with a separate product decision; specialized agents alone do not imply these features |
+| F27 | Ordered multi-step fallback chain with allowance-exhaustion trigger and fallback-model known-problem record | Candidate | D067; [re-scope findings](evidence/p7-subscription-rescope.md); needs Go over-limit behavior evidence and a D034 replacement decision |
+| F28 | Explicit private (physically local) route constraint | Candidate | D067; route labels are not locality (D002); needed before any local-to-hosted model mapping |
 
 ## Gaps closed by this review
 
