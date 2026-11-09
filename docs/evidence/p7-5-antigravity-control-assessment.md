@@ -47,14 +47,19 @@ Fresh help fingerprints (UTF-8 bytes as emitted; both commands exit 0, stdout em
 Reproduce only the synthetic help observations with the existing capture/profile helpers:
 
 ```sh
-python3 - <<'PY'
+python3 -B - <<'PY'
 import hashlib, pathlib, shutil, sys, tempfile
 sys.path.insert(0, 'scripts/experiments')
 import antigravity_feasibility as a
+a.check(sys.platform == 'darwin' and pathlib.Path('/usr/bin/sandbox-exec').is_file())
+installed = shutil.which('agy')
+a.check(installed is not None)
 with tempfile.TemporaryDirectory(prefix='ah-agy-assess-') as directory:
     root = pathlib.Path(directory).resolve()
     exe = root / 'agy'
-    shutil.copy2(shutil.which('agy'), exe)  # executable only; no settings/auth
+    shutil.copy2(installed, exe)  # executable only; no settings/auth
+    a.check(hashlib.sha256(exe.read_bytes()).hexdigest() ==
+            '5e4b545bff4a83a93354fc50c54631cf3e8cd02e1a469087af00929f3fdc4d51')
     home, project = root / 'home', root / 'project'
     home.mkdir()
     project.mkdir()
@@ -62,6 +67,8 @@ with tempfile.TemporaryDirectory(prefix='ah-agy-assess-') as directory:
            'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'NO_COLOR': '1',
            'TERM': 'dumb', 'LANG': 'C'}
     sandbox = ['/usr/bin/sandbox-exec', '-p', a.profile(root, pathlib.Path.home())]
+    out, err = a.capture([*sandbox, str(exe), '--version'], project, env)
+    a.check((out + err).decode().strip() == '1.5.3')
     for args in [['--help'], ['acp', '--help']]:
         out, err = a.capture([*sandbox, str(exe), *args], project, env)
         a.check(not out)
@@ -83,3 +90,6 @@ Resume Antigravity only on specific supported control/interface evidence, follow
 A version bump, settings parser acceptance, repeated initialization, prompt instruction or terminal-only sandbox is insufficient. A focused new source/control lead may reopen assessment; it does not by itself authorize production or inference.
 
 Antigravity is the last selected native candidate, now paused. Codex/Grok remain paused under D055/D058; Claude stays accepted. P7.6/P7.7 require the full four-target portfolio and are not ready. Independent P8.2 is the next available assessment: `command -v pi` now resolves `/Users/jason/bin/pi`, a symlink to `../.pi/agent/bin/pi`; executable presence alone proves no version, provenance, RPC, isolation or permission capability. No Pi command or login/model access was performed here. Verify those in a separate bounded no-inference installed-feasibility task under D060 before production work. P8.3 live acceptance, P8.4 workflow parity and P8.5 holistic review remain open. No development-platform switch is needed; a fresh context is efficient at this different-runtime boundary.
+
+
+[Grok review on PR #77](https://github.com/awesomejt/agent-harness/pull/77#pullrequestreview-5820539100) reviewed `c61a175` under the operator account: 0 blockers, 0 concerns, 2 nits. Both corrected: the help reproduction now checks platform/sandbox availability, executable presence, copied binary hash and version before help fingerprints, and runs Python with `-B`. The exact corrected snippet and missing-executable/build-drift refusals pass, as do relative links and whitespace checks. No critical/high finding; no re-review requested. Assessment closeout is effective on PR #77 merge; P7.5 acceptance stays open.
