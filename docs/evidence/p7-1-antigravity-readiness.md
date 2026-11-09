@@ -1,6 +1,6 @@
 # P7.1 evidence — Antigravity replacement and readiness
 
-2026-11-07. Entry: merged PR #74, `1db7875`. Task: [P7.1](../../tasks/07-native-adapters.md#p7-1); consuming task: [P7.5](../../tasks/07-native-adapters.md#p7-5). Decision: [D061](../../DECISIONS.md#2026-11-07--d061-replace-the-gemini-cli-requirement-with-antigravity-cli).
+2026-11-07. **Terms paragraph superseded by [D066](../../DECISIONS.md#2026-11-08--d066-block-antigravity-on-consumer-plan-terms) on 2026-11-08: P7.5 is blocked on consumer-plan terms.** Entry: merged PR #74, `1db7875`. Task: [P7.1](../../tasks/07-native-adapters.md#p7-1); consuming task: [P7.5](../../tasks/07-native-adapters.md#p7-5). Decision: [D061](../../DECISIONS.md#2026-11-07--d061-replace-the-gemini-cli-requirement-with-antigravity-cli).
 
 ## Requirement change and disposition
 
@@ -48,6 +48,8 @@ This is substantial functional overlap with the intended Gemini adapter: coding-
 D001/D047 apply: operator logs into the official CLI before harness use, and the CLI alone handles credentials. No reading, copying or exporting auth stores/keychain; no subscription traffic through LiteLLM. [Authentication documentation](https://antigravity.google/docs/install/) describes shared local sign-in across Antigravity surfaces and several account methods; it does not establish this operator's login or entitlement. Existing login reuse must be verified without credential inspection. No API-key, ADC, SDK or custom-endpoint form is selected here.
 
 [Antigravity terms](https://antigravity.google/terms) distinguish consumer and enterprise agreements and place responsibility for agent access/actions with the operator. The official documented ACP/headless interfaces are the integration candidate; this record makes no account-specific entitlement or legal conclusion. Do not spoof editor/client identity, bypass limits or share the operator's login with other users.
+
+> **Superseded on terms (2026-11-08, [D066](../../DECISIONS.md#2026-11-08--d066-block-antigravity-on-consumer-plan-terms)).** This paragraph cited only the general terms page and missed Google's [Antigravity FAQ](https://antigravity.google/docs/faq/). The FAQ says headless `agy -p` "is intended for direct scripting and CI workflows" and that wrapping `agy` inside third-party coding agents or applications "is not supported under consumer plans". It also warns that third-party access "can result in suspension or termination of your account". The harness driving `agy` on the operator's consumer login is that case, so P7.5 is blocked on terms as well as on D063's control gate. The [provider terms check](p7-native-terms-check.md) quotes the sources. The rest of this record stays as the historical readiness assessment.
 
 ## First consuming experiment and gates
 

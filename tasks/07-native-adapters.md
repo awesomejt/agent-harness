@@ -47,10 +47,12 @@ P7.3 is delivered in focused increments. First record target/interface selection
 
 D061 replaces the former Gemini CLI target at the same stable task ID. First prove installed `agy acp` permission/isolation controls using the [readiness assessment](../docs/evidence/p7-1-antigravity-readiness.md); selection and help discovery do not satisfy adapter acceptance. Historical Gemini evidence remains historical. The [contained startup/initialize increment](../docs/evidence/p7-5-antigravity-feasibility.md) (D062) establishes transport discovery only; the [supported-control assessment](../docs/evidence/p7-5-antigravity-control-assessment.md) (D063) pauses production/inference pending specific installed deny/source/login proof.
 
+**Blocked on terms ([D066](../DECISIONS.md#2026-11-08--d066-block-antigravity-on-consumer-plan-terms)).** Google's [Antigravity FAQ](https://antigravity.google/docs/faq/) says wrapping `agy` inside third-party coding agents or applications is not supported under consumer plans. The harness driving `agy acp` or `agy -p` on the operator's consumer Google AI Pro login is that case. Resume only with written confirmation from Google, or an enterprise or API-key path chosen in a new decision; D063's control gate still applies after that. No authentication, session or inference against Antigravity meanwhile. Sources: [provider terms check](../docs/evidence/p7-native-terms-check.md).
+
 - **Depends on:** [P7.1](07-native-adapters.md#p7-1)
 - **Deliverable and boundary:** For Antigravity, deliver narrow PRs for supported launch/authentication, progress/terminal mapping, model/effort, cancellation and constrained agent mapping. Include capability/setup docs as part of this adapter, not only at Phase 7 closeout.
 - **Acceptance evidence:** Fixture/policy/lifecycle tests plus one live project task and enforced constrained-role evidence. Unsupported features/version/platform limits are documented before advertising support.
-- **Decision/readiness gate:** Activation gate: Antigravity is the currently selected target from P7.1 or a later recorded selection. Reuse official authentication; no token scraping or prohibited proxying.
+- **Decision/readiness gate:** Activation gate: Antigravity is the currently selected target from P7.1 or a later recorded selection. Reuse official authentication; no token scraping or prohibited proxying. Blocked: D066's terms condition and D063's control gate must both be met.
 - **Contract:** [docs/EXECUTION.md](../docs/EXECUTION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
 
 <a id="p7-6"></a>
