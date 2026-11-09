@@ -76,15 +76,15 @@ Add a thin outer loop with fresh context per iteration, filesystem progress, a v
 
 **Decide here:** completion protocol, verification command rules, limits, budget handling where measurable, and recovery semantics. Neither a clean child exit nor model prose alone automatically proves task completion.
 
-## Phase 7 — Additional native CLIs
+## Phase 7 — Local and subscription portfolio
 
-**Depends on:** Phase 4; may run independently of Phases 5–6. **Goal:** extend G8/G5.
+**Depends on:** Phase 4; route feasibility and single-run increments may proceed independently of Phases 5–6. Integrated workflow acceptance P7.13 requires accepted P5.6/P6.5. **Goal:** extend G8/G5 under D068.
 
-Choose the first target from observed needs, then deliver Claude, Codex, Grok, and Antigravity one adapter at a time. Each adapter must cover official authentication, runtime launch, events, model selection, cancellation, constraints, and name-based agent mapping. Verify provider integration rules at implementation time.
+The finite portfolio is existing OpenCode/LiteLLM, accepted Claude P7.2, an explicit ChatGPT-plan route through OpenCode and an explicit dedicated Go route through OpenCode. P7.8 reconciles scope; P7.9/P7.10 separately prove pinned feasibility before P7.11/P7.12 design and deliver the new routes in focused PRs. Codex P7.3/Grok P7.4 remain paused and Antigravity P7.5 blocked outside mandatory closure, with evidence and resume gates preserved. Pi remains independent. An infeasible mandatory route requires a new scope decision, not an implicit waiver.
 
-**Exit evidence per adapter:** capability matrix, fixtures, lifecycle/policy tests, one live project task, and docs. Unsupported features are explicit. No single milestone must wait for all four providers.
+**Exit evidence:** each new route has a capability matrix, fixtures, effective auth/source/model/helper/endpoint and permission isolation, lifecycle tests, a live coding task and constrained review, and setup/account-control limitations. P7.13 exercises the selected portfolio through single runs, sequences and Ralph, interruption/recovery, limit failures without metered substitution, dirty-project preservation and sanitized output. P7.6 audits aggregate capability/version/install coverage; P7.7 reviews all accumulated Phase 7 work and requires resolved/verified findings before exit. Paused targets need dispositions, not fabricated implementation acceptance.
 
-**Decide per adapter:** ACP/native interface, version range, permission mapping, provider-specific setup. Do not bake a speculative common API around every provider.
+**Decide per consuming increment:** supported official integration and pinned version, runtime-owned authentication without copying login stores, exact provider/model selection, schema/compatibility and permissions. D067's operator-started own-account usage and included-allowance spend rule remain. No account hard-cap claim without evidence. F27/F28 stay candidates outside this exit gate; D034 fallback remains unchanged. No new route is supported merely by selecting this scope.
 
 ## Phase 8 — Pi and portability
 
@@ -110,7 +110,7 @@ Revisit ai-queue's usage readers, cooldown logic, prompt delays, and queue behav
 
 Each phase has a separate holistic review task: P0.13, P1.7, P2.9, P3.6, P4.9, P5.6, P6.5, P7.7, P8.5 and P9.5. Evidence-preparation/use tasks are prerequisites, not phase exit approval. Follow [PHASE_REVIEW.md](PHASE_REVIEW.md); review the integrated phase against all applicable contracts, record findings, fix them and verify corrections before an accepted pass. Successor tasks depend on the review gate.
 
-The existing branch structure remains after accepted prerequisite reviews. Quota work now waits for P7.7 (full portfolio review); scheduling waits for P5.6; Pi workflow parity waits for P6.5. This supersedes earlier narrower readiness shortcuts. Phase 9's review repeats for newly selected increment scope without requiring unselected features.
+The existing branch structure remains after accepted prerequisite reviews. Quota work now waits for P7.7 (selected portfolio review under D068); scheduling waits for P5.6; Pi workflow parity waits for P6.5. This supersedes earlier narrower readiness shortcuts. Phase 9's review repeats for newly selected increment scope without requiring unselected features.
 
 
 For each phase: run appropriate checks, record the usable example and limitations, complete PR review, update PROJECT.md, and append decisions with evidence. An unchecked task or unavailable external dependency remains visible; do not mark a milestone complete from mocked tests alone when live evidence is required.

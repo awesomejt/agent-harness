@@ -23,12 +23,14 @@ Rust is the accepted harness language. Deliver `ah` as prebuilt platform binarie
 | G5 | Portable named agents | Markdown + YAML definitions map by name; primary and specialized roles carry supported model/tool/permission constraints. | Phase 4, expanded in 7–8 |
 | G6 | Ordered execution | A folder of prompts runs in deterministic order with defined failure, context, and restart behavior. | Phase 5 |
 | G7 | Bounded iterative execution | Ralph uses fresh agent context per iteration, durable filesystem state, an explicit completion signal, and limits. | Phase 6 |
-| G8 | Multiple runtimes | OpenCode first; native Claude, Codex, Grok, Antigravity and Pi added with documented capability differences. | Phases 7–8 |
+| G8 | Multiple runtimes | OpenCode/LiteLLM and Claude, then explicit ChatGPT-plan and dedicated Go routes through OpenCode (D068); independent Pi portability. Codex/Grok deferred and Antigravity blocked outside mandatory portfolio closure. | Phases 7–8 |
 | G9 | Optional resource-aware operation | Where supported, expose quota/cooldown information and optional scheduling without overriding mode policy. | Phase 9; demand-driven |
+
+D068 selects a finite Phase 7 portfolio; selected routes require separate feasibility, implementation and live acceptance before support is advertised. P7.6 audits this portfolio and P7.7 reviews the entire phase, including historical paused experiments. D066/D067 terms, account and spend constraints remain binding. F27 extended fallback and F28 physical locality remain candidates; mode names and D034 behavior are unchanged.
 
 ## Feature coverage and supporting contracts
 
-The [feature landscape review](FEATURE_REVIEW.md) compares eight upstream projects and assigns F01–F26 to committed, backend-owned, candidate, or excluded scope. It supplements G1–G9 rather than claiming parity with every tool. [The documentation map](README.md) links the technical contracts and the phase responsible for finalizing each one.
+The [feature landscape review](FEATURE_REVIEW.md) compares eight upstream projects and assigns F01–F28 to committed, backend-owned, candidate, or excluded scope. It supplements G1–G9 rather than claiming parity with every tool. [The documentation map](README.md) links the technical contracts and the phase responsible for finalizing each one.
 
 Within existing goals, include inline/file/stdin prompt input; basic prerequisite diagnostics and a read-only resolved-plan/sync preview in Phase 2; versioned machine output and headless/CI guidance by Phase 4; and explicit verification gates in Phases 5–6. Single runs show transient attempt outcomes; Phase 5 durable sequence records (D044) persist workflow state for explicit `resume`. Ralph completion protocols remain Phase 6. Model-effort mapping is added only for supported adapters with documented handling of approximations.
 

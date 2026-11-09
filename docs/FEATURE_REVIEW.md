@@ -31,7 +31,7 @@ These projects are examples of feature families, not endorsements of every authe
 | F06 | Specialized roles with enforced constraints | Committed / 4 | G5; P4.3–P4.4; not an autonomous-team scheduler |
 | F07 | Ordered prompt sequences and step recovery | Committed / 5 | G6; P5.1–P5.4 |
 | F08 | Fresh-context bounded Ralph loop | Committed / 6 | G7; P6.1–P6.4 |
-| F09 | Additional native CLI adapters | Committed / 7, one at a time | G8; P7.1–P7.6 |
+| F09 | Selected local/subscription portfolio | Committed / 7, one at a time | G8; D068; accepted Claude P7.2, OpenCode ChatGPT/Go P7.9–P7.13, audit P7.6 and review P7.7. Codex/Grok deferred; Antigravity blocked outside closure. |
 | F10 | Pi adapter and documented portability limits | Committed / 8 | G8; P8.1–P8.4; workflow parity P8.4 waits for accepted P6.5 review |
 | F11 | Dependency diagnostics, resolved-plan and sync preview | Committed / basic 2, polish 4 | G1/G4; P2.7, P4.5 |
 | F12 | Inline, file, and stdin prompt inputs | Committed / 2 | G2; P2.2; mutual-exclusion/empty-input rules specified before launch |
@@ -49,8 +49,8 @@ These projects are examples of feature families, not endorsements of every authe
 | F24 | Headless/CI operation and explicit unanswered-permission behavior | Committed / validate 1–2, package 4 | G2/G5; P1.6, P1.3, P2.4, P4.7 |
 | F25 | Platform binaries, version/capability diagnostics, install/upgrade guidance | Committed / 2, 4 | G1/G8; P2.5, P2.7, P4.5; provider auto-install and silent self-update Excluded |
 | F26 | Parallel teams, distributed execution, hosted UI, remote messaging | Excluded from current roadmap | Revisit only with a separate product decision; specialized agents alone do not imply these features |
-| F27 | Ordered multi-step fallback chain with allowance-exhaustion trigger and fallback-model known-problem record | Candidate | D067; [re-scope findings](evidence/p7-subscription-rescope.md); needs Go over-limit behavior evidence and a D034 replacement decision |
-| F28 | Explicit private (physically local) route constraint | Candidate | D067; route labels are not locality (D002); needed before any local-to-hosted model mapping |
+| F27 | Ordered multi-step fallback chain with allowance-exhaustion trigger and fallback-model known-problem record | Candidate, outside D068 Phase 7 exit | D067/D068; [re-scope findings](evidence/p7-subscription-rescope.md); needs Go over-limit behavior evidence and a D034 replacement decision |
+| F28 | Explicit private (physically local) route constraint | Candidate, outside D068 Phase 7 exit | D067/D068; route labels are not locality (D002); needed before any local-to-hosted model mapping |
 
 ## Gaps closed by this review
 
