@@ -14,7 +14,7 @@ path = Path(__file__).resolve().parents[1] / 'experiments/pi_feasibility.py'
 spec = importlib.util.spec_from_file_location('pi_probe', path)
 probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)
-REPORT = {'type': 'ah_inventory', 'active': [], 'all': [], 'mcp': [], 'sentinelLoaded': False}
+REPORT = {'type': 'ah_inventory', 'active': [], 'all': [], 'mcp': [], 'skills': [], 'templates': [], 'sentinelLoaded': False}
 STATE = {'isStreaming': False, 'isCompacting': False, 'autoCompactionEnabled': False,
          'messageCount': 0, 'pendingMessageCount': 0, 'model': {
              'provider': 'ah-feasibility', 'id': 'ah-no-inference',
@@ -71,9 +71,12 @@ def main():
         records = copy.deepcopy(VALID)
         records[-1]['data']['model'][key] = 'wrong-route'
         refuses(lambda: validate(records))
-    for key in ['active', 'all', 'mcp']:
+    for key in ['active', 'all', 'mcp', 'skills', 'templates']:
         refuses(lambda: validate(report={**REPORT, key: ['unexpected']}))
     refuses(lambda: validate(report={**REPORT, 'sentinelLoaded': True}))
+    probe.validate(encode(VALID), encode([{**REPORT, 'skills': ['skill:inert'],
+                   'templates': ['inert']}]), resources_loaded=True)
+    refuses(lambda: probe.validate(encode(VALID), encode([REPORT]), resources_loaded=True))
     for out, err in [(b'not-json', encode([REPORT])), (encode(VALID), b''),
                      (encode(VALID), encode([REPORT, REPORT]))]:
         refuses(lambda: probe.validate(out, err))

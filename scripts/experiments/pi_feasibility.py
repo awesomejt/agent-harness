@@ -56,7 +56,7 @@ def requests():
         for ident, command in COMMANDS)
 
 
-def validate(stdout, stderr):
+def validate(stdout, stderr, resources_loaded=False):
     messages = [json.loads(line, object_pairs_hook=unique_object) for line in stdout.splitlines() if line.strip()]
     check(len(messages) == 3)
     reports = [json.loads(line, object_pairs_hook=unique_object) for line in stderr.splitlines() if line.strip()]
@@ -66,6 +66,8 @@ def validate(stdout, stderr):
     check(report.get('active') == [] and report.get('mcp') == [])
     check(report.get('all') == [])
     check(report.get('sentinelLoaded') is False)
+    check(report.get('skills') == (['skill:inert'] if resources_loaded else []))
+    check(report.get('templates') == (['inert'] if resources_loaded else []))
     for message, (ident, command) in zip(messages, COMMANDS):
         check(isinstance(message, dict) and message.get('type') == 'response'
               and message.get('id') == ident and message.get('command') == command
@@ -209,7 +211,7 @@ def main():
                      project / 'AGENTS.md': 'AH_UNPLANNED_PROJECT',
                      project / '.pi/SYSTEM.md': 'AH_UNPLANNED_SYSTEM',
                      state / 'AGENTS.md': 'AH_UNPLANNED_STATE',
-                     state / 'skills/inert/SKILL.md': '---\nname: inert\ndescription: inert\n---\nAH_UNPLANNED_SKILL',
+                     state / 'skills/inert/SKILL.md': '---\nname: inert\ndescription: AH_UNPLANNED_SKILL\n---\nAH_UNPLANNED_SKILL',
                      state / 'prompts/inert.md': 'AH_UNPLANNED_TEMPLATE'}
         for path, content in sentinels.items():
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -234,6 +236,8 @@ def main():
   pi.on('session_start', (_event, ctx) => {
     process.stdout.write(JSON.stringify({type:'ah_inventory',
       active:pi.getActiveTools(), all:pi.getAllTools().map(t=>t.name).sort(),
+      skills:pi.getCommands().filter(c=>c.source==='skill').map(c=>c.name).sort(),
+      templates:pi.getCommands().filter(c=>c.source==='prompt').map(c=>c.name).sort(),
       mcp:pi.getMcpServers(), sentinelLoaded:ctx.getSystemPrompt().includes('AH_UNPLANNED')})+'\\n');
   });
 }
@@ -244,10 +248,16 @@ def main():
                  '--model', 'ah-no-inference', '-e', str(extension)]
         out, err = run(flags, requests())
         validate(out, err)
+        # Positive controls bind detection to the actual loaded command inventory.
+        # With no read/bash tools Pi does not advertise skills in its prompt.
+        control_out, control_err = run([flag for flag in flags if flag not in
+            ('--no-skills', '--no-prompt-templates')], requests())
+        validate(control_out, control_err, resources_loaded=True)
         check(all(path.read_text() == content for path, content in sentinels.items()))
         check(not marker.exists())
         check(not list(state.glob('sessions/**/*.jsonl')))
         print('PASS: active tools=[], configured tools=[], MCP=[]; inert context absent; discovery canaries unloaded', flush=True)
+        print('PASS: skill/template inventories empty; positive loading control detected', flush=True)
         print('PASS: correlated disable retry/compaction and idle synthetic model state; no session file', flush=True)
         print('GATE OPEN: effective resource/settings/credential inventory, route capture and adversarial tool enforcement remain; no prompt sent', flush=True)
 
