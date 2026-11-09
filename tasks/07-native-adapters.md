@@ -45,7 +45,7 @@ P7.3 is delivered in focused increments. First record target/interface selection
 <a id="p7-5"></a>
 ## P7.5 — Antigravity native adapter
 
-D061 replaces the former Gemini CLI target at the same stable task ID. First prove installed `agy acp` permission/isolation controls using the [readiness assessment](../docs/evidence/p7-1-antigravity-readiness.md); selection and help discovery do not satisfy adapter acceptance. Historical Gemini evidence remains historical. The [contained startup/initialize increment](../docs/evidence/p7-5-antigravity-feasibility.md) (D062) establishes transport discovery only; next assess supported source exclusion, effective complete deny and login preservation before session/model or production work.
+D061 replaces the former Gemini CLI target at the same stable task ID. First prove installed `agy acp` permission/isolation controls using the [readiness assessment](../docs/evidence/p7-1-antigravity-readiness.md); selection and help discovery do not satisfy adapter acceptance. Historical Gemini evidence remains historical. The [contained startup/initialize increment](../docs/evidence/p7-5-antigravity-feasibility.md) (D062) establishes transport discovery only; the [supported-control assessment](../docs/evidence/p7-5-antigravity-control-assessment.md) (D063) pauses production/inference pending specific installed deny/source/login proof.
 
 - **Depends on:** [P7.1](07-native-adapters.md#p7-1)
 - **Deliverable and boundary:** For Antigravity, deliver narrow PRs for supported launch/authentication, progress/terminal mapping, model/effort, cancellation and constrained agent mapping. Include capability/setup docs as part of this adapter, not only at Phase 7 closeout.
