@@ -152,7 +152,8 @@ requires exact sets. Gated markers appear only when their option is on. The ance
 loads only in case 5. The location pin holds afterwards.
 
 **Runtime inventory from the synthetic server log.** The helper records only static messages,
-labelled watch targets and spawned executables:
+labelled watch targets and spawned executables. Each property below is enforced as a gate in
+every case, not only recorded:
 
 - **Watchers.** The parent entries watch on `/Library/Application Support` is acquired in every
   case, using the node backend, as D073 predicted. With project discovery on, entries watches
@@ -165,8 +166,8 @@ labelled watch targets and spawned executables:
   directory stays empty. Runtime-created entries stay inside the owned root: Bun's extracted
   libraries in `TMPDIR`, the XDG directories and an `opencode` temporary directory.
 
-The three installed runs during this increment passed with identical results, after
-the two findings above were corrected.
+Three installed runs passed with identical results after the two findings above were
+corrected, and two more passed after the review correction below.
 
 ## Row dispositions
 
@@ -249,3 +250,18 @@ Linux, use `sha256sum`.
 - **Other checks.** Python syntax, documentation links and anchors, link-checker fixtures and
   whitespace checks pass. Rust sources and dependencies are unchanged, and no direct-tool coding
   comparison applies.
+
+## Review
+
+Grok reviewed the first revision in [PR #90](https://github.com/awesomejt/agent-harness/pull/90)
+and found 0 blockers, 1 concern and 2 nits. All three are addressed:
+
+- **Concern:** the log-derived claims were recorded but not enforced. Each case now fails on
+  any `WARN`/`ERROR` line or `watcher failed` entry, and requires the started
+  `/Library/Application Support` entries watch. Offline cases cover the parsing.
+- **Nit:** aliased imports now map the local name to the original export, and `type` imports
+  are filtered before aliasing. The offline derivation fixture includes both.
+- **Nit:** the status line links the PR.
+
+Two installed runs, the offline suite, links and whitespace pass again. No critical or high
+finding, so no re-review was requested.
