@@ -80,7 +80,7 @@ D061 replaces the former Gemini CLI target at the same stable task ID. First pro
 - **Deliverable and boundary:** Separately select/version a contained no-inference experiment from fresh official sources. Establish dedicated Go rather than metered Zen selection, supported client identification/session headers, model/endpoint/helper and permission/source isolation, and supported account Extra Usage verification. No real credential inspection, authentication/session/model calls or production changes.
 - **Acceptance evidence:** Pinned capability/control evidence with synthetic inputs, exact provider distinction and account-control verification plan/limitations. No estimate-based hard-cap claim. Record blockers or a separate bounded follow-up for proof outside this task's boundary.
 - **Decision/readiness gate:** A failed gate blocks P7.12. OpenCode is the selected placement; LiteLLM/Pi placement needs another decision.
-- **Contract:** [Action plan step 2](../docs/SUBSCRIPTION_ACTION_PLAN.md), [configuration](../docs/CONFIGURATION.md).
+- **Contract:** [Action plan step 2](../docs/SUBSCRIPTION_ACTION_PLAN.md), [configuration](../docs/CONFIGURATION.md). The [bounded Go source assessment](../docs/evidence/p7-10-go-feasibility.md) (D072) records provider/header/helper and account-control findings; D071's shared source blocker stops installed expansion. Resume with the separately evidenced shared source-control plan before synthetic Go proof; current status remains in PROJECT.md.
 
 <a id="p7-11"></a>
 ## P7.11 — Explicit OpenCode ChatGPT-plan route
