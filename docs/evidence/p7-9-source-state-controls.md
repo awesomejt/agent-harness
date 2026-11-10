@@ -53,11 +53,31 @@ Reproduce without launching OpenCode or accessing user state:
 git clone --depth 1 --branch v2.2.5 https://github.com/anomalyco/opencode.git /tmp/ah-opencode-source-review
 git -C /tmp/ah-opencode-source-review rev-parse HEAD
 cd /tmp/ah-opencode-source-review
-shasum -a 256 packages/core/src/config/discovery.ts packages/server/src/options.ts packages/server/src/routes.ts packages/cli/src/server-process.ts
+shasum -a 256 packages/core/src/config.ts \
+  packages/core/src/config/discovery.ts \
+  packages/server/src/options.ts \
+  packages/server/src/routes.ts \
+  packages/cli/src/server-process.ts \
+  packages/core/src/config/plugin/agent.ts \
+  packages/core/src/config/plugin/command.ts \
+  packages/core/src/config/plugin/skill.ts \
+  packages/core/src/config/plugin/compatibility.ts \
+  packages/core/src/config/plugin/instruction.ts \
+  packages/core/src/config/plugin/source.ts \
+  packages/core/src/config/plugin/mcp.ts \
+  packages/core/src/instruction-discovery.ts \
+  packages/core/src/credential.ts \
+  packages/core/src/credential/sql.ts \
+  packages/core/src/kv.ts \
+  packages/core/src/wellknown.ts \
+  packages/core/src/config/integration.ts \
+  packages/core/src/plugin/provider/opencode.ts
 ```
 
 The destination must be absent; use a fresh disposable path if it already exists.
-No upstream dependency installation or source execution is needed. Inventory paths
+`shasum` is the macOS/Perl tool; Linux commonly uses `sha256sum` with the same
+file arguments (without `-a 256`). No upstream dependency installation or source
+execution is needed. Inventory paths
 below are relative to this checkout; fingerprints link directly to the pinned files.
 
 ## Discovery and resource inventory
@@ -190,5 +210,13 @@ state, with no evidenced safe supported alternative at this pin. It also confirm
 the missing installed system/MDM canaries, synthetic database startup test and
 installed source equivalence must remain explicit. No installed experiment ran
 because the plan's stop condition was met. Documentation links/anchors and Git
-whitespace checks are required before PR; no Rust tests are needed for unchanged
+whitespace checks pass; no Rust tests are needed for unchanged
 production sources/dependencies. Grok findings are recorded at closeout.
+
+
+Grok reviewed `f59630a` in [PR #85](https://github.com/awesomejt/agent-harness/pull/85)
+under the operator account: 0 blockers, 0 concerns, 2 nits. Both are addressed:
+the reproduction hashes all 19 files and notes the Linux tool equivalent; validation
+is recorded as completed. The exact expanded command reproduces all 19 hashes;
+links/anchors and whitespace pass again. No critical/high finding or re-review.
+Assessment closeout takes effect on merge; full P7.9 remains open.
