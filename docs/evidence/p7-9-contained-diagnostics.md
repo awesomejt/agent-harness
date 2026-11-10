@@ -107,8 +107,8 @@ No remote provider request is allowed. The external-address negative test
 requires an immediate permission denial, not a timeout or refusal from a peer.
 
 The negative transport matrix validates the rule construction on a disposable
-control port. The private server then uses a fresh selected port with the same
-rule construction, avoiding the echo connection's TIME_WAIT. The selection/start
+control port. Each private server instance then uses a fresh selected port with the same
+rule construction, avoiding the echo connection's and prior mode's TIME_WAIT. The selection/start
 race is not eliminated by port reservation: our child's exact readiness and
 successful private-password connection are required, and occupied-port refusal
 is separately observed. No shared-service discovery occurs. The generated
@@ -190,3 +190,9 @@ refusals, parent canaries, reproducible primitive/inheritance controls and
 process-group descendant coverage. Re-review found no critical/high or remaining
 correctness defect. Source-scope and state/endpoint/tool limitations above remain
 explicit. Grok PR review and closeout are recorded in PROJECT.md.
+
+Grok reviewed the initial PR commit with 0 blockers, 0 concerns and 2 nits. Both
+were corrected: each real server mode selects a fresh port, and the discovery
+positive control uses a copied environment so subsequent data-path checks retain
+project-config exclusion. Corrected installed and selected offline checks pass;
+no critical/high finding and no re-review required.

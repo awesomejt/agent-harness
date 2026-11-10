@@ -277,12 +277,20 @@ def main():
             reservation.close()
         print('PASS: occupied port refuses before readiness; no connection to the conflicting listener', flush=True)
         for inherited in (False, True):
+            server_env = dict(env)
             if inherited:
-                del env['OPENCODE_DISABLE_PROJECT_CONFIG']
-            with owned_server(executable, project, env, policy, port) as url:
+                del server_env['OPENCODE_DISABLE_PROJECT_CONFIG']
+            # Fresh listener per mode: do not depend on Bun's address-reuse
+            # behavior after the prior server's accepted TCP connections.
+            reservation = socket.socket()
+            reservation.bind(('127.0.0.1', 0))
+            port = reservation.getsockname()[1]
+            reservation.close()
+            policy = contained_profile(root, Path.home(), port)
+            with owned_server(executable, project, server_env, policy, port) as url:
                 for password, message in ((None, b'requires a password'),
                                           ('AH_WRONG_SYNTHETIC_PASSWORD', b'rejected the password')):
-                    unauthorized = dict(env)
+                    unauthorized = dict(server_env)
                     if password is None:
                         del unauthorized['OPENCODE_PASSWORD']
                     else:
@@ -290,7 +298,7 @@ def main():
                     out, err = diagnostic(executable, project, unauthorized, policy, ('debug', 'config'), url, status=1)
                     check(not out.strip() and message in err)
                 print('PASS: absent and wrong private-server passwords refused', flush=True)
-                raw, _ = diagnostic(executable, project, env, policy, ('debug', 'config'), url)
+                raw, _ = diagnostic(executable, project, server_env, policy, ('debug', 'config'), url)
                 sources = json.loads(raw)
                 if not inherited:
                     check(sources == [
@@ -299,7 +307,7 @@ def main():
                 else:
                     for path in (sentinel, parent_sentinel):
                         check(any(s.get('type') == 'document' and s.get('path') == str(path) for s in sources))
-                raw, _ = diagnostic(executable, project, env, policy, ('debug', 'agents'), url)
+                raw, _ = diagnostic(executable, project, server_env, policy, ('debug', 'agents'), url)
                 agents = json.loads(raw)
                 validate_agents(agents, model, rules, inherited)
                 check(any(a['id'] == 'ah-parent-sentinel' for a in agents) == inherited)
