@@ -32,6 +32,7 @@ SUITES = [
     ['scripts/tests/antigravity_feasibility_cases.py'],
     ['scripts/tests/pi_feasibility_cases.py'],
     ['scripts/tests/chatgpt_contained_cases.py'],
+    ['scripts/tests/chatgpt_observer_cases.py'],
     ['scripts/tests/agents_runtime.py'],
     ['scripts/tests/agent_emission_runtime.py'],
     ['scripts/tests/local_first.py'],

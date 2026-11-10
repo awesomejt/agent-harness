@@ -55,6 +55,7 @@ python3 scripts/tests/grok_feasibility_cases.py
 python3 scripts/tests/antigravity_feasibility_cases.py
 python3 scripts/tests/pi_feasibility_cases.py
 python3 scripts/tests/chatgpt_contained_cases.py
+python3 scripts/tests/chatgpt_observer_cases.py
 python3 scripts/tests/agents_runtime.py
 python3 scripts/tests/agent_emission_runtime.py
 python3 scripts/tests/local_first.py
@@ -113,3 +114,5 @@ P7.5’s opt-in `python3 scripts/experiments/antigravity_feasibility.py` reprodu
 P8.2’s opt-in `scripts/experiments/pi_feasibility.py` requires explicit installed release and Node paths; see the [exact reproduction and limits](evidence/p8-2-pi-feasibility.md). It copies and fingerprints runtime code, uses private state/allowlisted environment under verified macOS containment and allows only retry/compaction-disable plus state RPCs. No prompt or real credentials are used. The offline `pi_feasibility_cases.py` suite validates protocol/inventory/route refusals, input allowlisting, runtime fingerprints, output/deadline bounds and descendant cleanup; it joins `offline.py`. Empty inventories at startup do not close effective-control or production acceptance gates.
 
 P7.9’s opt-in `python3 -B scripts/experiments/chatgpt_contained.py` exercises pinned OpenCode 2.2.5 diagnostics under experimental macOS containment using one owned loopback TCP port and a literal `/dev/null` data-write exception. It verifies source/agent controls, password refusals and synthetic transport boundaries without provider authentication, sessions or inference. The macOS offline `chatgpt_contained_cases.py` suite covers command/narrowing refusals and six synthetic server lifecycle cases, including descendant cleanup; it joins `offline.py` without requiring OpenCode. See [evidence and limits](evidence/p7-9-contained-diagnostics.md).
+
+P7.9’s opt-in `python3 -B scripts/experiments/chatgpt_installed_observer.py --source <v2.2.5 checkout>` runs the D075 resource observer against pinned OpenCode 2.2.5 on fresh owned roots under the combined D070/D073 containment plus ancestor discovery-name denials. It derives the built-in plugin set from the pinned checkout, runs Bun filesystem equivalents and five paired installed cases, including late-create/replace/reload, without authentication, sessions or inference. The offline `chatgpt_observer_cases.py` suite covers route allowlist, response bounds, redaction, settle, static guards and plugin-ID derivation refusals without OpenCode. See [evidence and limits](evidence/p7-9-installed-observer.md).
