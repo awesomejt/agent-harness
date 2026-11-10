@@ -25,7 +25,7 @@ WORKER = r'''
 import json,os,subprocess,sys
 from pathlib import Path
 root=Path(sys.argv[1]); deny=sys.argv[2]=='deny'; phase=sys.argv[3]
-system=root/'machine'; mdm=root/'managed'
+system=root/'machine support'; mdm=root/'managed'
 def blocked(action):
  try: action()
  except PermissionError:
@@ -56,38 +56,36 @@ print('AH_SOURCE_'+phase.upper()+'_PASS')
 
 def main():
     check(sys.platform == 'darwin' and Path('/usr/bin/sandbox-exec').is_file())
-    with tempfile.TemporaryDirectory(prefix='ah-source-boundary-') as directory:
-        root = Path(directory).resolve()
-        for path in (root / 'machine', root / 'managed' / 'user', root / 'allowed'):
-            path.mkdir(parents=True)
-        files = {'machine/opencode.json': 'AH_SYSTEM',
-                 'managed/user/ai.opencode.managed.plist': 'AH_USER_MDM',
-                 'managed/ai.opencode.managed.plist': 'AH_MACHINE_MDM',
-                 'allowed/canary': 'AH_ALLOWED'}
-        for name, content in files.items():
-            (root / name).write_text(content)
-        (root / 'alias-in').symlink_to(root / 'machine', target_is_directory=True)
-        (root / 'machine' / 'alias-out').symlink_to(root / 'allowed' / 'canary')
-        worker = root / 'worker.py'
-        worker.write_text(WORKER)
-        env = {'HOME': str(root / 'home'), 'TMPDIR': str(root), 'PATH': '/usr/bin:/bin'}
-        # Real machine paths are denied without stat/list/read probes against
-        # them. Equivalent disposable roots supply paired semantic controls.
-        for deny in (False, True):
-            # Each worker starts with an absent source directory.
-            future = root / 'future'
-            if future.exists():
-                (future / 'opencode.json').unlink()
-                future.rmdir()
+    # Independent roots keep late-file creation genuine in both modes.
+    for deny in (False, True):
+        with tempfile.TemporaryDirectory(prefix='ah-source-boundary-') as directory:
+            root = Path(directory).resolve()
+            for path in (root / 'machine support', root / 'managed' / 'user', root / 'allowed'):
+                path.mkdir(parents=True)
+            files = {'machine support/opencode.json': 'AH_SYSTEM',
+                     'managed/user/ai.opencode.managed.plist': 'AH_USER_MDM',
+                     'managed/ai.opencode.managed.plist': 'AH_MACHINE_MDM',
+                     'allowed/canary': 'AH_ALLOWED'}
+            for name, content in files.items():
+                (root / name).write_text(content)
+            check(not (root / 'machine support' / 'late.json').exists())
+            check(not (root / 'future').exists())
+            (root / 'alias-in').symlink_to(root / 'machine support', target_is_directory=True)
+            (root / 'machine support' / 'alias-out').symlink_to(root / 'allowed' / 'canary')
+            worker = root / 'worker.py'
+            worker.write_text(WORKER)
+            env = {'HOME': str(root / 'home'), 'TMPDIR': str(root), 'PATH': '/usr/bin:/bin'}
+            # Real machine paths are denied without stat/list/read probes against
+            # them. Equivalent disposable roots supply paired semantic controls.
             roots = tuple(Path(path) for path in MACHINE_ROOTS)
             if deny:
-                roots += (root / 'machine', root / 'managed', root / 'future')
+                roots += (root / 'machine support', root / 'managed', root / 'future')
             policy = source_profile(root, Path.home(), roots)
             out, err = capture(['/usr/bin/sandbox-exec', '-p', policy, PYTHON, '-B',
                                 str(worker), str(root), 'deny' if deny else 'allow', 'parent'], root, env)
             check(not err and out.splitlines() == [b'AH_SOURCE_CHILD_PASS', b'AH_SOURCE_PARENT_PASS'])
-        print('PASS: paired synthetic data/metadata/listing, symlink, late-create/replace and inherited-child controls')
-        print('LIMIT: no OpenCode startup, real machine-source access, persistent state, login or model proof')
+    print('PASS: paired synthetic data/metadata/listing, symlink, late-create/replace and inherited-child controls')
+    print('LIMIT: no OpenCode startup, real machine-source access, persistent state, login or model proof')
 
 
 if __name__ == '__main__':

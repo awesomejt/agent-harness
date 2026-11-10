@@ -103,8 +103,10 @@ On macOS 27.0.1 build 26A434, arm64, the paired controls passed:
   data/metadata access.
 - The same matrix passes in a spawned descendant inheriting the boundary.
 
-Both modes retain real machine-root denials and D070's base containment. Only the
-synthetic root rules differ. No executable plugin, hook or MCP canary is loaded.
+Each mode uses a fresh independent disposable root with the same initial fixture
+contents and absent late file/directory assertions. One denied synthetic root has
+a space in its name to exercise quoted profile paths. Both modes retain real
+machine-root denials and D070's base containment. Only the synthetic root rules differ. No executable plugin, hook or MCP canary is loaded.
 The existing bounded capture helper limits output/time and reaps the process group;
 raw failure diagnostics are withheld. These observations do not establish Bun's
 filesystem behavior, effective OpenCode resource lists or persistent-state safety.
@@ -157,3 +159,12 @@ paths and incomplete diagnostic resource visibility. Both are addressed above wi
 watcher fingerprints, required watcher/reload observations and a coverage matrix
 which must be complete before installed launch. Grok disposition follows at closeout. No Rust tests are needed for unchanged
 production sources/dependencies. No direct-tool coding comparison applies.
+
+
+Grok reviewed `b8cbf7c` in [PR #87](https://github.com/awesomejt/agent-harness/pull/87)
+under the operator account: 0 blockers, 1 concern and 1 nit. Both are addressed:
+paired modes now build independent fresh fixtures so the denied late-file case
+creates a genuinely new file; a synthetic denied root contains a space to test
+profile quoting. The corrected probe, Python syntax, links/anchors and whitespace
+pass. No critical/high finding or re-review request. Focused design closeout takes
+effect on merge; full P7.9/P7.10 and route acceptance remain open.
