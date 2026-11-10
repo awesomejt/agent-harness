@@ -6,7 +6,8 @@ Date: 2026-11-09. Entry: PR #85 merged. Decision: D072.
 
 Select the unmodified official OpenCode CLI/server 2.2.5 candidate already used
 for D069/D070, on D041 Apple Silicon macOS. Select dedicated `opencode-go`,
-not metered `opencode`, and assess `kimi-k3` as a catalog example, not a public
+separately from non-Go `opencode`/Zen (which also includes free models), and assess
+`kimi-k3` as a catalog example, not a public
 support pin or entitlement claim. Fresh official tagged source is pinned below;
 installed executable provenance remains distinct from tagged source.
 
@@ -38,7 +39,8 @@ No pricing, model availability or default setting proves this operator's state.
 
 ## Pinned source findings
 
-Source paths in this section are relative to the official
+Table paths are relative to `packages/core/src/`, except `server/` denotes
+`packages/server/src/`, in the official
 [v2.2.5 commit](https://github.com/anomalyco/opencode/tree/9bbb8ce18c80f099e0e448775f59d965ead40a21).
 A fresh shallow checkout resolves to `9bbb8ce18c80f099e0e448775f59d965ead40a21`.
 
@@ -55,8 +57,8 @@ A fresh shallow checkout resolves to `9bbb8ce18c80f099e0e448775f59d965ead40a21`.
 | Limit reporting | `session/to-session-error.ts` maps `GoUsageLimitError` to `provider.go-limit`, with a message suggesting free models or Extra Usage. This is error classification, not proof of refusal without another paid request, disabled overage, or safe harness output. Preserve D034; no new fallback or automatic free-model switch is selected. |
 | Shared source blocker | `server/options.ts` exposes project/claude/file/content but no global/system controls; `server/routes.ts` forwards that subset. `config/discovery.ts` has core-only controls for machine directory/MDM discovery. D071's source/state blocker therefore applies to Go independently of credential type. |
 
-The `kimi-k3` catalog example advertises tool choice `none`; other Go models need
-separate capability checks. That metadata is not complete runtime no-tool denial.
+The `kimi-k3` catalog example lists `none` among its advertised tool choices
+(`auto`, `none`, `required`); other Go models need separate capability checks. That metadata is not complete runtime no-tool denial.
 No installed `deny`, exact trusted grant, named-role constraint or helper isolation
 is claimed. No public schema, model default, route target or CLI flag is added.
 
@@ -104,10 +106,13 @@ condition was met. D071 remains the complete shared discovery/state inventory.
 
 ## Extra Usage verification plan and limits
 
-Before any later live gate, the operator must verify the intended Console
-workspace/account, active Go plan and Extra Usage **off** on its Go page, recording
-a dated, sanitized attestation without keys, balance details or personal data.
-Recheck after workspace/plan changes and before live acceptance. Unknown, enabled
+Immediately before each later live-acceptance run, in the same operator session,
+the operator must verify the intended Console workspace/account, active Go plan
+and Extra Usage **off** on its Go page. Record the timestamp (with timezone),
+workspace/plan match and off result in the P7.12 live-acceptance evidence under
+`docs/evidence/`, linked from PROJECT.md, without keys, balance details or personal
+data. Recheck after workspace/plan changes and after any interruption between
+verification and the run; an earlier day/session attestation is insufficient. Unknown, enabled
 or wrong-workspace state blocks the run; do not infer off from individual-plan
 defaults or a zero balance. The operator owns account changes.
 
@@ -178,3 +183,13 @@ query cannot verify Extra Usage. The assessment records them as blockers rather
 than introducing runtime work. The exact extraction/hash command and all 18 fingerprints pass against the fresh
 checkout. Documentation links/anchors and Git whitespace checks pass. No Rust tests
 are required for unchanged production code/dependencies.
+
+Grok reviewed `acd7cdc` in [PR #86](https://github.com/awesomejt/agent-harness/pull/86)
+under the operator account: 0 blockers, 0 concerns, 2 nits. Both addressed: table
+path bases are explicit, and the Extra Usage check now requires the same operator
+session immediately before each run, with timestamp/timezone and a linked P7.12
+evidence location. Independent review's two wording refinements also clarify
+catalog tool choices and non-Go Zen's inclusion of free models. Documentation
+links/anchors, exact reproduction/fingerprints and whitespace pass. No critical/high
+finding and no re-review requested. Bounded assessment closeout is effective on
+merge; full P7.10 remains open.
