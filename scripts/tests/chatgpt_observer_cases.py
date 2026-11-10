@@ -166,11 +166,20 @@ def guard_cases():
         assert probe.watch_label('/', work) == 'UNOWNED_ANCESTOR'
         refuses(lambda: probe.watch_label('/Users', work))
         refuses(lambda: probe.watch_label('/Library/Application Support/opencode', work))
+    with tempfile.TemporaryDirectory() as directory:
+        work = Path(directory).resolve() / 'work'
+        log = ('level=INFO message="watcher started" path="/Library/Application Support" type=entries\n'
+               'level=WARN message="mcp connect failed" server=x\n'
+               f'level=INFO message="watcher failed" path={work / "home"} type=entries\n')
+        watches, _, problems = probe.log_inventory(log, work)
+        assert problems == [('WARN', 'mcp connect failed')]
+        assert ('work/home', 'entries', 'watcher failed') in watches
+        assert ('MACHINE_PARENT', 'entries', 'watcher started') in watches
     print('PASS: native-only MCP, instruction/plugin/symlink/env guards, ancestor denials and watch labels')
 
 
 INTERNAL = '''import { A } from "./a.js"
-import { B } from "./b.js"
+import { B as Renamed, type Unused as Ignored } from "./b.js"
 import { Group } from "./group.js"
 import Browser from "@opencode/browser"
 const pre = [
@@ -178,7 +187,7 @@ const pre = [
   ...Group,
   // comment
 ] as const satisfies readonly X[]
-const post = [B, Browser] as const satisfies readonly X[]
+const post = [Renamed, Browser] as const satisfies readonly X[]
 '''
 FILES = {
     'core/src/plugin/a.ts': 'export * as A from "./a.js"\nexport const Plugin = define({\n  id: "opencode.a",\n})\n',

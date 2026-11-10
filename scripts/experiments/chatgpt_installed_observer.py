@@ -93,9 +93,11 @@ def imports(packages, path):
     table = {}
     for names, specifier in re.findall(r'import\s+\{([^}]*)\}\s+from\s+"([^"]+)"', text):
         for name in names.split(','):
-            name = name.strip().split(' as ')[-1].strip()
-            if name and not name.startswith('type '):
-                table[name] = (specifier, name)
+            original, _, alias = name.strip().partition(' as ')
+            original = original.strip()
+            local = (alias or original).strip()
+            if local and not original.startswith('type '):
+                table[local] = (specifier, original)
     for name, specifier in re.findall(r'import\s+([A-Za-z_]\w*)\s+from\s+"([^"]+)"', text):
         table[name] = (specifier, 'default')
     return text, table
@@ -582,6 +584,10 @@ def run_case(executable, builtin, project_on, claude_on, reload, ancestor_denied
         check(not any(path.name == 'node_modules' for path in work.rglob('*')))
         check(not any((work / 'denied-bin').iterdir()))
         check({spawn for spawn in spawns} <= {('git', 'rev-parse')})
+        # Gates, not observations: no WARN/ERROR, no failed watcher, machine parent watched.
+        check(not problems)
+        check(not any(message == 'watcher failed' for _, _, message in watches))
+        check(('MACHINE_PARENT', 'entries', 'watcher started') in watches)
         created = sorted({str(p.relative_to(work)).split(os.sep)[0] for p in work.iterdir()})
         return {'project': project_on, 'claude': claude_on, 'reload': reload, 'ancestor_denied': ancestor_denied,
                 'commands': sorted(commands), 'skills': sorted(skills), 'mcp': sorted(mcp),
