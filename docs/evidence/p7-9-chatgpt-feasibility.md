@@ -29,6 +29,10 @@ an unproven boundary. No startup plugins, MCP or hooks are seeded.
 
 ## Results and disposition
 
+**Continuation:** [Contained diagnostics](p7-9-contained-diagnostics.md) resolves
+the experimental spawn/transport blocker under D070, while full P7.9 feasibility
+remains open. The observations below retain the original profile and boundary.
+
 The contained version check passes; standalone config inspection is blocked at
 child spawn. The full observations and unpassed disposition are below.
 
@@ -131,7 +135,9 @@ these observations reproduced, **not that feasibility passed**.
 - `--version --standalone` reports `opencode v2.2.5`.
 - `debug config --standalone` exits 1, with `EPERM` at child `posix_spawn`.
   `debug paths --standalone` was also attempted during investigation and failed
-  at the same capture boundary; it is not needed in the final reproducer.
+  at the capture boundary; the continuation establishes that this command rejects
+  that flag, rather than reaching the config diagnostic's spawn stage. It is not
+  needed in the original reproducer.
 - Pinned `cli/src/services/standalone.ts` starts a caller-owned `serve --stdio
   --port 0` subprocess. The observed spawn failure is an experimental containment
   blocker; its underlying cause is not established. Do not infer that ChatGPT
