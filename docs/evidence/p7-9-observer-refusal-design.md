@@ -37,7 +37,7 @@ P7.11/P7.12 blocked.
 
 ## Initialization findings
 
-All paths are relative to the official v2.2.5 checkout at
+All paths are relative to `packages/` in the official v2.2.5 checkout at
 `9bbb8ce18c80f099e0e448775f59d965ead40a21`. These are source observations, not
 verified installed-build provenance.
 
@@ -53,7 +53,7 @@ verified installed-build provenance.
   latch and starts the first `activate()` immediately when the layer is built. That
   call resolves sources, imports local modules, may install package plugins and runs
   each plugin's effect. `core/src/plugin.ts` sets `list()` to the inventory produced by
-  activation. The built-in set (`plugin/internal.ts`) includes the well-known,
+  activation. The built-in set (`plugin/internal.ts`) includes, among others, the well-known,
   provider, models, dynamic SDK, MCP, command, skill and instruction plugins, so boot
   itself carries their effects. **`plugin.list` can confirm what happened after
   activation. It cannot serve as a safety guard before activation.**
@@ -145,8 +145,8 @@ root placement. Each assertion names an exact positive marker and an exact absen
 | Config and agents | **Resolved.** Use D070 `debug config`/`agents` with distinct canaries in the owned global, compatibility, project and parent roots, with project discovery enabled and disabled. The agent and config outputs remain separate observations. |
 | Commands | **Resolved.** Put an included sentinel command in the owned global config directory and a marker command in the varied root, both inert Markdown with unique names. The positive case lists both; the negative case lists the sentinel without the marker. Because commands register in one pass, sentinel presence anchors marker absence. Never call `command.execute` or sessions. |
 | Skills | **Resolved.** Use the same sentinel/marker pattern, with skill names distinct per scope: global, project, `.claude` and `.agents`. The `config.claude` option gates `.claude` only; `.agents` roots exist only under owned HOME and project. Statically refuse any `skills` URL entry. Record the content hash, never the body. |
-| Instructions | **Resolved by static refusal only.** Before launch, require that the owned global `AGENTS.md` and every owned project/parent `AGENTS.md` are absent, project discovery is off, and no `instructions` entry exists in any owned document, file or environment content. Instructions are non-executable prompt context with no observer and are consumed only by sessions, which are out of scope. Proving discovered instruction content stays a P7.11 consuming gate. |
-| Plugins and hooks | **Resolved as a static guard plus post-activation confirmation.** Before launch, require that no owned eligible root contains a `plugin/` or `plugins/` entry of any type, that no owned document contains a `plugins` directive, and that no SDK or instance plugins are injected. After settling, `plugin.list` must equal the expected built-in set exactly, all `active`, with no `local` or `package` source. No positive discovery fixture: an executable canary remains forbidden. |
+| Instructions | **Resolved by static refusal only, under discovery on and off.** The ancestor walk in `config/plugin/instruction.ts` runs from the resolved location directory up to `stop`, which is HOME when the location is inside HOME and otherwise the project root. Fixtures must therefore place the owned project and parent beneath the owned synthetic HOME, with no symlinked path components, so `stop` is the owned HOME and every directory the walk can reach is owned. Before launch, in both cases, require that no `AGENTS.md` exists in the owned global config directory or in any directory from the location up to and including the owned HOME, and that no `instructions` entry exists in any owned document, file or environment content. Instructions are non-executable prompt context with no observer and are consumed only by sessions, which are out of scope. Proving discovered instruction content stays a P7.11 consuming gate. |
+| Plugins and hooks | **Resolved as a static guard plus post-activation confirmation.** Before launch, require that no owned eligible root contains a `plugin/` or `plugins/` entry of any type, that no owned document contains a `plugins` directive, and that no SDK or instance plugins are injected. After settling, `plugin.list` must equal the expected built-in set exactly, all `active`, with no `local` or `package` source. The expected set is the IDs of the `pre` and `post` arrays in the fingerprinted `plugin/internal.ts`, including their spread provider, web-search and optimize groups, each with `source.type` `builtin`. The helper derives this set from that file and records it, rather than relying on a hand-maintained copy; any difference in the installed build fails the run. No positive discovery fixture: an executable canary remains forbidden. |
 | MCP | **Resolved.** Use an included sentinel and a varied-root marker, both `type: "local"` and `disabled: true`, each running a nonexistent absolute command under a write-denied owned path, with unique names. Positive: both report status `disabled`. Negative: only the sentinel is listed. Status `failed` or `pending` means a start was attempted and fails the run. |
 | Well-known integration | **Resolved for fresh state; retained-cache pair blocked.** An exclusively created data root has no `wellknown:sources`, so no origins load (source-proven). Seeding a retained registration would require either `integration.wellknown.add`, which is a mutation that fetches the origin and needs a network exception beyond D070's single port, or direct writes to the internal KV schema. Both need a separate decision. |
 | Console integration | **Resolved for fresh state; connected pair blocked.** With fresh state and a cleared environment, `connection.active` has nothing to return. A positive fixture needs a credential-like row and a network `resolve` or refresh, both outside the D047/D067 boundaries. |
@@ -227,3 +227,17 @@ Verified the exact source commit and a clean worktree. Re-verified all 26 D074
 fingerprints and recorded the 41 above. Documentation relative links and anchors,
 link-checker fixtures and whitespace checks pass. This assessment is source-only, so
 no Rust changes or tests, installed runtime or direct-tool coding comparison apply.
+
+Grok reviewed the first revision in [PR #89](https://github.com/awesomejt/agent-harness/pull/89)
+under the operator account and found 0 blockers, 1 concern and 2 nits. All three are
+addressed:
+
+- **Concern:** the instruction refusal now holds with project discovery both on and
+  off. Fixtures sit under the owned synthetic HOME, so the ancestor walk's source-pinned
+  `stop` is owned, and the reachable directories are recorded.
+- **Nit:** the expected built-in plugin set is defined as the IDs in the fingerprinted
+  `plugin/internal.ts`, derived and recorded by the helper.
+- **Nit:** finding paths are stated as relative to `packages/`.
+
+Documentation links and anchors, link-checker fixtures, all fingerprints and whitespace
+checks pass again. No critical or high finding, so no re-review was requested.
