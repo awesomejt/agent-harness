@@ -60,9 +60,14 @@ All paths are relative to `packages/` in the official v2.2.5 checkout at
   harness-created root never contains that file.
 - **Console connection.** `core/src/plugin/provider/opencode.ts` loads Console remote
   configuration at boot whenever `integration.connection.active("opencode")` returns a
-  connection. When that load fails, the last config is kept. `integration.connection.key`
-  in `core/src/integration.ts` stores a key credential without any network call, so a
-  synthetic Console connection can be created offline through the official route.
+  connection. When that load fails, the last config is kept. The server route
+  `integration.connect.key` (`POST /api/integration/:integrationID/connect/key`, defined in
+  `protocol/src/groups/integration.ts`) calls the core service method `connection.key` in
+  `core/src/integration.ts`. That method stores a key credential without any network call,
+  so a synthetic Console connection can be created offline through the official route.
+  Route names in this report are the protocol endpoint identifiers, as the observer
+  allowlist uses them. The well-known route is `integration.wellknown.add`
+  (`POST /api/experimental/integration/wellknown`).
 - **Well-known cache.** `core/src/wellknown.ts` keeps sources, manifests and configs in KV
   and falls back to the cached copy when a refresh fails (D075). Upstream ships a synthetic
   origin fixture, `core/script/wellknown-server.ts`. It is cited for shape only and is
@@ -79,7 +84,7 @@ For the OpenCode ChatGPT route only. Experimental until its own installed proof 
 | Element | Selection |
 |---|---|
 | Root | A harness-owned directory created exclusively (`O_EXCL`, mode `0700`) with an ownership marker, under the harness's own state directory. It holds an owned HOME, owned XDG roots and an empty owned project. It is never the ordinary `~/.local/share/opencode`, and nothing is copied, linked or imported into it. `OPENCODE_DB` must be unset. |
-| Login | The operator runs the unmodified official CLI against that root: `opencode auth login openai --method chatgpt-token-sharing --standalone`, with HOME and XDG pointed at the owned roots, project discovery off, and the empty owned project as the working directory. The harness may print this command in setup docs and diagnostics. It does not run, wrap or prompt for it, and it never observes the browser exchange (D047). A URL target and the managed service are refused. |
+| Login | The operator runs the unmodified official CLI against that root, from the empty owned project, in a cleared environment: `env -i HOME=<root>/home XDG_DATA_HOME=<root>/data XDG_CONFIG_HOME=<root>/config XDG_CACHE_HOME=<root>/cache XDG_STATE_HOME=<root>/state PATH=/usr/bin:/bin:/usr/sbin:/sbin TERM=<operator TERM> OPENCODE_DISABLE_PROJECT_CONFIG=1 OPENCODE_DISABLE_CLAUDE_CODE=1 <absolute opencode path> auth login openai --method chatgpt-token-sharing --standalone`. That allowlist is the whole environment. `OPENCODE_DB`, `OPENCODE_CONFIG*`, provider keys and every other variable are absent, and the pinned executable is called by absolute path. The browser open is best effort and the CLI prints the URL anyway (`cli/src/ui/prompt.ts`), so the cleared environment needs nothing more for the browser. The later login task confirms that on the host. The harness may print this command in setup docs and diagnostics. It does not run, wrap or prompt for it, and it never observes the browser exchange (D047). A URL target and the managed service are refused. |
 | Ownership | One root serves one operator account and only operator-started runs (D067). An advisory exclusive lock is held for the whole run. The operator must not use the root by hand while a run is active. |
 | Preflight | Before any session, under the D076 composed profile with network fully denied, the observer adds `integration.list` to its allowlist and requires all of the invariants below. Any failure is a pre-submission setup error with no fallback (D031/D034). |
 | Run | The run boot repeats the same invariants before the first session is created. Data writes are allowed only beneath the owned root. Route, endpoint, method and permission controls are separate gates (P7.11). |
@@ -90,7 +95,13 @@ For the OpenCode ChatGPT route only. Experimental until its own installed proof 
 - **Root shape.** The ownership marker matches, no `auth.json` exists (checked by name
   only, never read), and the database path is the owned default.
 - **Integration set.** The integration IDs equal the pinned built-in set exactly. Any extra
-  ID means retained well-known or other registered state, and the run is refused.
+  ID means retained well-known or other registered state, and the run is refused. This
+  report does not derive that set. Integrations are registered by the built-in plugins, not
+  listed in one file. The next experiment fixes the expected set as the ID list that
+  `integration.list` returns on a fresh, unauthenticated root under the D076 profile. It
+  records the IDs, their count and a SHA-256, cross-checks them against the integration
+  registrations in D076's 91 fingerprinted built-in plugin files, and fails on any
+  difference between its control runs.
 - **Connections.** `openai` has exactly one connection, with method `oauth` and no
   `needs_auth` status. `opencode` (Console) and every other integration have none. Env
   connections are impossible because the environment is cleared. Labels and IDs are
@@ -155,6 +166,7 @@ Use the D071 clone procedure to obtain a public v2.2.5 checkout. Nothing is inst
 | `cli/src/services/standalone.ts` | `dc8197da471d3d213acf51ef809bb1c05a7cf697bce1f0795e49fdd4c0165cf9` |
 | `cli/src/commands/handlers/auth/login.ts` | `d38a229c7db598d499fa51602f3086a75c64b7f5de64f6e1de51ba5612c47f30` |
 | `cli/src/commands/handlers/auth/shared.ts` | `77179fe4706f3d62dc6aa00871ee10ccf93f1e6c2b3257d33263d82cbb7035e6` |
+| `cli/src/ui/prompt.ts` | `1726556f7f6f2577e7fd2c61786e2f37f1da641e73548b5474269606c92d1694` |
 | `schema/src/connection.ts` | `b8bec346b315e6ef36174945c6b62ac467465c2777d0666e103c90b9e55adbf8` |
 | `schema/src/integration.ts` | `2cf903a147260a405fa87504a07e05e3a5536ae62d351ddbacb3142af3274c82` |
 | `protocol/src/groups/integration.ts` | `3f3010e8b66f378b9a862b789bfc079369f5ce7c9a9b424ab2cfbf8623aceeb1` |
