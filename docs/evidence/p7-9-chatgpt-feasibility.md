@@ -89,6 +89,27 @@ other state: `core/src/config.ts` loads integration/well-known documents, and
 path override is consequently a lead, not accepted credential-only isolation.
 No normal database, auth file or account metadata was inspected.
 
+## Pinned diagnostic schema check (PR review)
+
+Grok questioned whether current docs' string model examples invalidate this
+probe's object model. At the selected pin,
+[`packages/schema/src/config/model.ts`](https://github.com/anomalyco/opencode/blob/9bbb8ce18c80f099e0e448775f59d965ead40a21/packages/schema/src/config/model.ts)
+defines `Selection` as a union of the short string and explicit
+`{providerID, model, variant?}` object, decoding either to the explicit form.
+[`packages/schema/src/config.ts`](https://github.com/anomalyco/opencode/blob/9bbb8ce18c80f099e0e448775f59d965ead40a21/packages/schema/src/config.ts)
+and `config/agent.ts` use that selection for root and agent models; root `share`
+explicitly permits `manual`, `auto` and `disabled`. `core/src/config/normalize.ts`
+decodes the selection and retains the explicit form. Thus the diagnostic input
+is valid by the pinned source schema; retain it and do not substitute assumptions
+from moving docs. This remains source evidence, not an installed effective-config
+observation. The schema files' SHA-256 values respectively are
+`ea2ade334413cdcb907a9b78cda00184c0cdac11a5ced57585bec1cc57ea3f4b` and
+`807a70bae2c0d83812fe9722a6e1312ae2974a036d27e3b973c415291ecab1a5`.
+
+Both version and standalone config invocations now pass through the same exact
+command allowlist and bounded status-capturing helper, addressing Grok's guard
+consistency nit. No auth/ACP/session/prompt command is allowlisted.
+
 ## Installed results
 
 Host: Apple Silicon macOS. Installed symlink resolves to Homebrew

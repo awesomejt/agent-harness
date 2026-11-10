@@ -11,7 +11,7 @@ import tempfile
 from antigravity_feasibility import capture, check, containment_checks, profile
 
 SHA256 = '4ecfcc961e52d7c89011db860df1cafcb3ed180a2902fbd5fb99fffc923bb1b5'
-COMMANDS = {('--version',)}
+COMMANDS = {('--version',), ('debug', 'config')}
 
 
 def main():
@@ -55,18 +55,21 @@ def main():
                          containment_checks(read_target, Path(fence) / 'write')], project, env)
         print('PASS: network bind, operator-home data read and outside write denied', flush=True)
 
-        def run(command):
+        def run(command, status=0):
             check(tuple(command) in COMMANDS)
-            out, _ = capture([*sandbox, str(executable), *command, '--standalone'], project, env)
-            return out.decode()
+            # Preserve the CLI status inside the bounded group capture, whose
+            # wrapper exits zero. Both invocations use this command guard.
+            wrapper = '"$@"; status=$?; printf "\\nAH_EXIT=%s\\n" "$status"'
+            out, err = capture([*sandbox, '/bin/sh', '-c', wrapper, 'ah-diagnostic',
+                                str(executable), *command, '--standalone'], project, env)
+            marker = ('\nAH_EXIT=' + str(status) + '\n').encode()
+            check(out.endswith(marker))
+            return out[:-len(marker)], err
 
-        check(run(['--version']).strip() == 'opencode v2.2.5')
-        # Standalone debug starts a child server. Preserve its exact exit status
-        # inside the bounded group capture; the wrapper itself always exits zero.
-        wrapper = '"$@"; status=$?; printf "\\nAH_EXIT=%s\\n" "$status"'
-        out, err = capture([*sandbox, '/bin/sh', '-c', wrapper, 'ah-diagnostic',
-                            str(executable), 'debug', 'config', '--standalone'], project, env)
-        check(out.endswith(b'\nAH_EXIT=1\n') and b'EPERM' in err and b'posix_spawn' in err)
+        out, _ = run(['--version'])
+        check(out.decode().strip() == 'opencode v2.2.5')
+        _, err = run(['debug', 'config'], status=1)
+        check(b'EPERM' in err and b'posix_spawn' in err)
         print('BLOCK: standalone debug config exits 1 with EPERM at child posix_spawn', flush=True)
         print('LIMIT: sources/agents positive controls not reached; no login/session/model or permission proof')
 
