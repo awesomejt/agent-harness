@@ -31,6 +31,7 @@ SUITES = [
     ['scripts/tests/grok_feasibility_cases.py'],
     ['scripts/tests/antigravity_feasibility_cases.py'],
     ['scripts/tests/pi_feasibility_cases.py'],
+    ['scripts/tests/pi_resource_route_cases.py'],
     ['scripts/tests/chatgpt_contained_cases.py'],
     ['scripts/tests/chatgpt_observer_cases.py'],
     ['scripts/tests/chatgpt_retained_cases.py'],
