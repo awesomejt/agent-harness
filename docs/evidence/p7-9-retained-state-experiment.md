@@ -63,7 +63,7 @@ controls run before any OpenCode process:
 | Control | Observation |
 |---|---|
 | D070 matrix under the composed profile | Owned echo works. Other TCP ports, binds, external TCP, UDP, IPv6, Unix sockets, operator-home reads and outside writes are denied. |
-| Extra origin port, paired | Without the allowance, connecting to the origin port is denied. With it, only an outbound connection to that port works. Binding it and connecting to a second live loopback listener stay denied. Neither listener received a request. |
+| Extra origin port, paired | Both controls use the same composition as each boot, including the ancestor denials. The origin port has live listeners on `127.0.0.1` and `::1`. Without the allowance, connecting to either is denied. With it, only outbound connections to that port work, and they work on both loopback addresses: SBPL `localhost` covers IPv4 and IPv6 loopback, and SBPL accepts only `localhost` or `*` as the host. Binding the port and connecting to a second live loopback listener stay denied. Neither origin listener received a request. |
 
 The allowance is added only to the boot that serves the synthetic origin (boot A of the two
 well-known cases). Every later boot runs without it.
@@ -133,7 +133,7 @@ from a retained well-known source.
 |---|---|---|---|
 | Reused root | Fresh, under the held lock | Identical integrations, resources, config documents and connection digests | `[]` / `openai-connection`, both boots |
 | Well-known control | Origin up and allowed, not seeded; 0 origin requests | Origin down, no allowance; same as boot A | `[]` both boots; no warnings |
-| Well-known seeded | Seeded; exactly 1 manifest request; one extra integration, the origin, with one `command`/`login` method | Origin down and denied; the origin integration is retained | `integration-set`, both boots |
+| Well-known seeded | Seeded; exactly 1 manifest request; one extra integration, the origin, with one `command`/`login` method | Origin down (listener closed) and no allowance; the origin integration is retained. From OpenCode's side, a refused and a denied connection look the same, and the paired boundary control proves the denial separately. | `integration-set`, both boots |
 | Console seeded | Seeded; `opencode` has one `credential`/`key` connection, the only connection anywhere | Same connection digest retained | `console-connection`, both boots; with login: `console-connection`, `openai-connection` |
 
 The reused-root case is also the unseeded Console control. Its lock probe from a second
@@ -244,7 +244,8 @@ Re-verified from D077: `wellknown.ts`, `plugin/provider/opencode.ts`, `integrati
   `failed to load wellknown config` warning. After the source check above, it was added to the
   expected set for seeded boots. Two runs then passed. The exact integration cross-check and
   the pre-launch boundary controls were added next, and three consecutive runs of the final helper passed with identical redacted
-  summaries. The missing-executable, byte-drift and wrong-checkout refusals pass.
+  summaries. After review, the boundary controls were aligned with the boot composition and
+  given an IPv6 probe, and two further full runs passed with identical summaries. The missing-executable, byte-drift and wrong-checkout refusals pass.
 - **D076 regression.** The observer's route allowlist became a class attribute so this helper
   can add one route. The D076 installed probe and `chatgpt_observer_cases.py` pass unchanged.
   The D076 observer still refuses `/api/integration`.
@@ -263,3 +264,19 @@ Re-verified from D077: `wellknown.ts`, `plugin/provider/opencode.ts`, `integrati
   - settle and timeout.
 - **Other checks.** Python syntax, documentation links and whitespace pass. Rust sources and
   dependencies are unchanged.
+
+## Review
+
+Grok reviewed the first revision in [PR #92](https://github.com/awesomejt/agent-harness/pull/92)
+and found 0 blockers, 0 concerns and 3 nits. All three are addressed:
+
+- **Nit:** the boundary controls used the D076 profile without the ancestor denials. They now
+  use the boot's exact composition, and the origin probe adds a live `::1` listener. The
+  allowance admits the origin port on IPv6 loopback as well, and the helper pins and records
+  that result.
+- **Nit:** the well-known boot B row now says the origin is down with no allowance, rather
+  than claiming a denial that this case cannot observe.
+- **Nit:** the status line links the PR.
+
+Two full installed runs, the offline cases, links and whitespace pass again. No critical or
+high finding, so no re-review was requested.

@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -373,10 +374,11 @@ ORIGIN_PROBE = r"""
 import json, socket, sys
 port, other = int(sys.argv[1]), int(sys.argv[2])
 out = {}
-for name, op in (('connect', lambda s: s.connect(('127.0.0.1', port))),
-                 ('bind', lambda s: s.bind(('127.0.0.1', port))),
-                 ('other', lambda s: s.connect(('127.0.0.1', other)))):
-    s = socket.socket(); s.settimeout(1)
+for name, family, op in (('connect', socket.AF_INET, lambda s: s.connect(('127.0.0.1', port))),
+                         ('connect_v6', socket.AF_INET6, lambda s: s.connect(('::1', port))),
+                         ('bind', socket.AF_INET, lambda s: s.bind(('127.0.0.1', port))),
+                         ('other', socket.AF_INET, lambda s: s.connect(('127.0.0.1', other)))):
+    s = socket.socket(family); s.settimeout(1)
     try:
         op(s); out[name] = 'ok'
     except PermissionError:
@@ -390,27 +392,39 @@ print(json.dumps(out))
 
 
 def boundary_controls(root):
-    """Revalidate the D076 composed profile, then pair the extra origin allowance with its absence."""
+    """Revalidate the composition each boot uses (D076 profile with ancestor denials), then pair the extra
+    origin allowance with its absence, over IPv4 and IPv6 loopback."""
+    denials = ancestor_denials(root / 'home')
     port = fresh_port()
     env = {'HOME': str(root), 'TMPDIR': str(root), 'PATH': '/usr/bin:/bin'}
     with tempfile.TemporaryDirectory(prefix='.ah-retained-read-', dir=Path.home()) as protected:
         target = Path(protected) / 'sentinel'
         target.write_text('AH_READ_DENIAL_SENTINEL')
         with tempfile.TemporaryDirectory(prefix='ah-retained-write-') as fence:
-            network_controls(root, combined_profile(root, port), env, port, target, Path(fence) / 'write')
+            network_controls(root, combined_profile(root, port, denials), env, port, target, Path(fence) / 'write')
     observed = {}
     with SyntheticOrigin(fresh_port(), root / 'absent') as origin, SyntheticOrigin(fresh_port(), root / 'absent') as other:
         origin_port, other_port = origin.server.server_address[1], other.server.server_address[1]
-        for allowed in (False, True):
-            policy = combined_profile(root, fresh_port()) + (origin_allowance(origin_port) if allowed else '')
-            out, err = capture(['/usr/bin/sandbox-exec', '-p', policy, PYTHON, '-B', '-c', ORIGIN_PROBE,
-                                str(origin_port), str(other_port)], root, env)
-            check(not err)
-            observed['allowed' if allowed else 'absent'] = json.loads(out)
+        # A real ::1 listener on the origin port, so the IPv6 result reflects the policy, not a refusal.
+        v6 = socket.socket(socket.AF_INET6)
+        v6.bind(('::1', origin_port))
+        v6.listen(4)
+        try:
+            for allowed in (False, True):
+                policy = combined_profile(root, fresh_port(), denials) + (
+                    origin_allowance(origin_port) if allowed else '')
+                out, err = capture(['/usr/bin/sandbox-exec', '-p', policy, PYTHON, '-B', '-c', ORIGIN_PROBE,
+                                    str(origin_port), str(other_port)], root, env)
+                check(not err)
+                observed['allowed' if allowed else 'absent'] = json.loads(out)
+        finally:
+            v6.close()
         check(origin.hits == {'manifest': 0, 'other': 0} and other.hits == {'manifest': 0, 'other': 0})
-    check(observed == {'absent': {'connect': 'denied', 'bind': 'denied', 'other': 'denied'},
-                       'allowed': {'connect': 'ok', 'bind': 'denied', 'other': 'denied'}})
-    print('PASS: composed D076 boundary revalidated; origin allowance permits only outbound to its own port', flush=True)
+    absent = {'connect': 'denied', 'connect_v6': 'denied', 'bind': 'denied', 'other': 'denied'}
+    check(observed['absent'] == absent)
+    # SBPL `localhost` covers both loopback families: the allowance admits the origin port on ::1 too.
+    check(observed['allowed'] == dict(absent, connect='ok', connect_v6='ok'))
+    print('PASS: composed D076 boundary revalidated; origin allowance permits only outbound to its own port (IPv4 and IPv6 loopback)', flush=True)
     return observed
 
 
