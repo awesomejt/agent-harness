@@ -157,17 +157,22 @@ pub(crate) fn validate_state(data: &Value, model: &str, api_base: &str) -> bool 
         && model_obj.get("id") == Some(&json!(model))
         && model_obj.get("baseUrl") == Some(&json!(api_base))
         && model_obj.get("api") == Some(&json!("openai-completions"))
-        && state.get("activeTools").is_none_or(empty_array)
-        && state.get("mcpServers").is_none_or(empty_array)
-        && state.get("tools").is_none_or(empty_array)
-        && state
-            .get("piVersion")
-            .and_then(Value::as_str)
-            .is_none_or(|v| v == VERSION)
+        && state.get("activeTools").is_some_and(empty_array)
+        && state.get("mcpServers").is_some_and(empty_array)
+        && state.get("tools").is_some_and(empty_array)
+        && state.get("piVersion") == Some(&json!(VERSION))
 }
 
 fn empty_array(value: &Value) -> bool {
     value.as_array().is_some_and(Vec::is_empty)
+}
+
+pub(crate) fn record_tool_call(line: &Value) -> bool {
+    match line.get("type").and_then(Value::as_str) {
+        Some("tool_call") => true,
+        Some("event") if line.get("event") == Some(&json!("tool_call")) => true,
+        _ => false,
+    }
 }
 
 pub(crate) fn validate_prompt_response(line: &Value, id: &str) -> bool {
@@ -187,6 +192,7 @@ pub(crate) enum Terminal {
 
 pub(crate) fn classify_event(line: &Value, interrupted: bool) -> Option<Terminal> {
     match line.get("type").and_then(Value::as_str) {
+        Some("agent_settled") if interrupted => Some(Terminal::Cancelled),
         Some("agent_settled")
             if line
                 .get("error")
@@ -194,7 +200,7 @@ pub(crate) fn classify_event(line: &Value, interrupted: bool) -> Option<Terminal
         {
             Some(Terminal::Other)
         }
-        Some("agent_settled") if !interrupted => {
+        Some("agent_settled") => {
             let text = line
                 .get("assistantText")
                 .and_then(Value::as_str)
@@ -203,8 +209,8 @@ pub(crate) fn classify_event(line: &Value, interrupted: bool) -> Option<Terminal
                 .to_owned();
             Some(Terminal::Success { text })
         }
-        Some("agent_settled") if interrupted => Some(Terminal::Cancelled),
         Some("tool_call") | Some("extension_error") => None,
+        Some("event") if line.get("event") == Some(&json!("tool_call")) => None,
         Some("agent_end") => None,
         _ => None,
     }
@@ -248,7 +254,7 @@ struct PreparedState {
 
 #[cfg(target_os = "macos")]
 impl PreparedState {
-    fn prepare(request: &Resolved, lookup: impl Fn(&str) -> Option<OsString>) -> io::Result<Self> {
+    fn prepare(request: &Resolved) -> io::Result<Self> {
         let agent_dir = AgentDir::new()?;
         let root = agent_dir.path();
         let key_name = request
@@ -285,7 +291,6 @@ impl PreparedState {
 }
 "#,
         )?;
-        let _ = lookup;
         Ok(Self {
             agent_dir,
             extension,
@@ -303,6 +308,7 @@ struct Channel {
     stdin: Option<tokio::process::ChildStdin>,
 }
 
+#[cfg(target_os = "macos")]
 impl Channel {
     async fn send(&mut self, value: &Value, deadline: Instant) -> bool {
         let Some(stdin) = self.stdin.as_mut() else {
@@ -453,39 +459,43 @@ async fn turn(
     progress.emit("attempt.prompt_submitted", json!({}));
     progress.note(json!({"prompt_submitted": true}));
     let bound = deadline.min(Instant::now() + Duration::from_secs(30));
-    let prompt_ok = tokio::select! {
+    let mut prompt_ok = false;
+    tokio::select! {
         record = tokio::time::timeout_at(bound, channel.records.recv()) => match record {
-            Ok(Some(Ok(line))) if validate_prompt_response(&line, prompt_id) => true,
-            Ok(Some(Ok(line))) if line.get("type") == Some(&json!("event")) => {
-                if line.get("event") == Some(&json!("tool_call")) {
-                    observed.tools += 1;
-                    observed.violation = true;
-                }
-                false
+            Ok(Some(Ok(line))) if validate_prompt_response(&line, prompt_id) => prompt_ok = true,
+            Ok(Some(Ok(line))) if record_tool_call(&line) => {
+                observed.tools += 1;
+                observed.violation = true;
             }
             Ok(Some(Err(()))) => return Outcome::Failed,
             Err(_) if Instant::now() >= deadline => return Outcome::Stopped,
+            Ok(Some(Ok(_))) => {}
             _ => return Outcome::Failed,
         },
         _ = cancelled.cancelled() => return Outcome::Stopped,
     };
     if !prompt_ok {
-        // Keep reading until the prompt response arrives or failure.
         let mut attempts = 0;
         while attempts < 8 {
             attempts += 1;
             let record = tokio::time::timeout_at(bound, channel.records.recv()).await;
             match record {
-                Ok(Some(Ok(line))) if validate_prompt_response(&line, prompt_id) => break,
-                Ok(Some(Ok(line))) if line.get("type") == Some(&json!("tool_call")) => {
+                Ok(Some(Ok(line))) if validate_prompt_response(&line, prompt_id) => {
+                    prompt_ok = true;
+                    break;
+                }
+                Ok(Some(Ok(line))) if record_tool_call(&line) => {
                     observed.tools += 1;
                     observed.violation = true;
                     return Outcome::Failed;
                 }
                 Ok(Some(Err(()))) => return Outcome::Failed,
                 Err(_) | Ok(None) => return Outcome::Failed,
-                _ => {}
+                Ok(Some(Ok(_))) => {}
             }
+        }
+        if !prompt_ok {
+            return Outcome::Failed;
         }
     }
     let mut interrupted = cancelled.is_cancelled();
@@ -504,17 +514,22 @@ async fn turn(
                 .await;
         }
         let bound = deadline.min(Instant::now() + Duration::from_secs(30));
-        let record = tokio::select! {
-            value = tokio::time::timeout_at(bound, channel.records.recv()) => value,
-            _ = cancelled.cancelled() => {
-                interrupted = true;
-                let _ = channel.send(&rpc("ah-abort", "abort", json!({})), deadline).await;
-                continue;
+        let record = if interrupted {
+            tokio::time::timeout_at(bound, channel.records.recv()).await
+        } else {
+            tokio::select! {
+                biased;
+                value = tokio::time::timeout_at(bound, channel.records.recv()) => value,
+                _ = cancelled.cancelled() => {
+                    interrupted = true;
+                    let _ = channel.send(&rpc("ah-abort", "abort", json!({})), deadline).await;
+                    continue;
+                }
             }
         };
         match record {
             Ok(Some(Ok(line))) => {
-                if line.get("type") == Some(&json!("tool_call")) {
+                if record_tool_call(&line) {
                     observed.tools += 1;
                     observed.violation = true;
                     return Outcome::Failed;
@@ -554,7 +569,7 @@ pub(crate) async fn attempt(
             return Exit::Invalid;
         }
     };
-    let prepared = match PreparedState::prepare(request, |name| std::env::var_os(name)) {
+    let prepared = match PreparedState::prepare(request) {
         Ok(prepared) => prepared,
         Err(_) => {
             progress.event("private Pi state setup failed");
@@ -692,12 +707,13 @@ mod tests {
             },
             "activeTools": [],
             "mcpServers": [],
+            "tools": [],
         });
         assert!(validate_state(&data, "fixture", "http://127.0.0.1:9/v1"));
     }
 
     #[test]
-    fn preflight_state_refuses_tooling() {
+    fn preflight_state_refuses_missing_version() {
         let data = json!({
             "isStreaming": false,
             "isCompacting": false,
@@ -710,9 +726,39 @@ mod tests {
                 "baseUrl": "http://127.0.0.1:9/v1",
                 "api": "openai-completions",
             },
-            "activeTools": ["bash"],
+            "activeTools": [],
+            "mcpServers": [],
+            "tools": [],
         });
         assert!(!validate_state(&data, "fixture", "http://127.0.0.1:9/v1"));
+    }
+
+    #[test]
+    fn preflight_state_refuses_tooling() {
+        let data = json!({
+            "isStreaming": false,
+            "isCompacting": false,
+            "autoCompactionEnabled": false,
+            "messageCount": 0,
+            "pendingMessageCount": 0,
+            "piVersion": VERSION,
+            "model": {
+                "provider": PROVIDER,
+                "id": "fixture",
+                "baseUrl": "http://127.0.0.1:9/v1",
+                "api": "openai-completions",
+            },
+            "activeTools": ["bash"],
+            "mcpServers": [],
+            "tools": [],
+        });
+        assert!(!validate_state(&data, "fixture", "http://127.0.0.1:9/v1"));
+    }
+
+    #[test]
+    fn settled_error_after_interrupt_maps_cancelled() {
+        let line = json!({"type": "agent_settled", "error": true});
+        assert_eq!(classify_event(&line, true), Some(Terminal::Cancelled));
     }
 
     #[test]

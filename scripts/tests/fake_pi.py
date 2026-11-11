@@ -16,6 +16,20 @@ MODEL = next((a.split('=', 1)[1] for a in sys.argv if a.startswith('--model=')),
 log = open(cwd / 'stdin.jsonl', 'a')
 
 
+def models_api_key():
+    root = os.environ.get('PI_CODING_AGENT_DIR')
+    if not root:
+        return None
+    path = Path(root) / 'models.json'
+    if not path.is_file():
+        return None
+    payload = json.loads(path.read_text())
+    key = payload.get('providers', {}).get(PROVIDER, {}).get('apiKey')
+    if case == 'models-key' and key:
+        (cwd / 'models_key.txt').write_text(str(key))
+    return key
+
+
 def emit(record):
     if isinstance(record, str):
         sys.stdout.write(record + '\n')
@@ -62,6 +76,11 @@ def respond(request):
     if case == 'control-error' and command == 'get_state':
         emit({'type': 'response', 'id': ident, 'command': command, 'success': False, 'error': 'nope'})
         return
+    if command == 'get_state' and case != 'control-error':
+        key = models_api_key()
+        if case == 'models-key' and key != '${LOCAL_KEY}':
+            emit({'type': 'response', 'id': ident, 'command': command, 'success': False, 'error': 'apiKey'})
+            return
     if command == 'prompt':
         (cwd / 'prompted').write_text(request.get('message', ''))
         emit({'type': 'response', 'id': ident, 'command': 'prompt', 'success': True,

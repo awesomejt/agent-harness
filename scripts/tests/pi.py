@@ -35,6 +35,9 @@ CASES = [
     ('malformed', 4, True, []),
     ('error-result', 1, True, []),
     ('cancel-deadline', 3, True, ['--timeout-secs', '3']),
+    ('cancel-stall', 3, True, ['--timeout-secs', '3']),
+    ('models-key', 0, True, []),
+    ('cloud-only-pi', 2, False, []),
     ('trusted', 2, False, T),
     ('agent-refuse', 2, False, ['--agent', 'coder']),
     ('local-first', 2, False, ['--mode', 'local-first',
@@ -42,9 +45,6 @@ CASES = [
     ('preview', 0, False, ['--preview']),
     ('missing-runtime', 2, False, []),
 ]
-
-PI_CLOUD = dict(version=1, mode='cloud-only', native=dict(target='opencode', model='gpt-5.4', api_key_env='K'),
-                litellm=dict(api_base='http://127.0.0.1:9/v1', api_key_env='LOCAL_KEY', runtime='pi'))
 
 count = 0
 for case, expected, prompted, extra in CASES:
@@ -59,33 +59,35 @@ for case, expected, prompted, extra in CASES:
         project = base / 'project'
         project.mkdir()
         (project / 'case').write_text(case)
-        ah = PI_CLOUD if case == 'cloud-only-runtime' else cfg()
-        if case == 'local-first':
-            (base / 'cloud-native.json').write_text(json.dumps(dict(
-                version=1, mode='local-first', model='fixture',
-                litellm=dict(api_base='http://127.0.0.1:9/v1', api_key_env='LOCAL_KEY', runtime='pi'),
-                native=dict(target='opencode', model='gpt-5.4', api_key_env='NATIVE_KEY'))))
+        if case == 'cloud-only-pi':
+            ah = dict(version=1, mode='cloud-only', native=dict(target='opencode', model='gpt-5.4', api_key_env='K'),
+                      litellm=dict(api_base='http://127.0.0.1:9/v1', api_key_env='LOCAL_KEY', runtime='pi'))
+        elif case == 'local-first':
+            ah = dict(version=1, mode='local-first', model='fixture',
+                      litellm=dict(api_base='http://127.0.0.1:9/v1', api_key_env='LOCAL_KEY', runtime='pi'),
+                      native=dict(target='opencode', model='gpt-5.4', api_key_env='NATIVE_KEY'))
+            (base / 'cloud-native.json').write_text(json.dumps(ah))
+        else:
+            ah = cfg()
         (project / 'ah.json').write_text(json.dumps(ah))
         if case == 'agent-refuse':
             (project / 'agents').mkdir()
             (project / 'agents/coder.md').write_text((ROOT / 'agents/coder.md').read_text())
         env = {'PATH': f'{bindir}:/usr/bin:/bin', 'HOME': str(base), 'LOCAL_KEY': 'synthetic',
                'NATIVE_KEY': 'synthetic'}
-        if case == 'local-first':
-            env['NATIVE_KEY'] = 'synthetic'
         args = [str(BINARY), 'single', 'pi task', '--project', str(project)] + extra
         if '--timeout-secs' not in extra:
             args += ['--timeout-secs', '15']
         if case == 'local-first':
             args += ['--config', str(base / 'cloud-native.json')]
-        p = subprocess.run(args, env=env, capture_output=True, text=True, timeout=40)
+        p = subprocess.run(args, env=env, capture_output=True, text=True, timeout=60)
         out = p.stdout + p.stderr
         assert p.returncode == expected, (case, p.returncode, p.stderr)
         assert (project / 'prompted').exists() == prompted, case
         launched = (project / 'argv.json').exists()
         refuse = {'trusted', 'agent-refuse', 'local-first', 'preview', 'missing-runtime',
-                  'cloud-only-runtime'}
-        if case == 'cloud-only-runtime':
+                  'cloud-only-pi'}
+        if case == 'cloud-only-pi':
             assert 'litellm.runtime pi applies only to local-only' in p.stderr, p.stderr
         assert launched == (case not in refuse), case
         if launched:
@@ -102,6 +104,8 @@ for case, expected, prompted, extra in CASES:
             if prompted:
                 assert types[:3] == ['set_auto_compaction', 'set_auto_retry', 'get_state'], (case, types)
                 assert types.index('prompt') == 3, (case, types)
+        if case == 'models-key':
+            assert (project / 'models_key.txt').read_text() == '${LOCAL_KEY}', case
         if case == 'success':
             assert p.stdout == 'fake response\nfinal line', (case, p.stdout)
         if case == 'jsonl':
