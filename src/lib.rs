@@ -11,6 +11,8 @@ pub mod config;
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod opencode;
 pub mod permission;
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+mod pi;
 mod preview;
 #[cfg(target_os = "macos")]
 mod probe;

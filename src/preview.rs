@@ -41,6 +41,7 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
     // Debug path formatting escapes control characters. No raw configuration,
     // endpoint, key value, prompt, or unmanaged settings are formatted here.
     let claude = r.runtime == crate::config::RuntimeKind::Claude;
+    let pi = r.runtime == crate::config::RuntimeKind::Pi;
     let runtime = if claude {
         let refused = match crate::claude::supported(r) {
             Ok(()) => String::new(),
@@ -54,6 +55,21 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
             None => format!(
                 "Claude Code stream-json; missing; install Claude Code {} on an absolute PATH entry{refused}",
                 crate::claude::VERSION
+            ),
+        }
+    } else if pi {
+        let refused = match crate::pi::supported(r) {
+            Ok(()) => String::new(),
+            Err(error) => format!("; execution refused: {}", error.0),
+        };
+        match discover_runtime("pi") {
+            Some(path) => format!(
+                "Pi RPC; discovered {path:?}; version unverified (requires {}){refused}",
+                crate::pi::VERSION
+            ),
+            None => format!(
+                "Pi RPC; missing; install Pi {} on an absolute PATH entry{refused}",
+                crate::pi::VERSION
             ),
         }
     } else {
@@ -109,6 +125,8 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
         } else {
             "LiteLLM primary; configured native OpenCode fallback"
         }
+    } else if pi {
+        "LiteLLM only (Pi runtime)"
     } else if local {
         "LiteLLM only"
     } else if claude {
@@ -117,7 +135,11 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
         "native OpenCode built-in opencode API-key provider"
     };
     let before = if local {
-        "ensure configured LiteLLM /v1 service is reachable and selected alias exists"
+        if pi {
+            "ensure configured LiteLLM /v1 service is reachable, selected alias exists and Pi is installed"
+        } else {
+            "ensure configured LiteLLM /v1 service is reachable and selected alias exists"
+        }
     } else if claude {
         "install the official claude CLI and log in with it first; the harness never reads its login"
     } else {
