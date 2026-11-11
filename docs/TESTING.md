@@ -56,6 +56,7 @@ python3 scripts/tests/antigravity_feasibility_cases.py
 python3 scripts/tests/pi_feasibility_cases.py
 python3 scripts/tests/chatgpt_contained_cases.py
 python3 scripts/tests/chatgpt_observer_cases.py
+python3 scripts/tests/chatgpt_retained_cases.py
 python3 scripts/tests/agents_runtime.py
 python3 scripts/tests/agent_emission_runtime.py
 python3 scripts/tests/local_first.py
@@ -116,3 +117,5 @@ P8.2’s opt-in `scripts/experiments/pi_feasibility.py` requires explicit instal
 P7.9’s opt-in `python3 -B scripts/experiments/chatgpt_contained.py` exercises pinned OpenCode 2.2.5 diagnostics under experimental macOS containment using one owned loopback TCP port and a literal `/dev/null` data-write exception. It verifies source/agent controls, password refusals and synthetic transport boundaries without provider authentication, sessions or inference. The macOS offline `chatgpt_contained_cases.py` suite covers command/narrowing refusals and six synthetic server lifecycle cases, including descendant cleanup; it joins `offline.py` without requiring OpenCode. See [evidence and limits](evidence/p7-9-contained-diagnostics.md).
 
 P7.9’s opt-in `python3 -B scripts/experiments/chatgpt_installed_observer.py --source <v2.2.5 checkout>` runs the D075 resource observer against pinned OpenCode 2.2.5 on fresh owned roots under the combined D070/D073 containment plus ancestor discovery-name denials. It derives the built-in plugin set from the pinned checkout, runs Bun filesystem equivalents and five paired installed cases, including late-create/replace/reload, without authentication, sessions or inference. The offline `chatgpt_observer_cases.py` suite covers route allowlist, response bounds, redaction, settle, static guards and plugin-ID derivation refusals without OpenCode. See [evidence and limits](evidence/p7-9-installed-observer.md).
+
+P7.9’s opt-in `python3 -B scripts/experiments/chatgpt_retained_state.py --source <v2.2.5 checkout>` runs the D077 retained-state preflight experiment on exclusively created owned roots under the D076 profile. It revalidates the composed boundary and the single extra origin port, then fixes the pinned integration set. It runs the reused-root, well-known and Console pairs, seeding only through the two official routes with synthetic values, and checks the root-shape refusals. It performs no authentication, sessions or inference. The offline `chatgpt_retained_cases.py` suite covers the added route, seeder, strict integration redaction, every preflight invariant, root and lock handling, and the integration cross-check, without OpenCode. See [evidence and limits](evidence/p7-9-retained-state-experiment.md).

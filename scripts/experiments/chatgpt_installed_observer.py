@@ -170,6 +170,8 @@ def expected_plugins(packages):
 class Observer:
     """Authenticated bounded GET observer for one owned server and location."""
 
+    allowed = ALLOWED  # Subclasses may add exact routes; every other route is refused.
+
     def __init__(self, port, password, location, connect=http.client.HTTPConnection):
         check(type(port) is int and 1 <= port <= 65535 and isinstance(password, str) and password)
         check(isinstance(location, Path) and location.is_absolute())
@@ -177,8 +179,8 @@ class Observer:
         self.authorization = 'Basic ' + base64.b64encode(f'opencode:{password}'.encode()).decode()
 
     def get(self, path):
-        check(path in ALLOWED)  # Every other route is refused before any connection.
-        query = '?' + urllib.parse.urlencode({'location[directory]': str(self.location)}) if ALLOWED[path] else ''
+        check(path in self.allowed)  # Every other route is refused before any connection.
+        query = '?' + urllib.parse.urlencode({'location[directory]': str(self.location)}) if self.allowed[path] else ''
         connection = self.connect('127.0.0.1', self.port, timeout=REQUEST_TIMEOUT)
         try:
             connection.request('GET', path + query, headers={
@@ -190,7 +192,7 @@ class Observer:
         finally:
             connection.close()
         value = json.loads(body)
-        if not ALLOWED[path]:
+        if not self.allowed[path]:
             return value
         check(isinstance(value, dict) and set(value) == {'location', 'data'})
         check(value['location'] == {'directory': str(self.location)} and isinstance(value['data'], list))
