@@ -1,6 +1,6 @@
 # Project tracker
 
-Last updated: 2026-11-10. Status is maintained here; phase contracts are in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
+Last updated: 2026-11-11. Status is maintained here; phase contracts are in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
 
 ## Current state
 
@@ -8,7 +8,7 @@ Last updated: 2026-11-10. Status is maintained here; phase contracts are in [doc
 - Active phase: 7 — Local and subscription portfolio. Phase 6 acceptance and verified findings remain in the [report](docs/reviews/phase-06.md); earlier accepted reviews remain unchanged.
 - P7.9 retained-state experiment landed D078 ([evidence](docs/evidence/p7-9-retained-state-experiment.md), [PR #92](https://github.com/awesomejt/agent-harness/pull/92)); next bounded operator login preflight remains unchecked under D067. P7.10–P7.12 blocked where recorded.
 - Preserved gates: Codex P7.3 paused D055; Grok P7.4 paused D058 and SuperGrok first-party-only D067; Antigravity P7.5 paused D063 and terms-blocked D066. Claude P7.2 remains accepted, with Anthropic recheck at each pin change and by 2027-02-08. F28/F27 remain candidates outside Phase 7 exit; D034 fallback is unchanged. Phase 9 remains demand-gated (quota after P7.7; scheduling after P5.6).
-- Active implementation task/PR: P8.2 Pi deny-profile launch, branch `feature/08/p8-2-deny-launch`, [evidence](docs/evidence/p8-2-pi-deny-launch.md), D080. `litellm.runtime: "pi"` local-only adapter, fake_pi regressions; no live model turn. P8.2 card remains partially open (trusted/agents/P8.3). Independent of Phase 7 P7.9 work.
+- Active implementation task/PR: none (pick next). P8.2 deny launch merged ([PR #94](https://github.com/awesomejt/agent-harness/pull/94), D080, [evidence](docs/evidence/p8-2-pi-deny-launch.md)). Remaining P8.2: trusted grants, named agents, then P8.3 installed live acceptance. Independent of Phase 7 operator-login P7.9 work.
 
 - Phase 0 holistic review P0.13: pass recorded in [review report](docs/reviews/phase-00.md), effective on PR #5 merge. P1.5 selects ACP protocol 1, the tested SDK/Tokio stack and Rust 1.88 baseline ([D023](DECISIONS.md#2026-11-02--d023-select-acp-and-the-tested-rust-integration-boundaries)); [acceptance preparation](docs/evidence/p1-5-integration-acceptance.md) and [dependency inventory](docs/evidence/p1-5-dependencies.md) feed P1.7. Production adapter dependencies enter with Phase 2 consumers.
 - External prerequisites (2026-11-01): corrected API base `http://litellm:4000/v1`, supplied by the user, supports authenticated discovery and a live ACP prompt using the existing `macmini-qwen3-coder-30b` alias. The prior localhost blocker described a different endpoint. Credential source is `.zshrc`; values are not recorded. Remote server version remains unreported. See [live P1.2 evidence](docs/evidence/p1-2-live-acp.md).
@@ -394,3 +394,5 @@ Review of PR #48 (temporary stand-in for Grok) at `1bd5b7d`: no actionable findi
 2026-11-10 — P8.2 Pi resource-route increment: [evidence](docs/evidence/p8-2-pi-resource-route.md), D079, branch `feature/08/p8-2-resource-route`. Installed 1.5.0 adds registry inventory, trapped `GET /v1/models` on one owned loopback port during `ModelRuntime.refresh`, and adversarial `prompt`/`bash` deny with outside-marker checks. Offline cases, `pi_feasibility_cases`, doclinks and whitespace pass; installed probe passes on this host. No adapter, model turn or real credentials. P8.2 remains unchecked for production; Grok placeholder pending PR.
 
 2026-11-10 — P8.2 Pi deny-profile launch slice: D080, [evidence](docs/evidence/p8-2-pi-deny-launch.md), branch `feature/08/p8-2-deny-launch`. Adds optional `litellm.runtime` (`opencode`|`pi`), macOS `pi.rs` deny RPC adapter, `fake_pi.py`/`pi.py`, config/preview/single integration. Refuses trusted, agent, local-first and non-local-only pi config before launch. No live provider traffic; Grok pending.
+
+2026-11-11 — P8.2 Pi deny-profile launch merged: D080, [evidence](docs/evidence/p8-2-pi-deny-launch.md), [PR #94](https://github.com/awesomejt/agent-harness/pull/94) (`cef8181`). `litellm.runtime: pi` local-only on macOS, 21 `fake_pi` cases, Grok follow-up clean (0 blockers/concerns). P8.2 card still open for trusted/agents and lifecycle acceptance; P8.3 live slice is next when selected.
