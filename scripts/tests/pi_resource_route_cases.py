@@ -58,12 +58,12 @@ def main():
         {'type': 'response', 'id': 'deny-bash', 'command': 'bash', 'success': False, 'error': 'denied'},
         {'type': 'response', 'id': 'post-adversarial', 'command': 'get_state', 'success': True,
          'data': {'messageCount': 0, 'pendingMessageCount': 0}},
-    ]) + b'\n{"type":"extension_error","event":"before_provider_request"}\n'
+    ]) + b'\nHarness blocked user bash\nHarness blocked provider request\n'
     with tempfile.TemporaryDirectory() as directory:
         marker = Path(directory) / 'marker'
-        probe.validate_adversarial(adversarial_ok, marker)
+        probe.validate_adversarial(adversarial_ok, b'', marker)
         refuses(lambda: probe.validate_adversarial(
-            adversarial_ok.replace(b'before_provider_request', b'other'), marker))
+            adversarial_ok.replace(b'Harness blocked user bash', b''), b'', marker))
         bad_state = {'type': 'response', 'id': 'post-adversarial', 'command': 'get_state',
                      'success': True, 'data': {'messageCount': 2, 'pendingMessageCount': 0}}
         hostile = encode([
@@ -72,12 +72,17 @@ def main():
             {'type': 'response', 'id': 'deny-bash', 'command': 'bash', 'success': False, 'error': 'denied'},
             bad_state,
         ]) + b'\n{"type":"extension_error","event":"before_provider_request"}\n'
-        refuses(lambda: probe.validate_adversarial(hostile, marker))
+        refuses(lambda: probe.validate_adversarial(hostile, b'Harness blocked user bash\n', marker))
     trap = encode([{'type': 'ah_http_trap', 'requests': [
-        {'method': 'GET', 'path': '/v1/models', 'headers': ['host', 'user-agent']}]}])
+        {'method': 'GET', 'path': '/v1/models', 'headers': ['authorization', 'host'],
+         'authorizationSynthetic': True}]}])
     probe.validate_trap(trap)
     refuses(lambda: probe.validate_trap(encode([{'type': 'ah_http_trap', 'requests': [
-        {'method': 'POST', 'path': '/v1/models', 'headers': ['authorization']}]}])))
+        {'method': 'POST', 'path': '/v1/models', 'headers': ['authorization'],
+         'authorizationSynthetic': True}]}])))
+    refuses(lambda: probe.validate_trap(encode([{'type': 'ah_http_trap', 'requests': [
+        {'method': 'GET', 'path': '/v1/models', 'headers': ['authorization'],
+         'authorizationSynthetic': False}]}])))
     refuses(lambda: probe.validate_trap(encode([{'type': 'ah_http_trap', 'requests': []}])))
     assert probe.contained_profile(Path('/tmp/a'), Path.home(), 54321).count('localhost:54321') == 2
     with tempfile.TemporaryDirectory(prefix='ah-pi-route-offline-') as directory:

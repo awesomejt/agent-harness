@@ -109,6 +109,16 @@ def adversarial_requests(marker):
     ))
 
 
+def validate_witness_positive_control(stdout, stderr, marker):
+    """Permissive observer writes the marker at session_start; proves blocking hooks matter."""
+    text = ((stdout.decode() if isinstance(stdout, (bytes, bytearray)) else stdout)
+            + (stderr.decode() if isinstance(stderr, (bytes, bytearray)) else stderr))
+    check('Harness blocked user bash' not in text)
+    check('Harness blocked agent start' not in text)
+    check('Harness blocked provider request' not in text)
+    check(marker.is_file() and marker.read_text() == 'witness')
+
+
 def validate_inventory(stdout, stderr):
     inventory = [json.loads(line, object_pairs_hook=unique_object) for line in stderr.splitlines() if line.strip()]
     check(len(inventory) == 1 and inventory[0].get('type') == 'ah_resource_route')
@@ -142,7 +152,8 @@ def validate_inventory(stdout, stderr):
 def parse_responses(stdout):
     responses = {}
     for line in stdout.splitlines():
-        if not line.strip():
+        line = line.strip()
+        if not line.startswith('{'):
             continue
         message = json.loads(line, object_pairs_hook=unique_object)
         if message.get('type') == 'response' and message.get('id'):
@@ -150,8 +161,9 @@ def parse_responses(stdout):
     return responses
 
 
-def validate_adversarial(stdout, marker):
-    text = stdout.decode() if isinstance(stdout, (bytes, bytearray)) else stdout
+def validate_adversarial(stdout, stderr, marker):
+    text = ((stdout.decode() if isinstance(stdout, (bytes, bytearray)) else stdout)
+            + (stderr.decode() if isinstance(stderr, (bytes, bytearray)) else stderr))
     responses = parse_responses(text)
     check(set(responses) == {ident for ident, _ in ADVERSARIAL})
     bash = responses['deny-bash']
@@ -161,11 +173,8 @@ def validate_adversarial(stdout, marker):
     data = state.get('data')
     check(isinstance(data, dict) and data.get('messageCount') == 0
           and data.get('pendingMessageCount') == 0)
-    prompt = responses['deny-prompt']
-    blocked = (prompt.get('success') is False and prompt.get('error')
-               or any('before_provider_request' in line or 'before_agent_start' in line
-                      for line in text.splitlines() if 'extension_error' in line))
-    check(blocked)
+    check('Harness blocked user bash' in text)
+    check('Harness blocked agent start' in text or 'Harness blocked provider request' in text)
     check('"stopReason":"stop"' not in text and '"stopReason":"toolUse"' not in text)
     check(not marker.exists())
 
@@ -179,7 +188,8 @@ def validate_trap(stdout):
         check(isinstance(hit, dict) and hit.get('method') == 'GET'
               and hit.get('path') in ('/v1/models', '/models'))
         headers = hit.get('headers')
-        check(isinstance(headers, list) and 'authorization' not in headers)
+        check(isinstance(headers, list) and 'authorization' in headers)
+        check(hit.get('authorizationSynthetic') is True)
 
 
 def unique_object(pairs):
@@ -200,10 +210,12 @@ def refresh_probe_source(port, runtime, agent_dir):
         const requests = [];
         const server = createServer((req, res) => {{
           const pathOnly = (req.url ?? '').split('?')[0];
+          const authorization = req.headers.authorization;
           requests.push({{
             method: req.method,
             path: pathOnly,
-            headers: Object.keys(req.headers).sort().filter((h) => h !== 'authorization'),
+            headers: Object.keys(req.headers).sort(),
+            authorizationSynthetic: authorization === 'Bearer synthetic',
           }});
           res.writeHead(200, {{'content-type': 'application/json'}});
           res.end(JSON.stringify({{object: 'list', data: [{{id: 'ah-trap-discovered', object: 'model'}}]}}));
@@ -248,12 +260,20 @@ def refresh_probe_source(port, runtime, agent_dir):
     """).strip() + '\n'
 
 
-def extension_source():
-    return """export default function(pi) {
-  pi.on('tool_call', () => ({block: true, reason: 'Harness adversarial deny'}));
+def extension_source(blocking=True):
+    guards = """
+  pi.on('tool_call', () => ({block: true, reason: 'Harness adversarial deny'}));"""
+    if blocking:
+        guards += """
   pi.on('before_agent_start', () => { throw new Error('Harness blocked agent start'); });
   pi.on('before_provider_request', () => { throw new Error('Harness blocked provider request'); });
-  pi.on('user_bash', () => { throw new Error('Harness blocked user bash'); });
+  pi.on('user_bash', () => { throw new Error('Harness blocked user bash'); });"""
+    witness = """
+    const marker = process.env.AH_MARKER_PATH;
+    if (marker) fs.writeFileSync(marker, 'witness');"""
+    imports = "import fs from 'node:fs';\n" if not blocking else ''
+    suppressed = '' if blocking else witness
+    return imports + """export default function(pi) {""" + guards + """
   pi.on('session_start', async (_event, ctx) => {
     const registry = ctx.modelRegistry;
     const redact = (info) => info ? {source: info.source ?? null,
@@ -277,7 +297,7 @@ def extension_source():
       active: pi.getActiveTools().map((tool) => tool.name).sort(),
       mcp: pi.getMcpServers().map((server) => server.name).sort(),
     };
-    process.stderr.write(JSON.stringify(report) + '\\n');
+    process.stderr.write(JSON.stringify(report) + '\\n');""" + suppressed + """
   });
 }
 """
@@ -305,10 +325,11 @@ def main():
         home, project, state = root / 'home', root / 'repo/project', root / 'state'
         for path in (home, project, state, root / 'repo/.git'):
             path.mkdir(parents=True, exist_ok=True)
+        marker = root / 'ah-adversarial-marker'
         env = {'HOME': str(home), 'TMPDIR': str(root), 'PATH': '/usr/bin:/bin',
                'PI_CODING_AGENT_DIR': str(state), 'PI_SKIP_VERSION_CHECK': '1',
                'NO_COLOR': '1', 'TERM': 'dumb', 'LANG': 'C',
-               'AH_FAKE_KEY': 'synthetic-not-a-credential'}
+               'AH_FAKE_KEY': 'synthetic-not-a-credential', 'AH_MARKER_PATH': str(marker)}
         sandbox_base = ['/usr/bin/sandbox-exec', '-p', profile(root, Path.home())]
         with tempfile.TemporaryDirectory(prefix='.ah-pi-read-', dir=Path.home()) as protected:
             read_target = Path(protected) / 'sentinel'
@@ -344,22 +365,26 @@ def main():
         out, err = run(flags, inventory)
         validate_inventory(out, err)
         print('PASS: provider registry inventory and idle synthetic model state', flush=True)
-        with tempfile.TemporaryDirectory(prefix='ah-pi-marker-') as fence:
-            marker = Path(fence) / 'ah-adversarial-marker'
-            hostile = adversarial_requests(marker)
-            out, err = run(flags, hostile)
-            validate_adversarial(out, marker)
+        if marker.exists():
+            marker.unlink()
+        hostile = adversarial_requests(marker)
+        out, err = run(flags, hostile)
+        validate_adversarial(out, err, marker)
+        positive = root / 'resource-route-positive.mjs'
+        positive.write_text(extension_source(blocking=False))
+        positive_flags = [flag if flag != str(extension) else str(positive) for flag in flags]
+        marker.unlink(missing_ok=True)
+        control_out, control_err = run(positive_flags, inventory_requests())
+        validate_witness_positive_control(control_out, control_err, marker)
         print('PASS: prompt and bash refused before provider/bash side effects', flush=True)
-        refresh_env = dict(env)
-        refresh_env.pop('PI_OFFLINE', None)
         probe = root / 'refresh_probe.mjs'
         copied_runtime = root / 'node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.js'
         probe.write_text(refresh_probe_source(trap_port, copied_runtime, state))
         trap_out, trap_err = bound_capture([*['/usr/bin/sandbox-exec', '-p', policy], str(node), str(probe)],
-                                           project, refresh_env)
+                                           project, env)
         check(not trap_err)
         validate_trap(trap_out)
-        print('PASS: trapped OpenAI-compatible listing; header names only recorded', flush=True)
+        print('PASS: refresh-hook listing trap; header names and synthetic-auth flag only', flush=True)
         print('GATE OPEN: adapter/production and lifecycle proofs remain', flush=True)
 
 
