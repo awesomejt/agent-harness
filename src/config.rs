@@ -54,6 +54,9 @@ pub struct Config {
 struct LiteLlm {
     api_base: String,
     api_key_env: String,
+    /// Local LiteLLM executor: `opencode` (default) or `pi` (D080).
+    #[serde(default, deserialize_with = "present")]
+    runtime: Option<String>,
     #[serde(default, deserialize_with = "present")]
     groups: Option<Named<String>>,
 }
@@ -106,12 +109,13 @@ struct Native {
     api_key_env: Option<String>,
 }
 
-/// Runtime executing an attempt. The LiteLLM route always runs OpenCode; the
-/// native route runs the runtime named by `native.target` (D048).
+/// Runtime executing an attempt. The LiteLLM route runs OpenCode or Pi (D080);
+/// the native route runs the runtime named by `native.target` (D048).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RuntimeKind {
     OpenCode,
     Claude,
+    Pi,
 }
 
 #[derive(Clone)]
@@ -344,6 +348,13 @@ impl Config {
                 "local-only and local-first config require a model default",
             ));
         }
+        if self.litellm.as_ref().and_then(|l| l.runtime.as_deref()) == Some("pi")
+            && self.mode != "local-only"
+        {
+            return Err(Invalid(
+                "litellm.runtime pi applies only to local-only configuration",
+            ));
+        }
         self.key_name(&self.mode)?;
         Ok(())
     }
@@ -374,6 +385,11 @@ fn validate_local(local: &LiteLlm) -> Result<()> {
         for (name, target) in &groups.0 {
             validate_model(name)?;
             validate_model(target)?;
+        }
+    }
+    if let Some(runtime) = &local.runtime {
+        if runtime != "opencode" && runtime != "pi" {
+            return Err(Invalid("litellm.runtime must be opencode or pi"));
         }
     }
     validate_key_name(&local.api_key_env)
@@ -907,9 +923,20 @@ impl Invocation {
         let instructions = instructions(&project)?;
         let mode = self.mode.as_deref().unwrap_or(&config.mode);
         let key_name = config.key_name(mode)?.map(str::to_owned);
-        let runtime = match (mode, config.native.as_ref()) {
-            ("cloud-only", Some(native)) if native.target == "claude" => RuntimeKind::Claude,
-            _ => RuntimeKind::OpenCode,
+        let runtime = if mode == "cloud-only" {
+            match config.native.as_ref() {
+                Some(native) if native.target == "claude" => RuntimeKind::Claude,
+                _ => RuntimeKind::OpenCode,
+            }
+        } else if config.litellm.as_ref().and_then(|l| l.runtime.as_deref()) == Some("pi") {
+            if mode != "local-only" {
+                return Err(Invalid(
+                    "litellm.runtime pi is unsupported with local-first and cloud-only overrides",
+                ));
+            }
+            RuntimeKind::Pi
+        } else {
+            RuntimeKind::OpenCode
         };
         let agent = self
             .agent
@@ -1116,26 +1143,28 @@ impl Resolved {
     /// Model as the runtime selects it: `PROVIDER/MODEL` for OpenCode, the
     /// alias or full model name for Claude Code.
     pub fn runtime_model(&self) -> String {
-        if self.runtime == RuntimeKind::Claude {
-            return self.model.clone();
+        match self.runtime {
+            RuntimeKind::Claude => self.model.clone(),
+            RuntimeKind::Pi => format!("pi/{}", self.model),
+            RuntimeKind::OpenCode => format!(
+                "{}/{}",
+                if self.mode == Mode::LocalOnly {
+                    "ah-litellm"
+                } else {
+                    "opencode"
+                },
+                self.model
+            ),
         }
-        format!(
-            "{}/{}",
-            if self.mode == Mode::LocalOnly {
-                "ah-litellm"
-            } else {
-                "opencode"
-            },
-            self.model
-        )
     }
 
     /// Model as workflow records and previews name it (D051): the OpenCode
-    /// runtime model, or `claude/MODEL` so a record names its runtime.
+    /// runtime model, or `claude/MODEL` / `pi/MODEL` so a record names its runtime.
     pub fn record_model(&self) -> String {
-        if self.runtime == RuntimeKind::Claude {
-            return format!("claude/{}", self.model);
+        match self.runtime {
+            RuntimeKind::Claude => format!("claude/{}", self.model),
+            RuntimeKind::Pi => format!("pi/{}", self.model),
+            RuntimeKind::OpenCode => self.runtime_model(),
         }
-        self.runtime_model()
     }
 }

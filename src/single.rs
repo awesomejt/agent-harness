@@ -104,6 +104,7 @@ fn execute(args: Vec<OsString>, progress: &crate::progress::Progress) -> Exit {
 /// both attempts share them. Sequences apply it to every step before step 1.
 pub(crate) fn supported(request: &crate::config::Resolved) -> Result<(), crate::config::Invalid> {
     crate::claude::supported(request)?;
+    crate::pi::supported(request)?;
     // Effort maps on Claude Code (D050); OpenCode still runs only default.
     if let Some(agent) = &request.agent
         && request.runtime == crate::config::RuntimeKind::OpenCode
@@ -291,6 +292,9 @@ async fn attempt(
     if request.runtime == crate::config::RuntimeKind::Claude {
         return crate::claude::attempt(request, label, deadline, cancelled, progress).await;
     }
+    if request.runtime == crate::config::RuntimeKind::Pi {
+        return crate::pi::attempt(request, label, deadline, cancelled, progress).await;
+    }
     let mut adapter =
         match crate::runtime::Runtime::new(request, deadline, cancelled, progress.clone()) {
             Ok(adapter) => adapter,
@@ -380,10 +384,12 @@ fn describe(request: &crate::config::Resolved, label: &str) -> serde_json::Value
         "runtime": match request.runtime {
             crate::config::RuntimeKind::OpenCode => "opencode",
             crate::config::RuntimeKind::Claude => "claude",
+            crate::config::RuntimeKind::Pi => "pi",
         },
         "runtime_version": match request.runtime {
             crate::config::RuntimeKind::OpenCode => crate::opencode::VERSION,
             crate::config::RuntimeKind::Claude => crate::claude::VERSION,
+            crate::config::RuntimeKind::Pi => crate::pi::VERSION,
         },
         "model": request.runtime_model(),
         "group": request.group,
@@ -406,7 +412,10 @@ pub(crate) fn prepare_plan(
     request: &crate::config::Resolved,
 ) -> Result<Option<Plan>, crate::config::Invalid> {
     match request.mode {
-        Mode::LocalOnly => Plan::prepare(request).map(Some),
+        Mode::LocalOnly if request.runtime != crate::config::RuntimeKind::Pi => {
+            Plan::prepare(request).map(Some)
+        }
+        Mode::LocalOnly => Ok(None),
         Mode::CloudOnly => Ok(None),
     }
 }

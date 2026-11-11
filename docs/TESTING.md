@@ -50,6 +50,7 @@ python3 scripts/tests/single_runtime.py --refuse
 python3 scripts/tests/native.py
 python3 scripts/tests/native_runtime.py
 python3 scripts/tests/claude.py
+python3 scripts/tests/pi.py
 python3 scripts/tests/codex_feasibility_cases.py
 python3 scripts/tests/grok_feasibility_cases.py
 python3 scripts/tests/antigravity_feasibility_cases.py

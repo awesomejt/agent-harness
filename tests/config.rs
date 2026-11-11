@@ -1366,3 +1366,46 @@ fn claude_fallback_resolves_runtime_without_reading_native_credentials() {
         .is_err()
     );
 }
+
+#[test]
+fn pi_runtime_resolves_for_local_only() {
+    use awesomejt_agent_harness::config::RuntimeKind;
+    let pi = VALID.replace(
+        "\"api_key_env\":\"TEST_KEY\"}",
+        "\"api_key_env\":\"TEST_KEY\",\"runtime\":\"pi\"}",
+    );
+    let r = invocation(&["single", "task"])
+        .resolve(
+            Config::read(pi.as_bytes()).unwrap(),
+            |name| {
+                assert_eq!(name, "TEST_KEY");
+                Some("secret".into())
+            },
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!(r.runtime, RuntimeKind::Pi);
+    assert_eq!(r.runtime_model(), "pi/test-alias");
+    assert_eq!(r.record_model(), "pi/test-alias");
+}
+
+#[test]
+fn pi_runtime_rejects_non_local_only_modes() {
+    for text in [
+        VALID.replace(
+            "\"mode\":\"local-only\"",
+            "\"mode\":\"local-first\",\"native\":{\"target\":\"opencode\",\"model\":\"m\",\"api_key_env\":\"NATIVE_KEY\"}",
+        )
+        .replace(
+            "\"api_key_env\":\"TEST_KEY\"}",
+            "\"api_key_env\":\"TEST_KEY\",\"runtime\":\"pi\"}",
+        ),
+        r#"{"version":1,"mode":"cloud-only","native":{"target":"opencode","model":"m","api_key_env":"K"},"litellm":{"api_base":"http://127.0.0.1:9/v1","api_key_env":"TEST_KEY","runtime":"pi"}}"#.to_string(),
+        VALID.replace(
+            "\"api_key_env\":\"TEST_KEY\"}",
+            "\"api_key_env\":\"TEST_KEY\",\"runtime\":\"codex\"}",
+        ),
+    ] {
+        assert!(Config::read(text.as_bytes()).is_err());
+    }
+}
