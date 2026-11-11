@@ -20,4 +20,4 @@ python3 scripts/tests/offline.py   # includes pi.py
 
 ## Grok review
 
-Pending PR review.
+[PR #94](https://github.com/awesomejt/agent-harness/pull/94): first pass 0 blockers / 6 concerns / 2 nits (RPC cancel loop, preflight pins, non-macOS `Channel`, prompt ack, `${ENV}` apiKey). Follow-up on `7aa4aca`: 0 blockers / 0 concerns / 2 nits. Merged to `main` as `cef8181`.
