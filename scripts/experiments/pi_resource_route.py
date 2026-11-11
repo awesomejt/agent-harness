@@ -109,14 +109,14 @@ def adversarial_requests(marker):
     ))
 
 
-def validate_witness_positive_control(stdout, stderr, marker):
-    """Permissive observer writes the marker at session_start; proves blocking hooks matter."""
+def validate_permissive_adversarial(stdout, stderr, marker):
+    """Same hostile RPCs without blocking hooks; marker must appear without harness errors."""
     text = ((stdout.decode() if isinstance(stdout, (bytes, bytearray)) else stdout)
             + (stderr.decode() if isinstance(stderr, (bytes, bytearray)) else stderr))
     check('Harness blocked user bash' not in text)
     check('Harness blocked agent start' not in text)
     check('Harness blocked provider request' not in text)
-    check(marker.is_file() and marker.read_text() == 'witness')
+    check(marker.is_file())
 
 
 def validate_inventory(stdout, stderr):
@@ -374,8 +374,8 @@ def main():
         positive.write_text(extension_source(blocking=False))
         positive_flags = [flag if flag != str(extension) else str(positive) for flag in flags]
         marker.unlink(missing_ok=True)
-        control_out, control_err = run(positive_flags, inventory_requests())
-        validate_witness_positive_control(control_out, control_err, marker)
+        control_out, control_err = run(positive_flags, inventory_requests() + hostile)
+        validate_permissive_adversarial(control_out, control_err, marker)
         print('PASS: prompt and bash refused before provider/bash side effects', flush=True)
         probe = root / 'refresh_probe.mjs'
         copied_runtime = root / 'node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.js'
