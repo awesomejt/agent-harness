@@ -52,6 +52,7 @@ CASES = [
     ('agent-reviewer', 0, True, ['--agent', 'reviewer'] + T),
     ('agent-coder-deny', 0, True, ['--agent', 'coder']),
     ('agent-effort-refuse', 2, False, ['--agent', 'coder'] + T),
+    ('agents-md', 0, True, []),
     ('local-first', 2, False, ['--mode', 'local-first',
                                  '--config', 'cloud-native.json']),
     ('preview', 0, False, ['--preview']),
@@ -70,6 +71,8 @@ for case, expected, prompted, extra in CASES:
             (bindir / 'pi').chmod(0o755)
         project = base / 'project'
         project.mkdir()
+        if case == 'agents-md':
+            (project / 'AGENTS.md').write_text('Project AGENTS sentinel\n')
         (project / 'case').write_text(case)
         if case == 'cloud-only-pi':
             ah = dict(version=1, mode='cloud-only', native=dict(target='opencode', model='gpt-5.4', api_key_env='K'),
@@ -150,6 +153,10 @@ for case, expected, prompted, extra in CASES:
             grant_line = next(l for l in (project / 'env.txt').read_text().splitlines()
                                 if l.startswith('AH_PI_GRANTABLE='))
             assert grant_line == 'AH_PI_GRANTABLE=read,search', grant_line
+        if case == 'agents-md':
+            text = (project / 'prompted').read_text()
+            assert text.startswith('Project AGENTS sentinel'), text
+            assert text.endswith('pi task'), text
         if case == 'agent-coder-deny':
             assert '--no-tools' in json.dumps(json.loads((project / 'argv.json').read_text())), case
             assert 'Read project instructions' in (project / 'prompted').read_text(), case

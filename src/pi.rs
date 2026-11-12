@@ -31,7 +31,8 @@ const UI_TITLE: &str = "ah-permission";
 /// Built-in tool names for a full trusted invocation (D081/D082); intersected for roles.
 pub(crate) const TRUSTED_TOOLS: [&str; 6] = ["bash", "edit", "find", "grep", "read", "write"];
 pub(crate) const BODY_LIMIT: usize = 128 << 10;
-const INSTRUCTION_LIMIT: usize = 1 << 20;
+/// Stay below stdout `LINE_LIMIT` after JSON wrapping of the RPC prompt.
+const COMPOSED_PROMPT_LIMIT: usize = (LINE_LIMIT * 3) / 4;
 
 /// Map a Pi tool name to the canonical grant kind OpenCode uses (D037).
 pub(crate) fn tool_kind(name: &str) -> Option<&'static str> {
@@ -86,6 +87,7 @@ pub(crate) fn supported(request: &Resolved) -> Result<(), Invalid> {
             "local-first is unsupported with litellm.runtime pi",
         ));
     }
+    let _ = composed_prompt(request)?;
     Ok(())
 }
 
@@ -93,20 +95,20 @@ pub(crate) fn supported(request: &Resolved) -> Result<(), Invalid> {
 pub(crate) fn composed_prompt(request: &Resolved) -> Result<String, Invalid> {
     let mut parts = Vec::new();
     if let Some(path) = &request.instructions {
-        let text = std::fs::read_to_string(path)
-            .map_err(|_| Invalid("cannot read project AGENTS.md for the Pi runtime prompt"))?;
-        if text.len() > INSTRUCTION_LIMIT {
-            return Err(Invalid(
-                "project AGENTS.md exceeds 1 MiB, the Pi runtime instruction bound",
-            ));
-        }
+        let text = crate::config::bounded(crate::config::open_regular_file(path)?)?;
         parts.push(text);
     }
     if let Some(agent) = &request.agent {
         parts.push(agent.body().to_owned());
     }
     parts.push(request.prompt.clone());
-    Ok(parts.join("\n\n"))
+    let message = parts.join("\n\n");
+    if message.len() > COMPOSED_PROMPT_LIMIT {
+        return Err(Invalid(
+            "composed Pi prompt exceeds the runtime message bound",
+        ));
+    }
+    Ok(message)
 }
 
 pub(crate) fn args(request: &Resolved, extension: &Path) -> Vec<OsString> {
@@ -657,8 +659,12 @@ async fn turn(
         }
     };
     if let Some(agent) = &request.agent {
+        let profile = match request.permissions {
+            Permissions::Deny => "deny",
+            Permissions::Trusted => "trusted",
+        };
         progress.event(format!(
-            "{label} via Pi {VERSION}; model pi/{}; agent {} ({}; tools {:?})",
+            "{label} via Pi {VERSION}; model pi/{}; permissions {profile}; agent {} ({}; effective tools {:?})",
             request.model,
             agent.name(),
             match agent.capacity() {
@@ -666,7 +672,7 @@ async fn turn(
                 agents::Capacity::Specialized => "specialized",
                 agents::Capacity::Both => "both",
             },
-            agent.tools(),
+            active_tools(request),
         ));
     } else {
         let profile = match request.permissions {
@@ -1076,6 +1082,10 @@ mod tests {
 
     #[test]
     fn composed_prompt_appends_agent_after_instructions() {
+        let dir = std::env::temp_dir().join("ah-pi-agents-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("AGENTS.md"), "Project rules\n").unwrap();
         let mut request = request(Permissions::Deny);
         request.prompt = "task".into();
         request.agent = Some(
@@ -1085,10 +1095,12 @@ mod tests {
             )
             .unwrap(),
         );
-        request.instructions = Some(PathBuf::from("/dev/null"));
-        // Skip reading /dev/null in unit test: no instructions path.
-        request.instructions = None;
-        assert_eq!(composed_prompt(&request).unwrap(), "Role body\n\n\ntask");
+        request.instructions = Some(dir.join("AGENTS.md"));
+        assert_eq!(
+            composed_prompt(&request).unwrap(),
+            "Project rules\n\n\nRole body\n\n\ntask"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
