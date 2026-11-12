@@ -106,10 +106,12 @@ pub(crate) fn supported(request: &crate::config::Resolved) -> Result<(), crate::
     crate::claude::supported(request)?;
     crate::pi::supported(request)?;
     // Effort maps on Claude Code (D050); OpenCode still runs only default.
-    if let Some(agent) = &request.agent
-        && request.runtime == crate::config::RuntimeKind::OpenCode
-    {
-        crate::opencode::supports(agent)?;
+    if let Some(agent) = &request.agent {
+        match request.runtime {
+            crate::config::RuntimeKind::OpenCode => crate::opencode::supports(agent)?,
+            crate::config::RuntimeKind::Pi => crate::pi::supports(agent)?,
+            _ => {}
+        }
     }
     crate::opencode::prompt_supported(&request.prompt)?;
     // Both runtime capability sets must hold before any network check or write.
