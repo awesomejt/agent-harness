@@ -10,9 +10,12 @@ ROOT = Path(__file__).resolve().parents[2]
 BINARY = ROOT / 'target/debug/ah'
 FAKE = ROOT / 'scripts/tests/fake_pi.py'
 ENV_NAMES = {'HOME', 'PATH', 'USER', 'LOGNAME', 'TMPDIR', 'PI_CODING_AGENT_DIR'}
-BASE_ARGS = ['--offline', '--mode', 'rpc', '--no-session', '--no-tools', '--no-extensions',
-             '--no-mcp', '--no-skills', '--no-prompt-templates', '--no-themes', '--no-context-files',
-             '--no-approve', '--provider', 'ah-litellm']
+SHARED_ARGS = ['--offline', '--mode', 'rpc', '--no-session', '--no-extensions',
+               '--no-mcp', '--no-skills', '--no-prompt-templates', '--no-themes', '--no-context-files',
+               '--no-approve', '--provider', 'ah-litellm']
+TRUSTED_TOOLS = 'bash,edit,find,grep,read,write'
+DENY_ARGS = SHARED_ARGS + ['--no-tools']
+TRUSTED_ARGS = SHARED_ARGS + [f'--tools={TRUSTED_TOOLS}']
 T = ['--permissions', 'trusted']
 
 
@@ -38,7 +41,12 @@ CASES = [
     ('cancel-stall', 3, True, ['--timeout-secs', '3']),
     ('models-key', 0, True, []),
     ('cloud-only-pi', 2, False, []),
-    ('trusted', 2, False, T),
+    ('trusted-success', 0, True, T),
+    ('trusted-bad-title', 4, True, T),
+    ('trusted-bad-method', 4, True, T),
+    ('trusted-unknown-tool', 4, True, T),
+    ('trusted-malformed-ui', 4, True, T),
+    ('trusted-duplicate-ui', 4, True, T),
     ('agent-refuse', 2, False, ['--agent', 'coder']),
     ('local-first', 2, False, ['--mode', 'local-first',
                                  '--config', 'cloud-native.json']),
@@ -85,19 +93,22 @@ for case, expected, prompted, extra in CASES:
         assert p.returncode == expected, (case, p.returncode, p.stderr)
         assert (project / 'prompted').exists() == prompted, case
         launched = (project / 'argv.json').exists()
-        refuse = {'trusted', 'agent-refuse', 'local-first', 'preview', 'missing-runtime',
-                  'cloud-only-pi'}
+        refuse = {'agent-refuse', 'local-first', 'preview', 'missing-runtime', 'cloud-only-pi'}
         if case == 'cloud-only-pi':
             assert 'litellm.runtime pi applies only to local-only' in p.stderr, p.stderr
         assert launched == (case not in refuse), case
         if launched:
             argv = json.loads((project / 'argv.json').read_text())
-            assert argv[:len(BASE_ARGS)] == BASE_ARGS, (case, argv)
+            base = TRUSTED_ARGS if case.startswith('trusted') else DENY_ARGS
+            assert argv[:len(base)] == base, (case, argv)
             assert argv.count('--provider') == 1 and 'ah-litellm' in argv, argv
             assert any(a.startswith('--model=fixture') for a in argv), argv
             assert any(a == '-e' or a.startswith('-e') for a in argv), argv
             names = {l.split('=', 1)[0] for l in (project / 'env.txt').read_text().splitlines() if '=' in l}
-            assert {'HOME', 'PATH', 'PI_CODING_AGENT_DIR', 'LOCAL_KEY'} <= names, (case, names)
+            want = {'HOME', 'PATH', 'PI_CODING_AGENT_DIR', 'LOCAL_KEY'}
+            if case.startswith('trusted'):
+                want.add('AH_PI_GRANTABLE')
+            assert want <= names, (case, names)
             assert 'PI_CODING_AGENT_DIR' in names, case
             lines = [json.loads(l) for l in (project / 'stdin.jsonl').read_text().splitlines()]
             types = [l['type'] for l in lines]
@@ -118,8 +129,13 @@ for case, expected, prompted, extra in CASES:
         if case == 'preview':
             assert 'Pi RPC' in p.stdout and 'litellm.runtime pi' not in p.stdout, p.stdout
             assert 'route: LiteLLM only (Pi runtime)' in p.stdout, p.stdout
-        if case == 'trusted':
-            assert 'trusted permissions are not yet supported on the Pi runtime' in p.stderr, p.stderr
+        if case == 'trusted-success':
+            ui = json.loads((project / 'ui_response.json').read_text())
+            assert ui.get('confirmed') is True, ui
+            assert p.stdout == 'fake response\nfinal line', (case, p.stdout)
+            env_text = (project / 'env.txt').read_text()
+            grant_line = next(l for l in env_text.splitlines() if l.startswith('AH_PI_GRANTABLE='))
+            assert grant_line == 'AH_PI_GRANTABLE=read,search,edit,execute', grant_line
         count += 1
 
-print(f'PASS: {count} Pi deny-profile launch cases')
+print(f'PASS: {count} Pi runtime launch cases (deny + trusted)')
