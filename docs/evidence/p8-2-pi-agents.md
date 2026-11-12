@@ -18,4 +18,4 @@ python3 -B scripts/tests/pi.py
 
 ## Grok review
 
-Pending PR.
+[PR #98](https://github.com/awesomejt/agent-harness/pull/98): first pass 0 blockers / 3 concerns / 1 nit (preflight AGENTS read, composed size cap, fixtures). Fixed on `7abf92d` without re-review. Merged as `5782e85`.
