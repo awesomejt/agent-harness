@@ -536,6 +536,7 @@ fn reader(stdout: tokio::process::ChildStdout) -> mpsc::Receiver<Result<Value, (
 #[derive(Default)]
 struct Observed {
     submitted: bool,
+    prompt_rejected: bool,
     violation: bool,
     tools: u32,
     permissions: u32,
@@ -571,18 +572,36 @@ fn record_assistant_message(observed: &mut Observed, message: &Value) {
 }
 
 #[cfg(target_os = "macos")]
+fn sanitize_stop_detail(raw: &str) -> String {
+    raw.chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(160)
+        .collect()
+}
+
 fn record_assistant_diagnostic(observed: &mut Observed, message: &Value) {
-    let detail = message
+    let stop = message
         .get("stopReason")
         .or_else(|| message.get("stop_reason"))
-        .and_then(Value::as_str)
-        .filter(|s| !s.is_empty() && *s != "stop" && *s != "end_turn");
-    if let Some(reason) = detail {
-        observed.assistant_stop = Some(reason.chars().take(160).collect());
+        .and_then(Value::as_str);
+    let error = message.get("errorMessage").and_then(Value::as_str);
+    if stop == Some("error") {
+        if let Some(text) = error {
+            observed.assistant_stop = Some(sanitize_stop_detail(text));
+        }
         return;
     }
-    if let Some(error) = message.get("errorMessage").and_then(Value::as_str) {
-        observed.assistant_stop = Some(error.chars().take(160).collect());
+    if let Some(text) = stop
+        .filter(|s| !s.is_empty() && !matches!(*s, "stop" | "end_turn" | "toolUse" | "tool_use"))
+    {
+        observed.assistant_stop = Some(sanitize_stop_detail(text));
+    } else if let Some(text) = error {
+        observed.assistant_stop = Some(sanitize_stop_detail(text));
     }
 }
 
@@ -613,10 +632,14 @@ fn terminal_text(settled_text: String, observed: &Observed) -> String {
 #[cfg(target_os = "macos")]
 fn record_agent_event(observed: &mut Observed, line: &Value) {
     match line.get("type").and_then(Value::as_str) {
-        Some("turn_start") => observed.assistant_text.clear(),
+        Some("turn_start") => {
+            observed.assistant_text.clear();
+            observed.assistant_stop = None;
+        }
         Some("message_start") => {
             if line.pointer("/message/role") == Some(&json!("assistant")) {
                 observed.assistant_text.clear();
+                observed.assistant_stop = None;
             }
             if let Some(message) = line.get("message") {
                 record_assistant_message(observed, message);
@@ -827,6 +850,7 @@ async fn turn(
     {
         return Outcome::Failed;
     }
+    observed.submitted = true;
     let bound = deadline.min(Instant::now() + Duration::from_secs(30));
     let mut prompt_ok = false;
     let mut attempts = 0;
@@ -846,6 +870,7 @@ async fn turn(
                     Err(outcome) => return outcome,
                     Ok(true) => continue,
                     Ok(false) if prompt_handled_by_extension(&line, prompt_id) => {
+                        observed.prompt_rejected = true;
                         return Outcome::Failed;
                     }
                     Ok(false) if validate_prompt_response(&line, prompt_id) => {
@@ -868,7 +893,6 @@ async fn turn(
     if !prompt_ok {
         return Outcome::Failed;
     }
-    observed.submitted = true;
     progress.emit("attempt.prompt_submitted", json!({}));
     progress.note(json!({"prompt_submitted": true}));
     let mut interrupted = cancelled.is_cancelled();
@@ -1045,6 +1069,10 @@ pub(crate) async fn attempt(
         Outcome::Stopped if cancelled.is_cancelled() || Instant::now() >= deadline => {
             return Exit::Cancelled;
         }
+        Outcome::Failed if observed.prompt_rejected => return Exit::Failed,
+        Outcome::Failed if observed.violation => return Exit::Uncertain,
+        Outcome::Failed if observed.submitted => return Exit::Uncertain,
+        Outcome::Failed => return Exit::Failed,
         Outcome::Terminal(terminal) if !observed.violation => terminal,
         _ if !cleanup || observed.submitted => return Exit::Uncertain,
         _ => return Exit::Failed,

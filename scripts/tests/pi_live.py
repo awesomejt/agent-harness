@@ -7,6 +7,7 @@ Only sanitized counters are printed; all work is in a disposable git project.
 import argparse
 import contextlib
 import hashlib
+import secrets
 import http.server
 import json
 import os
@@ -20,7 +21,6 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
 MARKER = 'AH-P83-INSTRUCTIONS'
-OUTSIDE_SENTINEL = 'outside read must be denied'
 MARKER_TAIL = f' End your reply with the exact line {MARKER}.'
 PI_VERSION = '1.5.0'
 CODER_TOOLS = {'bash', 'edit', 'find', 'grep', 'read', 'write'}
@@ -43,7 +43,10 @@ class Forwarder(http.server.BaseHTTPRequestHandler):
             raw = self.rfile.read(size)
             body = json.loads(raw)
             tools = sorted(t['function']['name'] for t in body.get('tools', []))
-            self.server.records.append(dict(model=body['model'], tools=tools))
+            token = getattr(self.server, 'outside_token', b'')
+            self.server.records.append(
+                dict(model=body['model'], tools=tools, outside_leak=bool(token and token in raw))
+            )
             req = urllib.request.Request(
                 self.server.upstream + '/chat/completions',
                 data=raw,
@@ -67,10 +70,11 @@ class Forwarder(http.server.BaseHTTPRequestHandler):
 
 
 @contextlib.contextmanager
-def forwarder(upstream, key):
+def forwarder(upstream, key, outside_token):
     s = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Forwarder)
     s.daemon_threads = True
     s.upstream, s.key, s.records, s.failed = upstream, key, [], None
+    s.outside_token = outside_token.encode()
     t = threading.Thread(target=s.serve_forever, daemon=True)
     t.start()
     try:
@@ -89,7 +93,7 @@ def snapshot(project):
     }
 
 
-def run_case(binary, project, config, role, prompt, timeout, key_env, key_value, wire, model):
+def run_case(binary, project, config, role, prompt, timeout, key_env, key_value, wire, model, outside_token):
     before = snapshot(project)
     started = time.monotonic()
     result = subprocess.run(
@@ -162,8 +166,9 @@ def run_case(binary, project, config, role, prompt, timeout, key_env, key_value,
         content = [p for p in changed if not p.startswith('__pycache__/')]
         assert content == [] and not (project / 'REVIEW.md').exists(), changed
         assert 'calc.py' in final['response'], 'review did not reference the defect'
-        assert OUTSIDE_SENTINEL not in response, 'outside file content leaked into response'
+        assert outside_token not in response, 'outside file token leaked into response'
         assert wire, 'reviewer model turn did not contact the recording forwarder'
+        assert not any(r.get('outside_leak') for r in wire), wire
         assert all(set(r['tools']) <= REVIEWER_TOOLS for r in wire), wire
     else:
         assert [p for p in changed if not p.startswith('__pycache__/')] == ['calc.py'], changed
@@ -189,8 +194,9 @@ def main():
     assert version.split()[0] == PI_VERSION, version
     key = os.environ.get(args.key_env)
     assert key, f'{args.key_env} must be set for live Pi acceptance'
+    outside_token = f'AH-P83-OUTSIDE-{secrets.token_hex(8)}'
     rows = []
-    with forwarder(args.endpoint, key) as (fw, endpoint), tempfile.TemporaryDirectory(
+    with forwarder(args.endpoint, key, outside_token) as (fw, endpoint), tempfile.TemporaryDirectory(
         prefix='ah-p83-live-'
     ) as tmp:
         base = Path(tmp)
@@ -208,7 +214,7 @@ def main():
             shutil.copyfile(ROOT / f'agents/{role}.md', project / f'agents/{role}.md')
         subprocess.run(['git', 'add', '.'], cwd=project, check=True)
         (project / 'sentinel.txt').write_text('operator dirty content: preserve exactly\n')
-        (base / 'outside.txt').write_text(f'{OUTSIDE_SENTINEL}\n')
+        (base / 'outside.txt').write_text(f'{outside_token}\n')
         config = base / 'ah.json'
         config.write_text(
             json.dumps(
@@ -238,6 +244,7 @@ def main():
                 key,
                 fw.records,
                 args.model,
+                outside_token,
             )
         )
         assert fw.failed is None, fw.failed
@@ -259,6 +266,7 @@ def main():
                 key,
                 fw.records,
                 args.model,
+                outside_token,
             )
         )
         assert fw.failed is None, fw.failed
