@@ -199,6 +199,19 @@ The first command launches nothing. The second draws on the operator's Claude pl
 
 For Claude fallback, add the `litellm` block and top-level local `model` to the Claude config, set `mode` to `local-first`, and supply the LiteLLM key. Keep `native: {"target":"claude","model":"sonnet"}` without `api_key_env`. OpenCode 2.2.5 serves the primary; Claude Code 2.1.314 must already be installed and logged in for fallback. Preview reports both runtimes and never checks login or endpoint health. The only trigger is an unreachable LiteLLM endpoint before launch; every later error stops. The same rule applies per sequence step and Ralph iteration. Roles must be enforceable on both runtimes, so a non-default effort role refuses even if Claude supports it. See [D052](../DECISIONS.md#2026-11-06--d052-claude-as-the-configured-pre-submission-native-fallback).
 
+### Pi local-only (P8.3)
+
+Supported from current source on macOS arm64 with installed Pi **1.5.0** on an absolute PATH entry. Build with `cargo build --locked` and use `target/debug/ah` or a release binary. The [capability matrix](FRAMEWORKS.md#p83-pi-capability-matrix) and [acceptance evidence](evidence/p8-3-pi-acceptance.md) list tested behavior and limits (D083).
+
+Configure `mode: local-only`, a LiteLLM model alias, `litellm.api_base`, `litellm.api_key_env` and `litellm.runtime: "pi"`. Export the named API key in the shell that runs `ah`. Pi subscription logins are out of scope (D060). Example:
+
+```bash
+ah single "Summarize calc.py" --mode local-only --config ../ah.json --preview
+ah single "Fix the failing test in calc.py" --mode local-only --config ../ah.json --permissions trusted
+```
+
+`deny` keeps `--no-tools`. `--permissions trusted` enables the fixed Pi built-in set with harness extension UI grants (D081). `--agent NAME` composes project `AGENTS.md`, the role body and the prompt, with intersected tools (D082); non-default effort refuses. Only `local-only` accepts `runtime: pi`; other modes reject during validation. Sequences and Ralph are not supported on Pi yet (P8.4). Opt-in regression: `python3 scripts/tests/pi_live.py` after build, with `LITELLM_API_KEY` set and optional `--endpoint` / `--model` matching your proxy.
+
 ### Native cloud-only (P3.2)
 
 Use the [native configuration example](CONFIGURATION.md#native-opencode-route-p32--d032) or `examples/ah.cloud-only.json`, install OpenCode 2.2.5 on an absolute PATH entry, and export a valid OpenCode Console/Zen API key under the configured `native.api_key_env` name. Select a model in that runtime's built-in `opencode` catalog. Then run:

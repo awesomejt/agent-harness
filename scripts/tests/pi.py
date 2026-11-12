@@ -15,9 +15,9 @@ SHARED_ARGS = ['--offline', '--mode', 'rpc', '--no-session', '--no-extensions',
                '--no-approve', '--provider', 'ah-litellm']
 TRUSTED_TOOLS = 'bash,edit,find,grep,read,write'
 REVIEWER_TOOLS = 'find,grep,read'
-DENY_ARGS = SHARED_ARGS + ['--no-tools']
-TRUSTED_ARGS = SHARED_ARGS + [f'--tools={TRUSTED_TOOLS}']
-REVIEWER_ARGS = SHARED_ARGS + [f'--tools={REVIEWER_TOOLS}']
+DENY_ARGS = SHARED_ARGS + ['--no-tools', '--model', 'fixture']
+TRUSTED_ARGS = SHARED_ARGS + ['--tools', TRUSTED_TOOLS, '--model', 'fixture']
+REVIEWER_ARGS = SHARED_ARGS + ['--tools', REVIEWER_TOOLS, '--model', 'fixture']
 T = ['--permissions', 'trusted']
 
 
@@ -119,8 +119,10 @@ for case, expected, prompted, extra in CASES:
                 base = DENY_ARGS
             assert argv[:len(base)] == base, (case, argv)
             assert argv.count('--provider') == 1 and 'ah-litellm' in argv, argv
-            assert any(a.startswith('--model=fixture') for a in argv), argv
-            assert any(a == '-e' or a.startswith('-e') for a in argv), argv
+            model_i = argv.index('--model')
+            assert argv[model_i + 1] == 'fixture', argv
+            ext_i = argv.index('-e')
+            assert ext_i >= 0 and argv[ext_i + 1].endswith('ah-policy.mjs'), argv
             names = {l.split('=', 1)[0] for l in (project / 'env.txt').read_text().splitlines() if '=' in l}
             want = {'HOME', 'PATH', 'PI_CODING_AGENT_DIR', 'LOCAL_KEY'}
             if case.startswith('trusted') or case == 'agent-reviewer':

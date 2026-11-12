@@ -113,4 +113,19 @@ The [supported Antigravity control assessment](evidence/p7-5-antigravity-control
 
 ## P8.1 Pi integration decision
 
-[D060](../DECISIONS.md#2026-11-07--d060-select-pi-rpc-for-litellm-first-feasibility) selects caller-owned Pi RPC for initial **LiteLLM local-only** feasibility. The [decision and capability matrix](evidence/p8-1-pi-integration.md) records pinned source, the renamed official package, canonical-role/skill/effort mapping, exact host-grant requirements and terminal semantics. Pi subscription-provider clients are not selected as official native CLI replacements. Pi was absent at P8.1; the [P8.2 installed discovery](evidence/p8-2-pi-feasibility.md) now identifies published 1.5.0 and verifies contained startup, empty tool/MCP inventories and idle synthetic model state (D064). The [P8.2 settings/credential substep](evidence/p8-2-pi-effective-controls.md) (D065) proves tested project-settings/SYSTEM exclusion with `--no-approve`, private cache-warming accessor behavior and synthetic stored-auth precedence. Complete resource/provider-source coverage, trapped HTTP route capture and adversarial denial remain unproven. No production support is claimed. P8.2 first proves isolated startup, complete deny and effective routing without inference; trusted permissions require a separately proven bridge. P8.3–P8.5 retain live acceptance, workflow parity and holistic review gates.
+[D060](../DECISIONS.md#2026-11-07--d060-select-pi-rpc-for-litellm-first-feasibility) selects caller-owned Pi RPC for initial **LiteLLM local-only** feasibility. The [decision and capability matrix](evidence/p8-1-pi-integration.md) records pinned source, the renamed official package, canonical-role/skill/effort mapping, exact host-grant requirements and terminal semantics. Pi subscription-provider clients are not selected as official native CLI replacements. P8.2 slices (D080–D082) prove deny/trusted/named agents on fixtures; [P8.3 live acceptance](evidence/p8-3-pi-acceptance.md) (D083) closes the initial single-run milestone on installed 1.5.0. P8.4 workflow parity and P8.5 holistic review remain open.
+
+## P8.3 Pi capability matrix
+
+Applies to current source on **macOS arm64, Pi 1.5.0**, `litellm.runtime: pi` and `mode: local-only` only. [Acceptance](evidence/p8-3-pi-acceptance.md), [setup](OPERATIONS.md#pi-local-only-p83) and [configuration](CONFIGURATION.md) define invocation details.
+
+| Capability | Supported behavior and boundary | Evidence |
+|---|---|---|
+| Route / runtime | `local-only` only; private `PI_CODING_AGENT_DIR`, synthetic `ah-litellm` provider; no `opencode.json` sync | D080, [deny launch](evidence/p8-2-pi-deny-launch.md) |
+| Authentication / HTTP | LiteLLM `api_base` + `api_key_env`; no Pi subscription client or credential copy | D060, [P8.3 acceptance](evidence/p8-3-pi-acceptance.md) |
+| Tools / permissions | Default `deny` (`--no-tools`); `trusted` offers six built-ins with extension UI allow-once grants; host privileges, no OS sandbox | [Trusted](evidence/p8-2-pi-trusted.md), D081 |
+| Named primary / specialized role | Composed `AGENTS.md` + body + prompt; intersected `--tools`; non-default effort refuses | [Agents](evidence/p8-2-pi-agents.md), D082 |
+| Lifecycle / results | RPC preflight, `agent_settled` terminal, deadline/interrupt cleanup; trusted deny blocks tool calls at extension | [Deny launch](evidence/p8-2-pi-deny-launch.md), `pi.py` |
+| Live coding acceptance | Sample coder/reviewer on real LiteLLM; independent tests after coder; reviewer leaves project unchanged | [P8.3 acceptance](evidence/p8-3-pi-acceptance.md), `pi_live.py` |
+
+Unsupported: `cloud-only`, `local-first`, sequences, Ralph, MCP/skills/context discovery, non-default effort on Pi, subscription Pi auth. Read-only agent ceilings intersect tools but do not yet deny every UI grant like Claude (D083 limit). Version/platform upgrades need new evidence.

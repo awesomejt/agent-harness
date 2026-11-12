@@ -138,13 +138,14 @@ pub(crate) fn args(request: &Resolved, extension: &Path) -> Vec<OsString> {
         if names.is_empty() {
             args.push(OsString::from("--no-tools"));
         } else {
-            args.push(format!("--tools={}", names.join(",")).into());
+            args.push(OsString::from("--tools"));
+            args.push(OsString::from(names.join(",")));
         }
     }
-    args.push(format!("--model={}", request.model).into());
-    let mut ext = OsString::from("-e");
-    ext.push(extension);
-    args.push(ext);
+    args.push(OsString::from("--model"));
+    args.push(OsString::from(request.model.as_str()));
+    args.push(OsString::from("-e"));
+    args.push(extension.as_os_str().to_owned());
     args
 }
 
@@ -214,6 +215,11 @@ pub(crate) fn validate_state(
     {
         return false;
     }
+    if let Some(version) = state.get("piVersion") {
+        if *version != json!(VERSION) {
+            return false;
+        }
+    }
     if state
         .get("messageCount")
         .and_then(Value::as_u64)
@@ -236,12 +242,18 @@ pub(crate) fn validate_state(
         && model_obj.get("id") == Some(&json!(model))
         && model_obj.get("baseUrl") == Some(&json!(api_base))
         && model_obj.get("api") == Some(&json!("openai-completions"))
-        && tool_names_match(state.get("activeTools"), request)
-        && state.get("mcpServers").is_some_and(empty_array)
-        && state
-            .get("tools")
-            .is_some_and(|value| tool_names_match(Some(value), request))
-        && state.get("piVersion") == Some(&json!(VERSION))
+        && optional_tool_inventory(state.get("activeTools"), request)
+        && optional_empty_mcp(state.get("mcpServers"))
+        && optional_tool_inventory(state.get("tools"), request)
+}
+
+fn optional_empty_mcp(value: Option<&Value>) -> bool {
+    value.is_none_or(empty_array)
+}
+
+/// Installed Pi 1.5.0 `get_state` may omit tool inventories; validate them when present.
+fn optional_tool_inventory(value: Option<&Value>, request: &Resolved) -> bool {
+    value.is_none_or(|tools| tool_names_match(Some(tools), request))
 }
 
 fn tool_names_match(value: Option<&Value>, request: &Resolved) -> bool {
@@ -332,7 +344,7 @@ pub(crate) fn validate_prompt_response(line: &Value, id: &str) -> bool {
         && line
             .pointer("/data/disposition")
             .and_then(Value::as_str)
-            .is_some_and(|d| d == "handled" || d == "started")
+            .is_some_and(|d| d == "started" || d == "queued")
 }
 
 #[derive(Debug, PartialEq)]
@@ -512,6 +524,60 @@ struct Observed {
     permissions: u32,
     grants: u32,
     answered_ui: HashSet<String>,
+    assistant_text: String,
+}
+
+#[cfg(target_os = "macos")]
+fn record_assistant_message(observed: &mut Observed, message: &Value) {
+    if message.get("role") != Some(&json!("assistant")) {
+        return;
+    }
+    match message.get("content") {
+        Some(Value::String(text)) if !text.is_empty() => observed.assistant_text = text.clone(),
+        Some(Value::Array(blocks)) => {
+            let mut text = String::new();
+            for block in blocks {
+                if block.get("type") == Some(&json!("text"))
+                    && let Some(part) = block.get("text").and_then(Value::as_str)
+                {
+                    text.push_str(part);
+                }
+            }
+            if !text.is_empty() {
+                observed.assistant_text = text;
+            }
+        }
+        _ => {}
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn record_agent_event(observed: &mut Observed, line: &Value) {
+    match line.get("type").and_then(Value::as_str) {
+        Some("message_start") | Some("message_end") | Some("turn_end") => {
+            if let Some(message) = line.get("message") {
+                record_assistant_message(observed, message);
+            }
+        }
+        Some("agent_end") => {
+            if let Some(messages) = line.get("messages").and_then(Value::as_array) {
+                for message in messages {
+                    record_assistant_message(observed, message);
+                }
+            }
+        }
+        Some("message_update") => {
+            for pointer in [
+                "/assistantMessageEvent/delta",
+                "/assistant_message_event/delta",
+            ] {
+                if let Some(delta) = line.pointer(pointer).and_then(Value::as_str) {
+                    observed.assistant_text.push_str(delta);
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -780,8 +846,14 @@ async fn turn(
                     observed.violation = true;
                     return Outcome::Failed;
                 }
+                record_agent_event(observed, &line);
                 if let Some(found) = classify_event(&line, interrupted) {
-                    terminal = Some(found);
+                    terminal = Some(match found {
+                        Terminal::Success { text } if text.is_empty() => Terminal::Success {
+                            text: observed.assistant_text.clone(),
+                        },
+                        other => other,
+                    });
                 }
             }
             Ok(Some(Err(()))) => return Outcome::Failed,
@@ -912,6 +984,10 @@ pub(crate) async fn attempt(
     }
     match terminal {
         Terminal::Success { text } => {
+            if text.trim().is_empty() {
+                progress.event("backend agent_settled with no assistant text");
+                return Exit::Failed;
+            }
             progress.note(json!({"backend_stop": "agent_settled"}));
             progress.emit(
                 "attempt.backend_stop",
@@ -1028,7 +1104,7 @@ mod tests {
     }
 
     #[test]
-    fn preflight_state_refuses_missing_version() {
+    fn preflight_state_accepts_installed_shape_without_inventories() {
         let data = json!({
             "isStreaming": false,
             "isCompacting": false,
@@ -1041,9 +1117,30 @@ mod tests {
                 "baseUrl": "http://127.0.0.1:9/v1",
                 "api": "openai-completions",
             },
-            "activeTools": [],
-            "mcpServers": [],
-            "tools": [],
+        });
+        assert!(validate_state(
+            &data,
+            "fixture",
+            "http://127.0.0.1:9/v1",
+            &request(Permissions::Deny)
+        ));
+    }
+
+    #[test]
+    fn preflight_state_refuses_wrong_version_when_reported() {
+        let data = json!({
+            "isStreaming": false,
+            "isCompacting": false,
+            "autoCompactionEnabled": false,
+            "messageCount": 0,
+            "pendingMessageCount": 0,
+            "piVersion": "9.9.9",
+            "model": {
+                "provider": PROVIDER,
+                "id": "fixture",
+                "baseUrl": "http://127.0.0.1:9/v1",
+                "api": "openai-completions",
+            },
         });
         assert!(!validate_state(
             &data,
@@ -1128,6 +1225,56 @@ mod tests {
     fn settled_error_after_interrupt_maps_cancelled() {
         let line = json!({"type": "agent_settled", "error": true});
         assert_eq!(classify_event(&line, true), Some(Terminal::Cancelled));
+    }
+
+    #[test]
+    fn prompt_response_rejects_handled_disposition() {
+        let line = json!({
+            "type": "response",
+            "id": "ah-prompt",
+            "command": "prompt",
+            "success": true,
+            "data": {"disposition": "handled"},
+        });
+        assert!(!validate_prompt_response(&line, "ah-prompt"));
+        let started = json!({
+            "type": "response",
+            "id": "ah-prompt",
+            "command": "prompt",
+            "success": true,
+            "data": {"disposition": "started"},
+        });
+        assert!(validate_prompt_response(&started, "ah-prompt"));
+    }
+
+    #[test]
+    fn agent_end_messages_fill_empty_settled_text() {
+        let mut observed = Observed::default();
+        record_agent_event(
+            &mut observed,
+            &json!({
+                "type": "agent_end",
+                "messages": [{
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "reviewed calc.py"}]
+                }],
+            }),
+        );
+        let terminal =
+            match classify_event(&json!({"type": "agent_settled", "aborted": false}), false)
+                .unwrap()
+            {
+                Terminal::Success { text } if text.is_empty() => Terminal::Success {
+                    text: observed.assistant_text.clone(),
+                },
+                other => other,
+            };
+        assert_eq!(
+            terminal,
+            Terminal::Success {
+                text: "reviewed calc.py".into()
+            }
+        );
     }
 
     #[test]
