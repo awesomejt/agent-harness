@@ -12,7 +12,18 @@ PROVIDER = 'ah-litellm'
 cwd = Path.cwd()
 case = (cwd / 'case').read_text().strip()
 (cwd / 'argv.json').write_text(json.dumps(sys.argv[1:]))
-MODEL = next((a.split('=', 1)[1] for a in sys.argv if a.startswith('--model=')), 'fixture')
+def _flag_value(long, short=None):
+    for i, a in enumerate(sys.argv):
+        if a == long and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+        if short and a == short and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+        if a.startswith(long + '='):
+            return a.split('=', 1)[1]
+    return None
+
+
+MODEL = _flag_value('--model') or 'fixture'
 log = open(cwd / 'stdin.jsonl', 'a')
 
 
@@ -48,15 +59,15 @@ def read():
 
 
 def active_tool_names():
-    if '--no-tools' in sys.argv:
+    if '--no-tools' in sys.argv or '-nt' in sys.argv:
         return []
-    spec = next((a.split('=', 1)[1] for a in sys.argv if a.startswith('--tools=')), '')
+    spec = _flag_value('--tools', '-t') or ''
     return sorted(spec.split(',')) if spec else []
 
 
 def state():
     tools = active_tool_names()
-    return {
+    data = {
         'isStreaming': False,
         'isCompacting': case == 'streaming',
         'autoCompactionEnabled': case == 'project-settings',
@@ -74,6 +85,10 @@ def state():
         'mcpServers': ['x'] if case == 'mcp' else [],
         'tools': (['bash'] if case in ('state-tools', 'init-tools') else tools),
     }
+    if case in ('trusted-state-no-inventories', 'state-omit-deny'):
+        for key in ('activeTools', 'tools', 'mcpServers'):
+            data.pop(key, None)
+    return data
 
 
 def respond(request):
@@ -91,8 +106,34 @@ def respond(request):
             return
     if command == 'prompt':
         (cwd / 'prompted').write_text(request.get('message', ''))
+        disposition = 'handled' if case == 'prompt-handled' else 'started'
         emit({'type': 'response', 'id': ident, 'command': 'prompt', 'success': True,
-              'data': {'disposition': 'started'}})
+              'data': {'disposition': disposition}})
+        if case == 'prompt-handled':
+            return
+        if case == 'empty-settled':
+            emit({'type': 'agent_settled', 'aborted': False})
+            return
+        if case == 'session-text':
+            emit({
+                'type': 'agent_end',
+                'messages': [{
+                    'role': 'assistant',
+                    'content': [{'type': 'text', 'text': 'session event response\n'}],
+                }],
+            })
+            emit({'type': 'agent_settled', 'aborted': False})
+            return
+        if case == 'trusted-state-no-inventories':
+            emit({
+                'type': 'agent_end',
+                'messages': [{
+                    'role': 'assistant',
+                    'content': [{'type': 'text', 'text': 'fake response\nfinal line\n'}],
+                }],
+            })
+            emit({'type': 'agent_settled', 'aborted': False})
+            return
         if case == 'tool-use':
             emit({'type': 'tool_call', 'name': 'bash'})
             time.sleep(0.5)
