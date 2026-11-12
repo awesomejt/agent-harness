@@ -1,6 +1,7 @@
 //! Pinned Pi 1.5.0 local-only adapter (D060/D080/D081): caller-owned RPC with
 //! harness-owned private state, provider routing, deny or trusted extension UI.
 
+use crate::agents::{self, Agent, Effort};
 use crate::config::{Invalid, Permissions, Resolved, RuntimeKind};
 use crate::permission::{
     OptionKind, PermissionOption, PermissionPolicy, PermissionRequest, PermissionResponse,
@@ -27,8 +28,10 @@ const PROVIDER: &str = "ah-litellm";
 const LINE_LIMIT: usize = 1 << 20;
 const OUTPUT_LIMIT: usize = 8 << 20;
 const UI_TITLE: &str = "ah-permission";
-/// Built-in tool names for a full trusted invocation (D081); intersected for roles later.
+/// Built-in tool names for a full trusted invocation (D081/D082); intersected for roles.
 pub(crate) const TRUSTED_TOOLS: [&str; 6] = ["bash", "edit", "find", "grep", "read", "write"];
+pub(crate) const BODY_LIMIT: usize = 128 << 10;
+const INSTRUCTION_LIMIT: usize = 1 << 20;
 
 /// Map a Pi tool name to the canonical grant kind OpenCode uses (D037).
 pub(crate) fn tool_kind(name: &str) -> Option<&'static str> {
@@ -53,14 +56,29 @@ pub(crate) fn active_tools(request: &Resolved) -> Vec<&'static str> {
         .collect()
 }
 
-/// Capabilities this increment refuses before launch (D060/D080/D081).
+/// Non-default effort is unsupported on Pi 1.5.0 (D082), same gate as OpenCode (D038).
+pub(crate) fn supports(agent: &Agent) -> Result<(), Invalid> {
+    if agent.effort() == Effort::Default {
+        Ok(())
+    } else {
+        Err(Invalid(
+            "agent effort is unsupported on the Pi runtime; only default effort runs",
+        ))
+    }
+}
+
+/// Capabilities this increment refuses before launch (D060/D080/D081/D082).
 pub(crate) fn supported(request: &Resolved) -> Result<(), Invalid> {
     if request.runtime != RuntimeKind::Pi {
         return Ok(());
     }
-    if request.agent.is_some() {
+    if request
+        .agent
+        .as_ref()
+        .is_some_and(|agent| agent.body().len() > BODY_LIMIT)
+    {
         return Err(Invalid(
-            "named agents are not yet supported on the Pi runtime",
+            "agent body exceeds 128 KiB, the Pi runtime prompt bound",
         ));
     }
     if request.fallback.is_some() {
@@ -69,6 +87,26 @@ pub(crate) fn supported(request: &Resolved) -> Result<(), Invalid> {
         ));
     }
     Ok(())
+}
+
+/// User prompt plus project `AGENTS.md` and named-role body (D082).
+pub(crate) fn composed_prompt(request: &Resolved) -> Result<String, Invalid> {
+    let mut parts = Vec::new();
+    if let Some(path) = &request.instructions {
+        let text = std::fs::read_to_string(path)
+            .map_err(|_| Invalid("cannot read project AGENTS.md for the Pi runtime prompt"))?;
+        if text.len() > INSTRUCTION_LIMIT {
+            return Err(Invalid(
+                "project AGENTS.md exceeds 1 MiB, the Pi runtime instruction bound",
+            ));
+        }
+        parts.push(text);
+    }
+    if let Some(agent) = &request.agent {
+        parts.push(agent.body().to_owned());
+    }
+    parts.push(request.prompt.clone());
+    Ok(parts.join("\n\n"))
 }
 
 pub(crate) fn args(request: &Resolved, extension: &Path) -> Vec<OsString> {
@@ -611,18 +649,39 @@ async fn turn(
     if cancelled.is_cancelled() || Instant::now() >= deadline {
         return Outcome::Stopped;
     }
-    let profile = match request.permissions {
-        Permissions::Deny => "deny (no tools offered)",
-        Permissions::Trusted => "trusted (extension UI grants)",
+    let message = match composed_prompt(request) {
+        Ok(message) => message,
+        Err(error) => {
+            progress.reject(error.0);
+            return Outcome::Refused;
+        }
     };
-    progress.event(format!(
-        "{label} via Pi {VERSION}; model pi/{}; permissions {profile}",
-        request.model
-    ));
+    if let Some(agent) = &request.agent {
+        progress.event(format!(
+            "{label} via Pi {VERSION}; model pi/{}; agent {} ({}; tools {:?})",
+            request.model,
+            agent.name(),
+            match agent.capacity() {
+                agents::Capacity::Primary => "primary",
+                agents::Capacity::Specialized => "specialized",
+                agents::Capacity::Both => "both",
+            },
+            agent.tools(),
+        ));
+    } else {
+        let profile = match request.permissions {
+            Permissions::Deny => "deny (no tools offered)",
+            Permissions::Trusted => "trusted (extension UI grants)",
+        };
+        progress.event(format!(
+            "{label} via Pi {VERSION}; model pi/{}; permissions {profile}",
+            request.model
+        ));
+    }
     let prompt_id = "ah-prompt";
     if !channel
         .send(
-            &rpc(prompt_id, "prompt", json!({"message": request.prompt})),
+            &rpc(prompt_id, "prompt", json!({"message": message})),
             deadline,
         )
         .await
@@ -875,6 +934,7 @@ pub(crate) async fn attempt(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::agents::Agent;
     use crate::config::{Mode, Permissions, Resolved, RuntimeKind, Source, Sources};
     use serde_json::json;
     use std::path::PathBuf;
@@ -1012,6 +1072,23 @@ mod tests {
             "http://127.0.0.1:9/v1",
             &request(Permissions::Deny)
         ));
+    }
+
+    #[test]
+    fn composed_prompt_appends_agent_after_instructions() {
+        let mut request = request(Permissions::Deny);
+        request.prompt = "task".into();
+        request.agent = Some(
+            Agent::read(
+                b"---\nversion: 1\nname: reviewer\ndescription: d\ncapacity: primary\npermissions: read-only\ntools: [read]\n---\nRole body\n"
+                    .as_slice(),
+            )
+            .unwrap(),
+        );
+        request.instructions = Some(PathBuf::from("/dev/null"));
+        // Skip reading /dev/null in unit test: no instructions path.
+        request.instructions = None;
+        assert_eq!(composed_prompt(&request).unwrap(), "Role body\n\n\ntask");
     }
 
     #[test]

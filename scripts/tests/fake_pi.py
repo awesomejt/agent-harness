@@ -128,11 +128,12 @@ def respond(request):
                       'title': title, 'message': payload})
                 time.sleep(0.2)
                 return
-            if case == 'trusted-success':
+            if case in ('trusted-success', 'agent-reviewer'):
                 emit({'type': 'extension_ui_request', 'id': ui_id, 'method': method,
                       'title': title, 'message': message})
                 resp = read()
-                (cwd / 'ui_response.json').write_text(json.dumps(resp))
+                if case == 'trusted-success':
+                    (cwd / 'ui_response.json').write_text(json.dumps(resp))
                 if not resp.get('confirmed'):
                     emit({'type': 'agent_settled', 'error': True})
                     return
