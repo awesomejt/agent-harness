@@ -29,7 +29,7 @@ Every successful attempt must report Pi 1.5.0, `pi/MODEL`, the selected role, `a
 
 ## Checks and limitations
 
-Offline: `python3 -B scripts/tests/pi.py` (29 cases), full `offline.py` suite, `cargo test --locked`, fmt/clippy as in prior P8.2 slices. Live inference remains excluded from `offline.py`.
+Offline: `python3 -B scripts/tests/pi.py` (34 cases), full `offline.py` suite, `cargo test --locked`, fmt/clippy as in prior P8.2 slices. Live inference remains excluded from `offline.py`.
 
 Supported scope is `local-only` with `litellm.runtime: pi` only. Read-only role ceilings intersect tools but may still grant some extension UI prompts (unlike Claude D050); grant counts are recorded explicitly. No sequences, Ralph, `local-first`, subscription Pi clients or non-default effort. P8.4 workflow parity and P8.5 holistic review remain gated.
 
@@ -39,4 +39,4 @@ On merge of this PR, record the driver and adapter fixes; mark **P8.3 complete**
 
 ## PR review closeout
 
-Pending: feature PR, Grok review, live run table filled with sanitized counters, and merge per [GIT_WORKFLOW](../GIT_WORKFLOW.md).
+Feature [PR #100](https://github.com/awesomejt/agent-harness/pull/100) merged after Grok review (first pass and follow-up addressed). Live run table remains pending two passing operator runs. P8.3 PROJECT checkbox stays open until the table is filled per [GIT_WORKFLOW](../GIT_WORKFLOW.md).
