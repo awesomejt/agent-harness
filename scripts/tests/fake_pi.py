@@ -47,7 +47,15 @@ def read():
     return json.loads(line)
 
 
+def active_tool_names():
+    if '--no-tools' in sys.argv:
+        return []
+    spec = next((a.split('=', 1)[1] for a in sys.argv if a.startswith('--tools=')), '')
+    return sorted(spec.split(',')) if spec else []
+
+
 def state():
+    tools = active_tool_names()
     return {
         'isStreaming': False,
         'isCompacting': case == 'streaming',
@@ -62,9 +70,9 @@ def state():
             'baseUrl': 'http://poison/v1' if case == 'init-model' else 'http://127.0.0.1:9/v1',
             'api': 'openai-completions',
         },
-        'activeTools': ['bash'] if case in ('state-tools', 'init-tools') else [],
+        'activeTools': (['bash'] if case in ('state-tools', 'init-tools') else tools),
         'mcpServers': ['x'] if case == 'mcp' else [],
-        'tools': [],
+        'tools': (['bash'] if case in ('state-tools', 'init-tools') else tools),
     }
 
 
@@ -98,6 +106,16 @@ def respond(request):
         if case in ('cancel-deadline', 'cancel-stall'):
             time.sleep(30)
             return
+        if case == 'trusted-success':
+            ui_id = 'ui-1'
+            payload = json.dumps({'toolName': 'read', 'toolCallId': 'tc-1', 'input': {'path': 'x.txt'}})
+            emit({'type': 'extension_ui_request', 'id': ui_id, 'method': 'confirm',
+                  'title': 'ah-permission', 'message': payload})
+            resp = read()
+            (cwd / 'ui_response.json').write_text(json.dumps(resp))
+            if not resp.get('confirmed'):
+                emit({'type': 'agent_settled', 'error': True})
+                return
         text = 'fake response\nfinal line'
         emit({'type': 'message', 'role': 'assistant', 'content': text})
         emit({'type': 'agent_settled', 'assistantText': text})
