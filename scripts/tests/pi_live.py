@@ -20,6 +20,7 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
 MARKER = 'AH-P83-INSTRUCTIONS'
+OUTSIDE_SENTINEL = 'outside read must be denied'
 MARKER_TAIL = f' End your reply with the exact line {MARKER}.'
 PI_VERSION = '1.5.0'
 CODER_TOOLS = {'bash', 'edit', 'find', 'grep', 'read', 'write'}
@@ -161,8 +162,9 @@ def run_case(binary, project, config, role, prompt, timeout, key_env, key_value,
         content = [p for p in changed if not p.startswith('__pycache__/')]
         assert content == [] and not (project / 'REVIEW.md').exists(), changed
         assert 'calc.py' in final['response'], 'review did not reference the defect'
-        if wire:
-            assert all(set(r['tools']) <= REVIEWER_TOOLS for r in wire), wire
+        assert OUTSIDE_SENTINEL not in response, 'outside file content leaked into response'
+        assert wire, 'reviewer model turn did not contact the recording forwarder'
+        assert all(set(r['tools']) <= REVIEWER_TOOLS for r in wire), wire
     else:
         assert [p for p in changed if not p.startswith('__pycache__/')] == ['calc.py'], changed
         assert last['grants'] >= 1
@@ -206,7 +208,7 @@ def main():
             shutil.copyfile(ROOT / f'agents/{role}.md', project / f'agents/{role}.md')
         subprocess.run(['git', 'add', '.'], cwd=project, check=True)
         (project / 'sentinel.txt').write_text('operator dirty content: preserve exactly\n')
-        (base / 'outside.txt').write_text('outside read must be denied\n')
+        (base / 'outside.txt').write_text(f'{OUTSIDE_SENTINEL}\n')
         config = base / 'ah.json'
         config.write_text(
             json.dumps(

@@ -113,7 +113,7 @@ The [supported Antigravity control assessment](evidence/p7-5-antigravity-control
 
 ## P8.1 Pi integration decision
 
-[D060](../DECISIONS.md#2026-11-07--d060-select-pi-rpc-for-litellm-first-feasibility) selects caller-owned Pi RPC for initial **LiteLLM local-only** feasibility. The [decision and capability matrix](evidence/p8-1-pi-integration.md) records pinned source, the renamed official package, canonical-role/skill/effort mapping, exact host-grant requirements and terminal semantics. Pi subscription-provider clients are not selected as official native CLI replacements. P8.2 slices (D080–D082) prove deny/trusted/named agents on fixtures; [P8.3 live acceptance](evidence/p8-3-pi-acceptance.md) (D083) closes the initial single-run milestone on installed 1.5.0. P8.4 workflow parity and P8.5 holistic review remain open.
+[D060](../DECISIONS.md#2026-11-07--d060-select-pi-rpc-for-litellm-first-feasibility) selects caller-owned Pi RPC for initial **LiteLLM local-only** feasibility. The [decision and capability matrix](evidence/p8-1-pi-integration.md) records pinned source, the renamed official package, canonical-role/skill/effort mapping, exact host-grant requirements and terminal semantics. Pi subscription-provider clients are not selected as official native CLI replacements. P8.2 slices (D080–D082) prove deny/trusted/named agents on fixtures; [P8.3 live acceptance](evidence/p8-3-pi-acceptance.md) (D083) adds the opt-in live driver and installed adapter fixes; single-run milestone closeout waits on passing `pi_live.py`. P8.4 workflow parity and P8.5 holistic review remain open.
 
 ## P8.3 Pi capability matrix
 

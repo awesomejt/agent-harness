@@ -57,6 +57,11 @@ CASES = [
                                  '--config', 'cloud-native.json']),
     ('preview', 0, False, ['--preview']),
     ('missing-runtime', 2, False, []),
+    ('prompt-handled', 1, True, []),
+    ('empty-settled', 1, True, []),
+    ('session-text', 0, True, []),
+    ('trusted-state-no-inventories', 0, True, T),
+    ('state-omit-deny', 2, False, []),
 ]
 
 count = 0
@@ -164,6 +169,8 @@ for case, expected, prompted, extra in CASES:
             assert 'Read project instructions' in (project / 'prompted').read_text(), case
         if case == 'agent-effort-refuse':
             assert 'agent effort is unsupported on the Pi runtime' in p.stderr, p.stderr
+        if case == 'session-text':
+            assert p.stdout == 'session event response\n', (case, p.stdout)
         if case == 'trusted-success':
             ui = json.loads((project / 'ui_response.json').read_text())
             assert ui.get('confirmed') is True, ui

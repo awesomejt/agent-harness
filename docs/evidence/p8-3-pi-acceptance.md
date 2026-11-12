@@ -1,6 +1,6 @@
 # P8.3 — Pi single-run live acceptance
 
-Date: 2026-11-12. Task: [P8.3](../../tasks/08-pi.md#p8-3). Consolidates installed Pi **1.5.0** adapter slices D080–D082 with live primary/specialized use. This closes the initial Pi single-run milestone; sequence/Ralph parity stays P8.4. The [capability matrix](../FRAMEWORKS.md#p83-pi-capability-matrix) and [setup](../OPERATIONS.md#pi-local-only-p83) describe the supported surface.
+Date: 2026-11-12. Task: [P8.3](../../tasks/08-pi.md#p8-3). Consolidates installed Pi **1.5.0** adapter slices D080–D082 with live primary/specialized use. **P8.3 checkboxes stay open** until two passing `pi_live.py` runs on the operator proxy; sequence/Ralph parity stays P8.4. The [capability matrix](../FRAMEWORKS.md#p83-pi-capability-matrix) and [setup](../OPERATIONS.md#pi-local-only-p83) describe the supported surface.
 
 ## Accepted surface and evidence
 
@@ -12,7 +12,7 @@ Date: 2026-11-12. Task: [P8.3](../../tasks/08-pi.md#p8-3). Consolidates installe
 | Live project tasks on real LiteLLM | `scripts/tests/pi_live.py`, observations below |
 | Documented capability limits | D083, capability matrix |
 
-Reviewed starting baseline: `main` after merged P8.2 named agents ([PR #98](https://github.com/awesomejt/agent-harness/pull/98)). This increment adds the opt-in live driver, acceptance record and docs only; no schema or routing-policy widening beyond D083.
+Reviewed starting baseline: `main` after merged P8.2 named agents ([PR #98](https://github.com/awesomejt/agent-harness/pull/98)). This increment adds the opt-in live driver, acceptance record, docs, and installed Pi runtime fixes (argv, preflight, prompt disposition, session response text).
 
 ## Fresh live acceptance
 
@@ -35,7 +35,7 @@ Supported scope is `local-only` with `litellm.runtime: pi` only. Read-only role 
 
 ## Next boundary
 
-On merge, P8.3 is complete for single-run acceptance; P8.2 holistic lifecycle may still be tracked separately in PROJECT.md. Next selected work is **P8.4** sequence/Ralph parity after **P6.5**, or other gated tasks. No development-platform switch is required.
+On merge of this PR, record the driver and adapter fixes; mark **P8.3 complete** in PROJECT.md only after sanitized live table rows pass. P8.2 holistic lifecycle may still be tracked separately. Next selected work is **P8.4** sequence/Ralph parity after **P6.5**, or other gated tasks. No development-platform switch is required.
 
 ## PR review closeout
 
