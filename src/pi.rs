@@ -10,9 +10,9 @@ use crate::progress::Progress;
 #[cfg(target_os = "macos")]
 use crate::{config::Exit, process::OwnedChild};
 use serde_json::{Value, json};
-use std::{ffi::OsString, path::Path};
 #[cfg(target_os = "macos")]
-use std::{io, path::PathBuf, time::Duration};
+use std::{collections::HashSet, io, path::PathBuf, time::Duration};
+use std::{ffi::OsString, path::Path};
 #[cfg(target_os = "macos")]
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 #[cfg(target_os = "macos")]
@@ -28,13 +28,13 @@ const LINE_LIMIT: usize = 1 << 20;
 const OUTPUT_LIMIT: usize = 8 << 20;
 const UI_TITLE: &str = "ah-permission";
 /// Built-in tool names for a full trusted invocation (D081); intersected for roles later.
-pub(crate) const TRUSTED_TOOLS: [&str; 6] = ["bash", "edit", "glob", "grep", "read", "write"];
+pub(crate) const TRUSTED_TOOLS: [&str; 6] = ["bash", "edit", "find", "grep", "read", "write"];
 
 /// Map a Pi tool name to the canonical grant kind OpenCode uses (D037).
 pub(crate) fn tool_kind(name: &str) -> Option<&'static str> {
     match name {
         "read" => Some("read"),
-        "glob" | "grep" => Some("search"),
+        "find" | "grep" | "ls" => Some("search"),
         "edit" | "write" => Some("edit"),
         "bash" => Some("execute"),
         _ => None,
@@ -95,7 +95,11 @@ pub(crate) fn args(request: &Resolved, extension: &Path) -> Vec<OsString> {
     } else {
         let mut names: Vec<_> = active_tools(request).into_iter().collect();
         names.sort();
-        args.push(format!("--tools={}", names.join(",")).into());
+        if names.is_empty() {
+            args.push(OsString::from("--no-tools"));
+        } else {
+            args.push(format!("--tools={}", names.join(",")).into());
+        }
     }
     args.push(format!("--model={}", request.model).into());
     let mut ext = OsString::from("-e");
@@ -267,7 +271,7 @@ fn policy_extension(trusted: bool) -> &'static str {
     if trusted {
         r#"export default function(pi) {
   const grantable = new Set((process.env.AH_PI_GRANTABLE || '').split(',').filter(Boolean));
-  const kindOf = (name) => ({read:'read',glob:'search',grep:'search',edit:'edit',write:'edit',bash:'execute'}[name]);
+  const kindOf = (name) => ({read:'read',find:'search',grep:'search',ls:'search',edit:'edit',write:'edit',bash:'execute'}[name]);
   pi.on('tool_call', async (event, ctx) => {
     const kind = kindOf(event.toolName);
     if (!kind || !grantable.has(kind)) return {block: true, reason: 'Harness policy'};
@@ -467,6 +471,7 @@ struct Observed {
     tools: u32,
     permissions: u32,
     grants: u32,
+    answered_ui: HashSet<String>,
 }
 
 #[cfg(target_os = "macos")]
@@ -504,6 +509,10 @@ async fn answer_extension_ui(
         .and_then(Value::as_str)
         .filter(|s| !s.is_empty())
         .ok_or(Outcome::Failed)?;
+    if !observed.answered_ui.insert(id.to_owned()) {
+        observed.violation = true;
+        return Err(Outcome::Failed);
+    }
     let message = line.get("message").and_then(Value::as_str).unwrap_or("");
     let eligible = !cancelled.is_cancelled() && Instant::now() < deadline;
     let grantable = crate::opencode::grantable(request);
@@ -514,6 +523,7 @@ async fn answer_extension_ui(
     observed.permissions += 1;
     if allow {
         observed.grants += 1;
+        observed.tools += 1;
     }
     let response = json!({
         "type": "extension_ui_response",
@@ -939,9 +949,9 @@ mod tests {
                 "baseUrl": "http://127.0.0.1:9/v1",
                 "api": "openai-completions",
             },
-            "activeTools": ["bash","edit","glob","grep","read","write"],
+            "activeTools": ["bash","edit","find","grep","read","write"],
             "mcpServers": [],
-            "tools": ["bash","edit","glob","grep","read","write"],
+            "tools": ["bash","edit","find","grep","read","write"],
         });
         assert!(validate_state(
             &data,
@@ -1012,6 +1022,17 @@ mod tests {
             Some(true)
         );
         assert_eq!(decide_ui("ui-1", message, &["edit"], true), Some(false));
+        assert_eq!(decide_ui("ui-1", message, &["read"], false), Some(false));
+        assert_eq!(decide_ui("ui-1", "not-json", &["read"], true), None);
+        assert_eq!(
+            decide_ui(
+                "ui-1",
+                r#"{"toolName":"find","toolCallId":"t1","input":{}}"#,
+                &["search"],
+                true
+            ),
+            Some(true)
+        );
     }
 
     #[test]

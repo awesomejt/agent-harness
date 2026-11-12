@@ -13,7 +13,7 @@ ENV_NAMES = {'HOME', 'PATH', 'USER', 'LOGNAME', 'TMPDIR', 'PI_CODING_AGENT_DIR'}
 SHARED_ARGS = ['--offline', '--mode', 'rpc', '--no-session', '--no-extensions',
                '--no-mcp', '--no-skills', '--no-prompt-templates', '--no-themes', '--no-context-files',
                '--no-approve', '--provider', 'ah-litellm']
-TRUSTED_TOOLS = 'bash,edit,glob,grep,read,write'
+TRUSTED_TOOLS = 'bash,edit,find,grep,read,write'
 DENY_ARGS = SHARED_ARGS + ['--no-tools']
 TRUSTED_ARGS = SHARED_ARGS + [f'--tools={TRUSTED_TOOLS}']
 T = ['--permissions', 'trusted']
@@ -42,6 +42,11 @@ CASES = [
     ('models-key', 0, True, []),
     ('cloud-only-pi', 2, False, []),
     ('trusted-success', 0, True, T),
+    ('trusted-bad-title', 4, True, T),
+    ('trusted-bad-method', 4, True, T),
+    ('trusted-unknown-tool', 4, True, T),
+    ('trusted-malformed-ui', 4, True, T),
+    ('trusted-duplicate-ui', 4, True, T),
     ('agent-refuse', 2, False, ['--agent', 'coder']),
     ('local-first', 2, False, ['--mode', 'local-first',
                                  '--config', 'cloud-native.json']),
@@ -128,6 +133,9 @@ for case, expected, prompted, extra in CASES:
             ui = json.loads((project / 'ui_response.json').read_text())
             assert ui.get('confirmed') is True, ui
             assert p.stdout == 'fake response\nfinal line', (case, p.stdout)
+            env_text = (project / 'env.txt').read_text()
+            grant_line = next(l for l in env_text.splitlines() if l.startswith('AH_PI_GRANTABLE='))
+            assert grant_line == 'AH_PI_GRANTABLE=read,search,edit,execute', grant_line
         count += 1
 
 print(f'PASS: {count} Pi runtime launch cases (deny + trusted)')

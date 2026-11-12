@@ -18,4 +18,4 @@ python3 -B scripts/tests/pi.py
 
 ## Grok review
 
-Pending PR.
+[PR #96](https://github.com/awesomejt/agent-harness/pull/96): first pass 0 blockers / 2 concerns / 3 nits (Pi `find` vs `glob`, trusted deny-path fixtures, empty allowlist, duplicate UI ids, tool event counts). Addressed before merge without re-review.

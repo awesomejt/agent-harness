@@ -106,15 +106,40 @@ def respond(request):
         if case in ('cancel-deadline', 'cancel-stall'):
             time.sleep(30)
             return
-        if case == 'trusted-success':
+        if case.startswith('trusted'):
             ui_id = 'ui-1'
-            payload = json.dumps({'toolName': 'read', 'toolCallId': 'tc-1', 'input': {'path': 'x.txt'}})
-            emit({'type': 'extension_ui_request', 'id': ui_id, 'method': 'confirm',
-                  'title': 'ah-permission', 'message': payload})
-            resp = read()
-            (cwd / 'ui_response.json').write_text(json.dumps(resp))
-            if not resp.get('confirmed'):
-                emit({'type': 'agent_settled', 'error': True})
+            title = 'ah-permission'
+            method = 'confirm'
+            message = json.dumps({'toolName': 'read', 'toolCallId': 'tc-1', 'input': {'path': 'x.txt'}})
+            if case == 'trusted-bad-title':
+                title = 'other'
+            elif case == 'trusted-bad-method':
+                method = 'pick'
+            elif case == 'trusted-unknown-tool':
+                message = json.dumps({'toolName': 'mystery', 'toolCallId': 'tc-1', 'input': {}})
+            elif case == 'trusted-malformed-ui':
+                message = 'not-json'
+            elif case == 'trusted-duplicate-ui':
+                payload = message
+                emit({'type': 'extension_ui_request', 'id': ui_id, 'method': method,
+                      'title': title, 'message': payload})
+                read()
+                emit({'type': 'extension_ui_request', 'id': ui_id, 'method': method,
+                      'title': title, 'message': payload})
+                time.sleep(0.2)
+                return
+            if case == 'trusted-success':
+                emit({'type': 'extension_ui_request', 'id': ui_id, 'method': method,
+                      'title': title, 'message': message})
+                resp = read()
+                (cwd / 'ui_response.json').write_text(json.dumps(resp))
+                if not resp.get('confirmed'):
+                    emit({'type': 'agent_settled', 'error': True})
+                    return
+            elif case.startswith('trusted-'):
+                emit({'type': 'extension_ui_request', 'id': ui_id, 'method': method,
+                      'title': title, 'message': message})
+                time.sleep(0.5)
                 return
         text = 'fake response\nfinal line'
         emit({'type': 'message', 'role': 'assistant', 'content': text})
