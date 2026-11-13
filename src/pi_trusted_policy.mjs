@@ -106,20 +106,39 @@ function isSafeNullDevice(absPath) {
   return path.normalize(absPath) === '/dev/null';
 }
 
-function walkPathInside(rootReal, absPath) {
-  let abs = absPath;
-  let root = rootReal;
-  try {
-    abs = fs.realpathSync.native(absPath);
-  } catch {
-    abs = path.normalize(absPath);
+function resolveAbsForWalk(absPath) {
+  const normalized = path.normalize(absPath);
+  if (fileExists(normalized)) {
+    try {
+      return fs.realpathSync.native(normalized);
+    } catch {
+      return normalized;
+    }
   }
+  let current = normalized;
+  const tail = [];
+  while (current !== path.dirname(current)) {
+    tail.unshift(path.basename(current));
+    current = path.dirname(current);
+    if (fileExists(current)) {
+      try {
+        return path.join(fs.realpathSync.native(current), ...tail);
+      } catch {
+        break;
+      }
+    }
+  }
+  return normalized;
+}
+
+function walkPathInside(rootReal, absPath) {
+  let root = rootReal;
   try {
     root = fs.realpathSync.native(rootReal);
   } catch {
     root = rootReal;
   }
-  const norm = path.normalize(abs);
+  const norm = path.normalize(resolveAbsForWalk(absPath));
   if (BLOCKED_DEVICES.has(norm)) return false;
   if (isSafeNullDevice(norm)) return true;
   const rel = path.relative(root, norm);

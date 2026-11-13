@@ -574,13 +574,58 @@ fn path_literal_blocked(raw: &str) -> bool {
     let trimmed = raw.trim();
     trimmed.to_ascii_lowercase().starts_with("file://")
         || trimmed.starts_with('~')
-        || trimmed.starts_with('@')
         || trimmed.contains("$HOME")
         || trimmed.contains("${HOME")
 }
 
 #[cfg(target_os = "macos")]
-fn walk_inside(root: &Path, abs: &Path) -> bool {
+fn canonicalize_or_partial(abs: &Path) -> PathBuf {
+    if let Ok(canon) = std::fs::canonicalize(abs) {
+        return canon;
+    }
+    let mut missing = PathBuf::new();
+    let mut probe = abs.to_path_buf();
+    loop {
+        if let Ok(canon) = std::fs::canonicalize(&probe) {
+            return if missing.as_os_str().is_empty() {
+                canon
+            } else {
+                canon.join(missing)
+            };
+        }
+        let name = probe.file_name().map(PathBuf::from).unwrap_or_default();
+        missing = if missing.as_os_str().is_empty() {
+            name
+        } else {
+            name.join(missing)
+        };
+        if !probe.pop() {
+            return abs.to_path_buf();
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn relative_under_root(root: &Path, project: &Path, abs: &Path) -> Option<PathBuf> {
+    use std::path::Component;
+    let canon_abs = canonicalize_or_partial(abs);
+    for base in [root, project] {
+        let Ok(rel) = canon_abs.strip_prefix(base) else {
+            continue;
+        };
+        if rel
+            .components()
+            .any(|part| matches!(part, Component::ParentDir))
+        {
+            continue;
+        }
+        return Some(rel.to_path_buf());
+    }
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn walk_inside(root: &Path, project: &Path, abs: &Path) -> bool {
     use std::path::Component;
     let norm = abs.to_string_lossy();
     if norm == "/dev/stdout" || norm == "/dev/stderr" {
@@ -589,20 +634,11 @@ fn walk_inside(root: &Path, abs: &Path) -> bool {
     if norm == "/dev/null" {
         return true;
     }
-    if abs == root {
-        return true;
-    }
-    let Ok(relative) = abs.strip_prefix(root) else {
+    let Some(relative) = relative_under_root(root, project, abs) else {
         return !abs.is_absolute();
     };
     if relative.as_os_str().is_empty() {
         return true;
-    }
-    if relative
-        .components()
-        .any(|part| matches!(part, Component::ParentDir))
-    {
-        return false;
     }
     let mut current = root.to_path_buf();
     for part in relative.components() {
@@ -620,7 +656,7 @@ fn walk_inside(root: &Path, abs: &Path) -> bool {
                 } else {
                     current.parent().unwrap_or(root).join(target)
                 };
-                if !walk_inside(root, &resolved) {
+                if !walk_inside(root, project, &resolved) {
                     return false;
                 }
                 if let Ok(real) = std::fs::canonicalize(&current) {
@@ -661,7 +697,7 @@ fn trusted_path_allowed(project: &Path, tool: &str, input: &Value) -> bool {
         } else {
             root_real.join(user)
         };
-        if !walk_inside(&root_real, &abs) {
+        if !walk_inside(&root_real, project, &abs) {
             return false;
         }
     }
@@ -1029,28 +1065,37 @@ async fn turn(
     progress.emit("attempt.prompt_submitted", json!({}));
     progress.note(json!({"prompt_submitted": true}));
     let mut interrupted = cancelled.is_cancelled();
+    let mut cancel_at: Option<Instant> = None;
     let mut terminal = None;
     while terminal.is_none() {
         if cancelled.is_cancelled() && !interrupted {
             interrupted = true;
+            cancel_at.get_or_insert(Instant::now());
             let _ = channel
                 .send(&rpc("ah-abort", "abort", json!({})), deadline)
                 .await;
         }
         if Instant::now() >= deadline {
             interrupted = true;
+            cancel_at.get_or_insert(Instant::now());
             let _ = channel
                 .send(&rpc("ah-abort", "abort", json!({})), deadline)
                 .await;
         }
+        let recv_deadline = if let Some(started) = cancel_at {
+            deadline.min(started + Duration::from_secs(30))
+        } else {
+            deadline
+        };
         let record = if interrupted {
-            tokio::time::timeout_at(deadline, channel.records.recv()).await
+            tokio::time::timeout_at(recv_deadline, channel.records.recv()).await
         } else {
             tokio::select! {
                 biased;
                 value = tokio::time::timeout_at(deadline, channel.records.recv()) => value,
                 _ = cancelled.cancelled() => {
                     interrupted = true;
+                    cancel_at.get_or_insert(Instant::now());
                     let _ = channel.send(&rpc("ah-abort", "abort", json!({})), deadline).await;
                     continue;
                 }
@@ -1084,7 +1129,7 @@ async fn turn(
             }
             Ok(Some(Err(()))) => return Outcome::Failed,
             Ok(None) => return Outcome::Failed,
-            Err(_) if Instant::now() >= deadline => return Outcome::Stopped,
+            Err(_) if cancel_at.is_some() || Instant::now() >= deadline => return Outcome::Stopped,
             Err(_) => return Outcome::Failed,
         }
     }
@@ -1309,12 +1354,14 @@ mod tests {
             _ => None,
         })
         .expect("environment");
-        assert!(env.iter().any(|(key, value)| {
-            key == LITELLM_KEY_ENV && value == "secret"
-        }));
-        assert!(!env
-            .iter()
-            .any(|(key, _)| key.to_string_lossy() == "LOCAL_KEY"));
+        assert!(
+            env.iter()
+                .any(|(key, value)| { key == LITELLM_KEY_ENV && value == "secret" })
+        );
+        assert!(
+            !env.iter()
+                .any(|(key, _)| key.to_string_lossy() == "LOCAL_KEY")
+        );
     }
 
     #[test]
