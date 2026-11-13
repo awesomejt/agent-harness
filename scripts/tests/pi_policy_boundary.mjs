@@ -116,3 +116,56 @@ test('bash blocks parent traversal and absolute outside paths', () => {
 test('missing root does not block', () => {
   assert.equal(boundaryBlocked('', 'read', { path: '/etc/passwd' }), false);
 });
+
+test('file URL and home paths are blocked', () => {
+  withProject(({ root }) => {
+    assert.equal(
+      boundaryBlocked(root, 'read', { path: 'file:///etc/passwd' }),
+      true,
+    );
+    assert.equal(boundaryBlocked(root, 'read', { path: '@~/.zshrc' }), true);
+  });
+});
+
+test('device nodes other than /dev/null are blocked', () => {
+  withProject(({ root }) => {
+    assert.equal(boundaryBlocked(root, 'write', { path: '/dev/stdout' }), true);
+    assert.equal(
+      boundaryBlocked(root, 'bash', { command: 'cat > /dev/stderr' }),
+      true,
+    );
+    assert.equal(
+      boundaryBlocked(root, 'bash', { command: 'python3 test.py 2>/dev/null' }),
+      false,
+    );
+  });
+});
+
+test('dangling symlink write escapes are blocked', () => {
+  withProject(({ root, project, base }) => {
+    const outside = path.join(base, 'outside-created.txt');
+    const link = path.join(project, 'link.txt');
+    fs.symlinkSync(path.relative(project, outside), link);
+    assert.equal(boundaryBlocked(root, 'write', { path: 'link.txt' }), true);
+  });
+});
+
+test('curly-quote read fallbacks stay inside the root', () => {
+  withProject(({ root, outside, project }) => {
+    const curly = path.join(project, 'curly\u2019name');
+    fs.symlinkSync(outside, curly);
+    assert.equal(
+      boundaryBlocked(root, 'read', { path: "curly'name" }),
+      true,
+    );
+  });
+});
+
+test('bash double-slash absolute paths are blocked', () => {
+  withProject(({ root }) => {
+    assert.equal(
+      boundaryBlocked(root, 'bash', { command: 'cat //etc/passwd' }),
+      true,
+    );
+  });
+});

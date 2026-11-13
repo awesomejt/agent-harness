@@ -61,6 +61,9 @@ CASES = [
     ('missing-runtime', 2, False, []),
     ('prompt-handled', 1, True, []),
     ('empty-settled', 1, True, []),
+    ('assistant-stop-error', 1, True, []),
+    ('assistant-stop-length', 1, True, []),
+    ('settled-aborted', 1, True, []),
     ('session-text', 0, True, []),
     ('trusted-state-no-inventories', 0, True, T),
     ('state-omit-deny', 2, False, []),
@@ -131,10 +134,11 @@ for case, expected, prompted, extra in CASES:
             ext_i = argv.index('-e')
             assert ext_i >= 0 and argv[ext_i + 1].endswith('ah-policy.mjs'), argv
             names = {l.split('=', 1)[0] for l in (project / 'env.txt').read_text().splitlines() if '=' in l}
-            want = {'HOME', 'PATH', 'PI_CODING_AGENT_DIR', 'LOCAL_KEY'}
+            want = {'HOME', 'PATH', 'PI_CODING_AGENT_DIR', 'AH_PI_LITELLM_API_KEY'}
             if case.startswith('trusted') or case == 'agent-reviewer':
                 want.update(('AH_PI_GRANTABLE', 'AH_PI_PROJECT_ROOT'))
             assert want <= names, (case, names)
+            assert 'LOCAL_KEY' not in names, (case, names)
             assert 'PI_CODING_AGENT_DIR' in names, case
             lines = [json.loads(l) for l in (project / 'stdin.jsonl').read_text().splitlines()]
             types = [l['type'] for l in lines]
@@ -142,7 +146,10 @@ for case, expected, prompted, extra in CASES:
                 assert types[:3] == ['set_auto_compaction', 'set_auto_retry', 'get_state'], (case, types)
                 assert types.index('prompt') == 3, (case, types)
         if case == 'models-key':
-            assert (project / 'models_key.txt').read_text() == '${LOCAL_KEY}', case
+            assert (project / 'models_key.txt').read_text() == '${AH_PI_LITELLM_API_KEY}', case
+        if case in ('assistant-stop-error', 'assistant-stop-length', 'settled-aborted'):
+            assert 'secret provider text' not in (p.stdout + p.stderr), (case, out)
+            assert p.returncode == 1, case
         if case == 'success':
             assert p.stdout == 'fake response\nfinal line', (case, p.stdout)
         if case == 'jsonl':

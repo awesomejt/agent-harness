@@ -113,7 +113,7 @@ The [supported Antigravity control assessment](evidence/p7-5-antigravity-control
 
 ## P8.1 Pi integration decision
 
-[D060](../DECISIONS.md#2026-11-07--d060-select-pi-rpc-for-litellm-first-feasibility) selects caller-owned Pi RPC for initial **LiteLLM local-only** feasibility. The [decision and capability matrix](evidence/p8-1-pi-integration.md) records pinned source, the renamed official package, canonical-role/skill/effort mapping, exact host-grant requirements and terminal semantics. Pi subscription-provider clients are not selected as official native CLI replacements. P8.2 slices (D080–D082) prove deny/trusted/named agents on fixtures; [P8.3 live acceptance](evidence/p8-3-pi-acceptance.md) (D083) adds the opt-in live driver and installed adapter fixes; single-run milestone closeout waits on passing `pi_live.py`. P8.4 workflow parity and P8.5 holistic review remain open.
+[D060](../DECISIONS.md#2026-11-07--d060-select-pi-rpc-for-litellm-first-feasibility) selects caller-owned Pi RPC for initial **LiteLLM local-only** feasibility. The [decision and capability matrix](evidence/p8-1-pi-integration.md) records pinned source, the renamed official package, canonical-role/skill/effort mapping, exact host-grant requirements and terminal semantics. Pi subscription-provider clients are not selected as official native CLI replacements. P8.2 slices (D080–D082) prove deny/trusted/named agents on fixtures; [P8.3 live acceptance](evidence/p8-3-pi-acceptance.md) (D083) adds the opt-in live driver and installed adapter fixes; [P8.4 workflow parity](evidence/p8-4-pi-workflows.md) (D084) covers sequences and Ralph. P8.5 holistic review is recorded in [phase-08.md](reviews/phase-08.md); phase pass waits on remediation merge.
 
 ## P8.3 Pi capability matrix
 
@@ -122,10 +122,10 @@ Applies to current source on **macOS arm64, Pi 1.5.0**, `litellm.runtime: pi` an
 | Capability | Supported behavior and boundary | Evidence |
 |---|---|---|
 | Route / runtime | `local-only` only; private `PI_CODING_AGENT_DIR`, synthetic `ah-litellm` provider; no `opencode.json` sync | D080, [deny launch](evidence/p8-2-pi-deny-launch.md) |
-| Authentication / HTTP | LiteLLM `api_base` + `api_key_env`; no Pi subscription client or credential copy | D060, [P8.3 acceptance](evidence/p8-3-pi-acceptance.md) |
+| Authentication / HTTP | LiteLLM `api_base` + operator `api_key_env` remapped to child `AH_PI_LITELLM_API_KEY`; no Pi subscription client or credential copy | D060, D065, [P8.3 acceptance](evidence/p8-3-pi-acceptance.md) |
 | Tools / permissions | Default `deny` (`--no-tools`); `trusted` offers six built-ins with extension UI allow-once grants; harness extension blocks tool **path** fields and best-effort `bash` checks outside `AH_PI_PROJECT_ROOT` (not OS sandbox) | [Trusted](evidence/p8-2-pi-trusted.md), D081, `pi_policy_boundary.mjs` |
 | Named primary / specialized role | Composed `AGENTS.md` + body + prompt; intersected `--tools`; non-default effort refuses | [Agents](evidence/p8-2-pi-agents.md), D082 |
 | Lifecycle / results | RPC preflight, `agent_settled` terminal, deadline/interrupt cleanup; trusted deny blocks tool calls at extension | [Deny launch](evidence/p8-2-pi-deny-launch.md), `pi.py` |
 | Live coding acceptance | Sample coder/reviewer on real LiteLLM; independent tests after coder; reviewer leaves project unchanged | [P8.3 acceptance](evidence/p8-3-pi-acceptance.md), `pi_live.py` |
 
-Unsupported: `cloud-only`, `local-first`, MCP/skills/context discovery, non-default effort on Pi, subscription Pi auth. Sequences and Ralph use fresh Pi single runs per step/iteration ([P8.4 evidence](evidence/p8-4-pi-workflows.md), D084). Read-only agent ceilings intersect tools but do not yet deny every UI grant like Claude (D083 limit). Version/platform upgrades need new evidence.
+Unsupported: `cloud-only`, `local-first`, MCP/skills/context discovery, non-default effort on Pi, subscription Pi auth. Sequences and Ralph use fresh Pi single runs per step/iteration ([P8.4 evidence](evidence/p8-4-pi-workflows.md), D084). Trusted `find`/`grep` need `fd` and `rg` on the operator PATH (Pi resolves them at tool use; the harness does not bundle them). Read-only agent ceilings intersect tools but do not yet deny every UI grant like Claude (D083 limit). Version/platform upgrades need new evidence.

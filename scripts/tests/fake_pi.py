@@ -109,7 +109,7 @@ def respond(request):
         return
     if command == 'get_state' and case != 'control-error':
         key = models_api_key()
-        if case == 'models-key' and key != '${LOCAL_KEY}':
+        if case == 'models-key' and key != '${AH_PI_LITELLM_API_KEY}':
             emit({'type': 'response', 'id': ident, 'command': command, 'success': False, 'error': 'apiKey'})
             return
     if command == 'prompt':
@@ -153,6 +153,32 @@ def respond(request):
             return
         if case == 'error-result':
             emit({'type': 'agent_settled', 'error': True})
+            return
+        if case == 'assistant-stop-error':
+            emit({
+                'type': 'agent_end',
+                'messages': [{
+                    'role': 'assistant',
+                    'stopReason': 'error',
+                    'errorMessage': 'secret provider text',
+                    'content': [{'type': 'text', 'text': 'partial answer\n'}],
+                }],
+            })
+            emit({'type': 'agent_settled', 'assistantText': 'partial answer\n'})
+            return
+        if case == 'assistant-stop-length':
+            emit({
+                'type': 'agent_end',
+                'messages': [{
+                    'role': 'assistant',
+                    'stopReason': 'length',
+                    'content': [{'type': 'text', 'text': 'trimmed answer\n'}],
+                }],
+            })
+            emit({'type': 'agent_settled', 'assistantText': 'trimmed answer\n'})
+            return
+        if case == 'settled-aborted':
+            emit({'type': 'agent_settled', 'aborted': True, 'assistantText': 'should not succeed\n'})
             return
         if case in ('cancel-deadline', 'cancel-stall'):
             time.sleep(30)

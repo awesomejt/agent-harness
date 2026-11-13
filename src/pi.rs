@@ -24,6 +24,8 @@ use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
 pub(crate) const VERSION: &str = "1.5.0";
+/// Fixed child credential name so config `api_key_env` cannot override runtime controls (D065).
+pub(crate) const LITELLM_KEY_ENV: &str = "AH_PI_LITELLM_API_KEY";
 const PROVIDER: &str = "ah-litellm";
 const LINE_LIMIT: usize = 1 << 20;
 const OUTPUT_LIMIT: usize = 8 << 20;
@@ -170,8 +172,8 @@ pub(crate) fn environment(
             agent_dir.as_os_str().to_owned(),
         ),
     ];
-    if let Some(key) = lookup(key_env) {
-        env.push((OsString::from(key_env), key));
+    if let Some(key) = lookup(key_env).filter(|value| !value.is_empty()) {
+        env.push((OsString::from(LITELLM_KEY_ENV), key));
     }
     for name in ["USER", "LOGNAME", "TMPDIR"] {
         if let Some(value) = lookup(name) {
@@ -364,6 +366,9 @@ pub(crate) enum Terminal {
 pub(crate) fn classify_event(line: &Value, interrupted: bool) -> Option<Terminal> {
     match line.get("type").and_then(Value::as_str) {
         Some("agent_settled") if interrupted => Some(Terminal::Cancelled),
+        Some("agent_settled") if line.get("aborted") == Some(&json!(true)) && !interrupted => {
+            Some(Terminal::Other)
+        }
         Some("agent_settled")
             if line
                 .get("error")
@@ -429,10 +434,12 @@ impl PreparedState {
         let trusted = request.permissions == Permissions::Trusted;
         let agent_dir = AgentDir::new()?;
         let root = agent_dir.path();
-        let key_name = request
-            .api_key_env
-            .as_deref()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "missing api_key_env"))?;
+        if request.api_key_env.as_deref().is_none() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "missing api_key_env",
+            ));
+        }
         let api_base = request
             .api_base
             .as_deref()
@@ -442,7 +449,7 @@ impl PreparedState {
                 PROVIDER: {
                     "baseUrl": api_base,
                     "api": "openai-completions",
-                    "apiKey": format!("${{{key_name}}}"),
+                    "apiKey": format!("${{{}}}", LITELLM_KEY_ENV),
                     "models": [{"id": request.model, "name": request.model}],
                 }
             }
@@ -453,7 +460,7 @@ impl PreparedState {
         )?;
         std::fs::write(
             root.join("settings.json"),
-            br#"{"compaction":{"enabled":false},"retry":{"enabled":false}}"#,
+            br#"{"compaction":{"enabled":false},"retry":{"enabled":false},"cacheWarming":"off"}"#,
         )?;
         let extension = root.join("ah-policy.mjs");
         std::fs::write(&extension, policy_extension(trusted))?;
@@ -523,7 +530,6 @@ fn reader(stdout: tokio::process::ChildStdout) -> mpsc::Receiver<Result<Value, (
 }
 
 #[cfg(target_os = "macos")]
-#[derive(Default)]
 struct Observed {
     submitted: bool,
     prompt_rejected: bool,
@@ -534,6 +540,180 @@ struct Observed {
     answered_ui: HashSet<String>,
     assistant_text: String,
     assistant_stop: Option<String>,
+    /// False when the last assistant stop reason was not a normal completion.
+    terminal_viable: bool,
+    settled_aborted: bool,
+}
+
+#[cfg(target_os = "macos")]
+impl Default for Observed {
+    fn default() -> Self {
+        Self {
+            submitted: false,
+            prompt_rejected: false,
+            violation: false,
+            tools: 0,
+            permissions: 0,
+            grants: 0,
+            answered_ui: HashSet::new(),
+            assistant_text: String::new(),
+            assistant_stop: None,
+            terminal_viable: true,
+            settled_aborted: false,
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn project_root_real(project: &Path) -> Option<PathBuf> {
+    std::fs::canonicalize(project).ok()
+}
+
+#[cfg(target_os = "macos")]
+fn path_literal_blocked(raw: &str) -> bool {
+    let trimmed = raw.trim();
+    trimmed.to_ascii_lowercase().starts_with("file://")
+        || trimmed.starts_with('~')
+        || trimmed.contains("$HOME")
+        || trimmed.contains("${HOME")
+}
+
+#[cfg(target_os = "macos")]
+fn canonicalize_or_partial(abs: &Path) -> PathBuf {
+    if let Ok(canon) = std::fs::canonicalize(abs) {
+        return canon;
+    }
+    let mut missing = PathBuf::new();
+    let mut probe = abs.to_path_buf();
+    loop {
+        if let Ok(canon) = std::fs::canonicalize(&probe) {
+            return if missing.as_os_str().is_empty() {
+                canon
+            } else {
+                canon.join(missing)
+            };
+        }
+        let name = probe.file_name().map(PathBuf::from).unwrap_or_default();
+        missing = if missing.as_os_str().is_empty() {
+            name
+        } else {
+            name.join(missing)
+        };
+        if !probe.pop() {
+            return abs.to_path_buf();
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn relative_under_root(root: &Path, project: &Path, abs: &Path) -> Option<PathBuf> {
+    use std::path::Component;
+    let canon_abs = canonicalize_or_partial(abs);
+    for base in [root, project] {
+        let Ok(rel) = canon_abs.strip_prefix(base) else {
+            continue;
+        };
+        if rel
+            .components()
+            .any(|part| matches!(part, Component::ParentDir))
+        {
+            continue;
+        }
+        return Some(rel.to_path_buf());
+    }
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn walk_inside(root: &Path, project: &Path, abs: &Path) -> bool {
+    use std::path::Component;
+    let norm = abs.to_string_lossy();
+    if norm == "/dev/stdout" || norm == "/dev/stderr" {
+        return false;
+    }
+    if norm == "/dev/null" {
+        return true;
+    }
+    let Some(relative) = relative_under_root(root, project, abs) else {
+        return !abs.is_absolute();
+    };
+    if relative.as_os_str().is_empty() {
+        return true;
+    }
+    let mut current = root.to_path_buf();
+    for part in relative.components() {
+        let Component::Normal(name) = part else {
+            continue;
+        };
+        current.push(name);
+        match std::fs::symlink_metadata(&current) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                let Ok(target) = std::fs::read_link(&current) else {
+                    return false;
+                };
+                let resolved = if target.is_absolute() {
+                    target
+                } else {
+                    current.parent().unwrap_or(root).join(target)
+                };
+                if !walk_inside(root, project, &resolved) {
+                    return false;
+                }
+                if let Ok(real) = std::fs::canonicalize(&current) {
+                    current = real;
+                }
+            }
+            Err(_) => return true,
+            Ok(_) => {}
+        }
+    }
+    true
+}
+
+#[cfg(target_os = "macos")]
+fn trusted_path_allowed(project: &Path, tool: &str, input: &Value) -> bool {
+    let Some(root_real) = project_root_real(project) else {
+        return true;
+    };
+    let fields: &[&str] = match tool {
+        "read" | "write" | "edit" => &["path", "filePath"],
+        "find" => &["path", "cwd", "directory"],
+        "grep" => &["path", "cwd"],
+        "ls" => &["path", "directory"],
+        "bash" => &[],
+        _ => return true,
+    };
+    for key in fields {
+        let Some(raw) = input.get(key).and_then(Value::as_str) else {
+            continue;
+        };
+        if path_literal_blocked(raw) {
+            return false;
+        }
+        let stripped = raw.trim().trim_start_matches('@');
+        let user = Path::new(stripped);
+        let abs = if user.is_absolute() {
+            user.to_path_buf()
+        } else {
+            root_real.join(user)
+        };
+        if !walk_inside(&root_real, project, &abs) {
+            return false;
+        }
+    }
+    true
+}
+
+#[cfg(target_os = "macos")]
+fn ui_tool_path_allowed(project: &Path, message: &str) -> bool {
+    let Ok(action) = serde_json::from_str::<Value>(message) else {
+        return true;
+    };
+    let Some(tool) = action.get("toolName").and_then(Value::as_str) else {
+        return true;
+    };
+    let input = action.get("input").cloned().unwrap_or(json!({}));
+    trusted_path_allowed(project, tool, &input)
 }
 
 #[cfg(target_os = "macos")]
@@ -561,37 +741,30 @@ fn record_assistant_message(observed: &mut Observed, message: &Value) {
     }
 }
 
-#[cfg(target_os = "macos")]
-fn sanitize_stop_detail(raw: &str) -> String {
-    raw.chars()
-        .map(|c| if c.is_control() { ' ' } else { c })
-        .collect::<String>()
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .chars()
-        .take(160)
-        .collect()
-}
-
 fn record_assistant_diagnostic(observed: &mut Observed, message: &Value) {
     let stop = message
         .get("stopReason")
         .or_else(|| message.get("stop_reason"))
         .and_then(Value::as_str);
-    let error = message.get("errorMessage").and_then(Value::as_str);
-    if stop == Some("error") {
-        if let Some(text) = error {
-            observed.assistant_stop = Some(sanitize_stop_detail(text));
+    match stop {
+        Some("error") => {
+            observed.terminal_viable = false;
+            observed.assistant_stop = Some("backend_error".to_owned());
         }
-        return;
-    }
-    if let Some(text) = stop
-        .filter(|s| !s.is_empty() && !matches!(*s, "stop" | "end_turn" | "toolUse" | "tool_use"))
-    {
-        observed.assistant_stop = Some(sanitize_stop_detail(text));
-    } else if let Some(text) = error {
-        observed.assistant_stop = Some(sanitize_stop_detail(text));
+        Some("length") => {
+            observed.terminal_viable = false;
+            observed.assistant_stop = Some("length".to_owned());
+        }
+        Some("content_filter") => {
+            observed.terminal_viable = false;
+            observed.assistant_stop = Some("content_filter".to_owned());
+        }
+        Some("stop") | Some("end_turn") | Some("toolUse") | Some("tool_use") | None => {}
+        Some(other) if !other.is_empty() => {
+            observed.terminal_viable = false;
+            observed.assistant_stop = Some("backend_stop".to_owned());
+        }
+        _ => {}
     }
 }
 
@@ -648,6 +821,9 @@ fn record_agent_event(observed: &mut Observed, line: &Value) {
             }
         }
         Some("message_update") => append_text_delta(observed, line),
+        Some("agent_settled") if line.get("aborted") == Some(&json!(true)) => {
+            observed.settled_aborted = true;
+        }
         _ => {}
     }
 }
@@ -694,6 +870,10 @@ async fn answer_extension_ui(
     let message = line.get("message").and_then(Value::as_str).unwrap_or("");
     let eligible = !cancelled.is_cancelled() && Instant::now() < deadline;
     let grantable = crate::opencode::grantable(request);
+    if eligible && !ui_tool_path_allowed(&request.project, message) {
+        observed.violation = true;
+        return Err(Outcome::Failed);
+    }
     let Some(allow) = decide_ui(id, message, &grantable, eligible) else {
         observed.violation = true;
         return Err(Outcome::Failed);
@@ -841,12 +1021,11 @@ async fn turn(
         return Outcome::Failed;
     }
     observed.submitted = true;
-    let bound = deadline.min(Instant::now() + Duration::from_secs(30));
     let mut prompt_ok = false;
     let mut attempts = 0;
     while !prompt_ok && attempts < 16 {
         let record = tokio::select! {
-            value = tokio::time::timeout_at(bound, channel.records.recv()) => value,
+            value = tokio::time::timeout_at(deadline, channel.records.recv()) => value,
             _ = cancelled.cancelled() => return Outcome::Stopped,
         };
         attempts += 1;
@@ -886,29 +1065,37 @@ async fn turn(
     progress.emit("attempt.prompt_submitted", json!({}));
     progress.note(json!({"prompt_submitted": true}));
     let mut interrupted = cancelled.is_cancelled();
+    let mut cancel_at: Option<Instant> = None;
     let mut terminal = None;
     while terminal.is_none() {
         if cancelled.is_cancelled() && !interrupted {
             interrupted = true;
+            cancel_at.get_or_insert(Instant::now());
             let _ = channel
                 .send(&rpc("ah-abort", "abort", json!({})), deadline)
                 .await;
         }
         if Instant::now() >= deadline {
             interrupted = true;
+            cancel_at.get_or_insert(Instant::now());
             let _ = channel
                 .send(&rpc("ah-abort", "abort", json!({})), deadline)
                 .await;
         }
-        let bound = deadline.min(Instant::now() + Duration::from_secs(30));
+        let recv_deadline = if let Some(started) = cancel_at {
+            deadline.min(started + Duration::from_secs(30))
+        } else {
+            deadline
+        };
         let record = if interrupted {
-            tokio::time::timeout_at(bound, channel.records.recv()).await
+            tokio::time::timeout_at(recv_deadline, channel.records.recv()).await
         } else {
             tokio::select! {
                 biased;
-                value = tokio::time::timeout_at(bound, channel.records.recv()) => value,
+                value = tokio::time::timeout_at(deadline, channel.records.recv()) => value,
                 _ = cancelled.cancelled() => {
                     interrupted = true;
+                    cancel_at.get_or_insert(Instant::now());
                     let _ = channel.send(&rpc("ah-abort", "abort", json!({})), deadline).await;
                     continue;
                 }
@@ -942,7 +1129,7 @@ async fn turn(
             }
             Ok(Some(Err(()))) => return Outcome::Failed,
             Ok(None) => return Outcome::Failed,
-            Err(_) if Instant::now() >= deadline => return Outcome::Stopped,
+            Err(_) if cancel_at.is_some() || Instant::now() >= deadline => return Outcome::Stopped,
             Err(_) => return Outcome::Failed,
         }
     }
@@ -1080,10 +1267,18 @@ pub(crate) async fn attempt(
     }
     match terminal {
         Terminal::Success { text } => {
+            if observed.settled_aborted || !observed.terminal_viable {
+                if let Some(reason) = &observed.assistant_stop {
+                    progress.event(format!("backend agent_settled; assistant outcome={reason}"));
+                } else {
+                    progress.event("backend agent_settled; assistant outcome not acceptable");
+                }
+                return Exit::Failed;
+            }
             if text.trim().is_empty() {
                 if let Some(reason) = &observed.assistant_stop {
                     progress.event(format!(
-                        "backend agent_settled with no assistant text; stopReason={reason}"
+                        "backend agent_settled with no assistant text; outcome={reason}"
                     ));
                 } else {
                     progress.event("backend agent_settled with no assistant text");
@@ -1149,6 +1344,24 @@ mod tests {
             fallback: None,
             verify: None,
         }
+    }
+
+    #[test]
+    fn environment_remapped_litellm_key() {
+        let env = environment(Path::new("/tmp/pi"), "LOCAL_KEY", |name| match name {
+            "LOCAL_KEY" => Some(OsString::from("secret")),
+            "HOME" => Some(OsString::from("/home/test")),
+            _ => None,
+        })
+        .expect("environment");
+        assert!(
+            env.iter()
+                .any(|(key, value)| { key == LITELLM_KEY_ENV && value == "secret" })
+        );
+        assert!(
+            !env.iter()
+                .any(|(key, _)| key.to_string_lossy() == "LOCAL_KEY")
+        );
     }
 
     #[test]
