@@ -103,7 +103,13 @@ def main(argv=None):
     for entry in selected:
         label = ' '.join(entry)
         started = time.monotonic()
-        completed = subprocess.run(command_for(entry), cwd=REPO_ROOT)
+        try:
+            completed = subprocess.run(command_for(entry), cwd=REPO_ROOT)
+        except FileNotFoundError as exc:
+            print('FAIL %s (missing executable: %s, %.1fs)' % (label, exc.filename, time.monotonic() - started),
+                  flush=True)
+            failed += 1
+            continue
         elapsed = time.monotonic() - started
         if completed.returncode == 0:
             print('PASS %s (%.1fs)' % (label, elapsed), flush=True)

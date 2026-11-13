@@ -251,12 +251,19 @@ count += 1
 base, project, ah = workflow(['trusted-write', 'error-result', 'success'])
 p = ah('sequence', 'run', str(project / 'steps'), '--project', str(project), *T, '--timeout-secs', '15')
 assert p.returncode == 1, p.stderr
+assert len(launched(project)) == 2 and all(argv_matches(a, TRUSTED_ARGS) for a in launched(project)), launched(project)
 assert (project / 'made.txt').read_text() == 'made by fake'
 rec = record(base, 'sequences')
 assert [s['status'] for s in rec['steps']] == ['succeeded', 'failed'], rec
+assert rec['steps'][0]['attempts'][0]['backends'][0]['grants'] == 1, rec
+assert rec['steps'][1]['attempts'][0]['backends'][0]['prompt_submitted'] is True, rec
 run = rec['run']
-assert ah('sequence', 'resume', run, *T, '--timeout-secs', '15').returncode == 2
-assert ah('sequence', 'resume', run, '--retry', *T, '--timeout-secs', '15').returncode == 0
+p = ah('sequence', 'resume', run, *T, '--timeout-secs', '15')
+assert p.returncode == 2 and len(launched(project)) == 2, p.stderr
+p = ah('sequence', 'resume', run, '--retry', *T, '--timeout-secs', '15')
+assert p.returncode == 0, p.stderr
+assert len(launched(project)) == 3 and all(argv_matches(a, TRUSTED_ARGS) for a in launched(project))
+assert prompts(project)[-1] == 'second step'
 rec = record(base, 'sequences')
 assert rec['status'] == 'completed' and [a['reason'] for a in rec['steps'][1]['attempts']] == ['initial', 'retry'], rec
 count += 1

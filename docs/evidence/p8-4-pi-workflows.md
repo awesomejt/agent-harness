@@ -14,7 +14,7 @@ Date: 2026-11-12. Task: [P8.4](../../tasks/08-pi.md#p8-4). Decision: [D084](../.
 - `cargo fmt --check`, `cargo clippy --locked`, `cargo test --locked` pass.
 - `python3 -B scripts/tests/pi.py`: **41** cases (34 single-run + 7 workflow).
 - `node --test scripts/tests/pi_policy_boundary.mjs`: 8 cases.
-- `python3 -B scripts/tests/offline.py`: **36/36** suites (includes `pi.py` and `pi_policy_boundary.mjs`; no live model).
+- `python3 -B scripts/tests/offline.py`: **36/36** suites on the operator host after the `command_for()` runner fix (includes `pi.py` and `pi_policy_boundary.mjs`; no live model).
 
 ## Limits
 

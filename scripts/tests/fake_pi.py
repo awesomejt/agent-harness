@@ -185,11 +185,11 @@ def respond(request):
                 resp = read()
                 if case == 'trusted-success':
                     (cwd / 'ui_response.json').write_text(json.dumps(resp))
-                if case == 'trusted-write':
-                    (cwd / 'made.txt').write_text('made by fake')
                 if not resp.get('confirmed'):
                     emit({'type': 'agent_settled', 'error': True})
                     return
+                if case == 'trusted-write':
+                    (cwd / 'made.txt').write_text('made by fake')
             elif case.startswith('trusted-'):
                 emit({'type': 'extension_ui_request', 'id': ui_id, 'method': method,
                       'title': title, 'message': message})
