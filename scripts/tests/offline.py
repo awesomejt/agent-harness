@@ -66,6 +66,13 @@ def script_name(entry):
     return os.path.splitext(os.path.basename(entry[0]))[0]
 
 
+def command_for(entry):
+    """Python suites run under sys.executable; other argv lists run as given."""
+    if entry[0].endswith('.py'):
+        return [sys.executable, *entry]
+    return list(entry)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--list', action='store_true', help='print the suites in order, one per line')
@@ -96,7 +103,13 @@ def main(argv=None):
     for entry in selected:
         label = ' '.join(entry)
         started = time.monotonic()
-        completed = subprocess.run([sys.executable, *entry], cwd=REPO_ROOT)
+        try:
+            completed = subprocess.run(command_for(entry), cwd=REPO_ROOT)
+        except FileNotFoundError as exc:
+            print('FAIL %s (missing executable: %s, %.1fs)' % (label, exc.filename, time.monotonic() - started),
+                  flush=True)
+            failed += 1
+            continue
         elapsed = time.monotonic() - started
         if completed.returncode == 0:
             print('PASS %s (%.1fs)' % (label, elapsed), flush=True)

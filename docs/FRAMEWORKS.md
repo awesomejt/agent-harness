@@ -128,4 +128,4 @@ Applies to current source on **macOS arm64, Pi 1.5.0**, `litellm.runtime: pi` an
 | Lifecycle / results | RPC preflight, `agent_settled` terminal, deadline/interrupt cleanup; trusted deny blocks tool calls at extension | [Deny launch](evidence/p8-2-pi-deny-launch.md), `pi.py` |
 | Live coding acceptance | Sample coder/reviewer on real LiteLLM; independent tests after coder; reviewer leaves project unchanged | [P8.3 acceptance](evidence/p8-3-pi-acceptance.md), `pi_live.py` |
 
-Unsupported: `cloud-only`, `local-first`, sequences, Ralph, MCP/skills/context discovery, non-default effort on Pi, subscription Pi auth. Read-only agent ceilings intersect tools but do not yet deny every UI grant like Claude (D083 limit). Version/platform upgrades need new evidence.
+Unsupported: `cloud-only`, `local-first`, MCP/skills/context discovery, non-default effort on Pi, subscription Pi auth. Sequences and Ralph use fresh Pi single runs per step/iteration ([P8.4 evidence](evidence/p8-4-pi-workflows.md), D084). Read-only agent ceilings intersect tools but do not yet deny every UI grant like Claude (D083 limit). Version/platform upgrades need new evidence.

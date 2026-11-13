@@ -11,6 +11,14 @@ PROVIDER = 'ah-litellm'
 
 cwd = Path.cwd()
 case = (cwd / 'case').read_text().strip()
+launches = cwd / 'launches.jsonl'
+index = len(launches.read_text().splitlines()) if launches.exists() else 0
+with open(launches, 'a') as f:
+    f.write(json.dumps(sys.argv[1:]) + '\n')
+if (cwd / 'cases').exists():
+    picked = json.loads((cwd / 'cases').read_text())
+    case = picked[min(index, len(picked) - 1)]
+FINAL = 'done\nAH-RALPH-COMPLETE' if case == 'claim' else 'fake response\nfinal line'
 (cwd / 'argv.json').write_text(json.dumps(sys.argv[1:]))
 def _flag_value(long, short=None):
     for i, a in enumerate(sys.argv):
@@ -111,6 +119,8 @@ def respond(request):
               'data': {'disposition': disposition}})
         if case == 'prompt-handled':
             return
+        if case == 'eof-after-submit':
+            sys.exit(0)
         if case == 'empty-settled':
             emit({'type': 'agent_settled', 'aborted': False})
             return
@@ -169,7 +179,7 @@ def respond(request):
                       'title': title, 'message': payload})
                 time.sleep(0.2)
                 return
-            if case in ('trusted-success', 'agent-reviewer'):
+            if case in ('trusted-success', 'agent-reviewer', 'trusted-write'):
                 emit({'type': 'extension_ui_request', 'id': ui_id, 'method': method,
                       'title': title, 'message': message})
                 resp = read()
@@ -178,14 +188,15 @@ def respond(request):
                 if not resp.get('confirmed'):
                     emit({'type': 'agent_settled', 'error': True})
                     return
+                if case == 'trusted-write':
+                    (cwd / 'made.txt').write_text('made by fake')
             elif case.startswith('trusted-'):
                 emit({'type': 'extension_ui_request', 'id': ui_id, 'method': method,
                       'title': title, 'message': message})
                 time.sleep(0.5)
                 return
-        text = 'fake response\nfinal line'
-        emit({'type': 'message', 'role': 'assistant', 'content': text})
-        emit({'type': 'agent_settled', 'assistantText': text})
+        emit({'type': 'message', 'role': 'assistant', 'content': FINAL})
+        emit({'type': 'agent_settled', 'assistantText': FINAL})
         return
     if command == 'abort':
         (cwd / 'aborted').touch()

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""P8.2 Pi runtime fixtures through the public CLI. No provider traffic."""
+"""P8.2/P8.4 Pi runtime and workflow fixtures through the public CLI. No provider traffic."""
+import atexit
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 
@@ -180,4 +182,138 @@ for case, expected, prompted, extra in CASES:
             assert grant_line == 'AH_PI_GRANTABLE=read,search,edit,execute', grant_line
         count += 1
 
-print(f'PASS: {count} Pi runtime launch cases (deny + trusted + agents)')
+
+def workflow(cases):
+    d = tempfile.mkdtemp(prefix='ah-pi-wf-')
+    atexit.register(shutil.rmtree, d, True)
+    base = Path(d).resolve()
+    bindir = base / 'bin'
+    bindir.mkdir()
+    (bindir / 'pi').write_text(
+        f'#!/bin/sh\n/usr/bin/env > "$PWD/env.txt"\nexec /usr/bin/python3 {FAKE} "$@"\n')
+    (bindir / 'pi').chmod(0o755)
+    project = base / 'project'
+    project.mkdir()
+    (project / 'steps').mkdir()
+    (project / 'case').write_text(cases[0])
+    (project / 'cases').write_text(json.dumps(cases))
+    (project / 'steps/1-first.md').write_text('first step')
+    (project / 'steps/2-second.md').write_text('second step')
+    (project / 'task.md').write_text('loop task')
+    (base / 'ah.json').write_text(json.dumps({
+        **cfg(),
+        'checks': {'test': {'argv': ['/usr/bin/true']}},
+    }))
+    env = {'PATH': f'{bindir}:/usr/bin:/bin', 'HOME': str(base),
+           'XDG_STATE_HOME': str(base / 'state'), 'LOCAL_KEY': 'synthetic'}
+
+    def ah(*args):
+        extra = ['--config', str(base / 'ah.json')] if args[0] == 'single' or args[1] == 'run' else []
+        return subprocess.run([str(BINARY), *args, *extra], env=env, capture_output=True,
+                              text=True, timeout=120, cwd=project)
+
+    return base, project, ah
+
+
+def launched(project):
+    path = project / 'launches.jsonl'
+    return [json.loads(l) for l in path.read_text().splitlines()] if path.exists() else []
+
+
+def argv_matches(argv, base):
+    return argv[:len(base)] == base
+
+
+def record(base, kind):
+    return json.loads(next((base / 'state/agent-harness' / kind).glob('*.json')).read_text())
+
+
+def prompts(project):
+    return [json.loads(l)['message'] for l in (project / 'stdin.jsonl').read_text().splitlines()
+            if json.loads(l).get('type') == 'prompt']
+
+
+# P8.4: sequences and Ralph — one fresh Pi single run per step or iteration (D084).
+base, project, ah = workflow(['success', 'success'])
+p = ah('sequence', 'run', str(project / 'steps'), '--project', str(project), '--timeout-secs', '15')
+assert p.returncode == 0, p.stderr
+assert len(launched(project)) == 2 and all(argv_matches(a, DENY_ARGS) for a in launched(project)), launched(project)
+assert prompts(project) == ['first step', 'second step'], prompts(project)
+rec = record(base, 'sequences')
+assert rec['status'] == 'completed' and [s['status'] for s in rec['steps']] == ['succeeded'] * 2, rec
+for step in rec['steps']:
+    attempt = step['attempts'][0]
+    assert attempt['model'] == 'pi/fixture' and attempt['route'] == 'local-only', attempt
+    backend = attempt['backends'][0]
+    assert backend['backend_stop'] == 'agent_settled' and backend['prompt_submitted'] is True, backend
+count += 1
+
+base, project, ah = workflow(['trusted-write', 'error-result', 'success'])
+p = ah('sequence', 'run', str(project / 'steps'), '--project', str(project), *T, '--timeout-secs', '15')
+assert p.returncode == 1, p.stderr
+assert len(launched(project)) == 2 and all(argv_matches(a, TRUSTED_ARGS) for a in launched(project)), launched(project)
+assert (project / 'made.txt').read_text() == 'made by fake'
+rec = record(base, 'sequences')
+assert [s['status'] for s in rec['steps']] == ['succeeded', 'failed'], rec
+assert rec['steps'][0]['attempts'][0]['backends'][0]['grants'] == 1, rec
+assert rec['steps'][1]['attempts'][0]['backends'][0]['prompt_submitted'] is True, rec
+run = rec['run']
+p = ah('sequence', 'resume', run, *T, '--timeout-secs', '15')
+assert p.returncode == 2 and len(launched(project)) == 2, p.stderr
+p = ah('sequence', 'resume', run, '--retry', *T, '--timeout-secs', '15')
+assert p.returncode == 0, p.stderr
+assert len(launched(project)) == 3 and all(argv_matches(a, TRUSTED_ARGS) for a in launched(project))
+assert prompts(project)[-1] == 'second step'
+rec = record(base, 'sequences')
+assert rec['status'] == 'completed' and [a['reason'] for a in rec['steps'][1]['attempts']] == ['initial', 'retry'], rec
+count += 1
+
+base, project, ah = workflow(['success', 'eof-after-submit'])
+p = ah('sequence', 'run', str(project / 'steps'), '--project', str(project), '--timeout-secs', '15')
+assert p.returncode == 4, p.stderr
+rec = record(base, 'sequences')
+assert [s['status'] for s in rec['steps']] == ['succeeded', 'uncertain'], rec
+count += 1
+
+base, project, ah = workflow(['success', 'success'])
+p = ah('sequence', 'run', str(project / 'steps'), '--project', str(project), '--preview')
+assert p.returncode == 0 and 'model pi/fixture' in p.stdout and launched(project) == [], p.stdout
+count += 1
+
+base, project, ah = workflow(['success', 'claim'])
+p = ah('ralph', 'run', str(project / 'task.md'), '--project', str(project), '--verify', 'test',
+       '--max-iterations', '3', '--timeout-secs', '15')
+assert p.returncode == 0, p.stderr
+rec = record(base, 'ralph')
+assert rec['status'] == 'completed' and [i['claim'] for i in rec['iterations']] == [False, True], rec
+assert all(i['model'] == 'pi/fixture' for i in rec['iterations']), rec
+count += 1
+
+base, project, ah = workflow(['cancel-deadline', 'claim'])
+p = ah('ralph', 'run', str(project / 'task.md'), '--project', str(project), '--verify', 'test',
+       '--timeout-secs', '3')
+assert p.returncode == 3, p.stderr
+rec = record(base, 'ralph')
+run = rec['run']
+assert ah('ralph', 'resume', run, '--verify', 'test', '--timeout-secs', '15').returncode == 2
+assert ah('ralph', 'resume', run, '--retry', '--verify', 'test', '--timeout-secs', '15').returncode == 0
+assert record(base, 'ralph')['status'] == 'completed'
+count += 1
+
+base, project, ah = workflow(['success'])
+lf = base / 'lf.json'
+lf.write_text(json.dumps(dict(
+    version=1, mode='local-first', model='fixture',
+    litellm=dict(api_base='http://127.0.0.1:9/v1', api_key_env='LOCAL_KEY', runtime='pi'),
+    native=dict(target='opencode', model='fixture', api_key_env='NATIVE_KEY'),
+)))
+p = subprocess.run(
+    [str(BINARY), 'sequence', 'run', str(project / 'steps'), '--project', str(project),
+     '--config', str(lf), '--timeout-secs', '15'],
+    env={'PATH': f'{base}/bin:/usr/bin:/bin', 'HOME': str(base),
+         'XDG_STATE_HOME': str(base / 'state'), 'LOCAL_KEY': 'synthetic'},
+    capture_output=True, text=True, cwd=project)
+assert p.returncode == 2 and 'litellm.runtime pi applies only to local-only' in p.stderr, p.stderr
+count += 1
+
+print(f'PASS: {count} Pi runtime and workflow cases (deny + trusted + agents + sequence/Ralph)')
