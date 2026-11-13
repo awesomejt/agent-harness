@@ -4,10 +4,10 @@
 
 - **Task:** P8.5 ([card](../../tasks/08-pi.md#p8-5)); consolidating reviewer: Grok (2026-11-12), Claude Opus (2026-11-13), Codex (2026-11-13). Independent reports: [Grok](2026-11-12-grok-phase-8-holistic-review.md) (G08-*), [Claude Opus](2026-11-13-claude-opus-phase-8-holistic-review.md) (C08-*), [Codex](2026-11-13-codex-phase-8-holistic-review.md) (X08-*).
 - **Accepted entry baseline:** Phase 6 `fe4e116` ([PR #58](https://github.com/awesomejt/agent-harness/pull/58)). **Reviewed material head:** `35777fb` (P8.4 merged, [PR #104](https://github.com/awesomejt/agent-harness/pull/104)).
-- **Included PRs:** P8.1–P8.4 implementation PRs per task cards; review PR [#105](https://github.com/awesomejt/agent-harness/pull/105) (`review/08-pi`) records assessments; remediation **`patch/p8-5-review-fixes`** resolves every finding.
+- **Included PRs:** P8.1–P8.4 implementation PRs per task cards; review PR [#105](https://github.com/awesomejt/agent-harness/pull/105) (`review/08-pi`) records assessments; remediation [#106](https://github.com/awesomejt/agent-harness/pull/106) (`patch/p8-5-review-fixes`) resolves every finding, including Grok follow-up on cancel grace and Rust path alignment (`266fe3e`).
 - **Mandatory scope:** P8.1–P8.4 and P8.5; D060/D065/D079–D084; F10 and AC01–AC11 regression constraints for shared launch paths.
 
-Review PR #105 merged under D042 with gate **changes required**. This report and `patch/p8-5-review-fixes` propose phase pass after Grok-reviewed remediation merges.
+Review PR #105 merged under D042 with gate **changes required**. Remediation PR #106 merged after one Grok follow-up review (`31dd078`); its two Concerns (and the realpath Nit) were addressed on the same branch in `266fe3e` before merge without a further review pass.
 
 ## Findings and resolution
 
@@ -30,4 +30,4 @@ Review PR #105 merged under D042 with gate **changes required**. This report and
 
 ## Gate outcome
 
-**Pass proposed** when `patch/p8-5-review-fixes` merges after `/grok review`. P8.5 then closes Phase 8.
+**Pass** for Phase 8 (`fe4e116..2e01610`, plus remediation in [PR #106](https://github.com/awesomejt/agent-harness/pull/106)). All twelve holistic findings (G08/C08/X08) are resolved with expanded policy tests, Pi CLI cases and document rechecks. Phase 8 exit evidence (P8.3–P8.4) and regression constraints for shared `single::launch` paths remain satisfied. Pass effective on PR #106 merge; P8.5 closes the phase. **Next bounded portfolio work:** P7.9 operator-authorised login preflight (D077/D078).
