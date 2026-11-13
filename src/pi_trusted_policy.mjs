@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 /** Path-shaped fields per tool; content and patterns are intentionally excluded. */
@@ -20,8 +21,21 @@ function realRoot(root) {
   }
 }
 
+/** Fail closed on paths Pi would reinterpret (~, @, home env interpolation). */
+function pathUsesPiEscapeHatch(value) {
+  if (typeof value !== 'string' || !value) return false;
+  const v = value.trim().normalize('NFC');
+  return (
+    v.startsWith('@') ||
+    v.startsWith('~') ||
+    v.includes('$HOME') ||
+    v.includes('${HOME')
+  );
+}
+
 function relativeInside(rootReal, target) {
   if (!rootReal || typeof target !== 'string' || !target) return true;
+  if (pathUsesPiEscapeHatch(target)) return false;
   const abs = path.isAbsolute(target)
     ? path.normalize(target)
     : path.resolve(rootReal, target);
@@ -53,13 +67,18 @@ function relativeInside(rootReal, target) {
 
 function absolutePathTokens(text) {
   const paths = [];
-  for (const m of text.matchAll(/(?:^|\s)(\/[^\s;|&<>"']+)/g)) paths.push(m[1]);
+  for (const m of text.matchAll(/(?:^|[\s"'=<>:])(\/[^\s;|&]+)/g)) paths.push(m[1]);
+  for (const m of text.matchAll(/(?:^|[\s"'=])(~\/[^\s;|&]+)/g)) {
+    paths.push(path.join(os.homedir(), m[1].slice(2)));
+  }
   return paths;
 }
 
 function bashEscapes(rootReal, command) {
   if (typeof command !== 'string' || !command) return false;
-  if (/(^|\s)\.\.(\/|\\)/.test(command) || /(^|\s)\.\.$/.test(command)) return true;
+  if (pathUsesPiEscapeHatch(command) || /\$\{HOME/.test(command)) return true;
+  if (/(^|[\s"'=:/])\.\.(?=$|[\s"'/;|&])/.test(command)) return true;
+  if (/\/\.\.(\/|$)/.test(command)) return true;
   return absolutePathTokens(command).some((p) => !relativeInside(rootReal, p));
 }
 

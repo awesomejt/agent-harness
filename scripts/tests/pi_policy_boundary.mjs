@@ -19,7 +19,7 @@ function withProject(fn) {
   const root = fs.realpathSync.native(project);
   const outsideReal = fs.realpathSync.native(outside);
   try {
-    fn({ root, outside: outsideReal, project });
+    fn({ root, outside: outsideReal, project, base });
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
   }
@@ -35,6 +35,33 @@ test('read outside absolute path is blocked', () => {
 test('read parent traversal is blocked', () => {
   withProject(({ root }) => {
     assert.equal(boundaryBlocked(root, 'read', { path: '../outside.txt' }), true);
+  });
+});
+
+test('Pi ~ and @ path escapes are blocked', () => {
+  withProject(({ root }) => {
+    assert.equal(boundaryBlocked(root, 'read', { path: '~/.ssh/id_rsa' }), true);
+    assert.equal(boundaryBlocked(root, 'read', { path: '@/etc/passwd' }), true);
+  });
+});
+
+test('in-project symlink to outside is blocked', () => {
+  withProject(({ root, outside, project }) => {
+    const link = path.join(project, 'leak.txt');
+    fs.symlinkSync(outside, link);
+    assert.equal(boundaryBlocked(root, 'read', { path: 'leak.txt' }), true);
+  });
+});
+
+test('non-canonical absolute path to inside file is allowed on macOS layout', () => {
+  withProject(({ root, project }) => {
+    const inside = path.join(project, 'inside.txt');
+    const maybeVar = inside.replace('/private', '');
+    if (maybeVar !== inside && fs.existsSync(maybeVar)) {
+      assert.equal(boundaryBlocked(root, 'read', { path: maybeVar }), false);
+    } else {
+      assert.equal(boundaryBlocked(root, 'read', { path: inside }), false);
+    }
   });
 });
 
@@ -58,6 +85,10 @@ test('bash blocks parent traversal and absolute outside paths', () => {
   withProject(({ root, outside }) => {
     assert.equal(
       boundaryBlocked(root, 'bash', { command: 'cat ../outside.txt' }),
+      true,
+    );
+    assert.equal(
+      boundaryBlocked(root, 'bash', { command: 'cd .. && cat outside.txt' }),
       true,
     );
     assert.equal(

@@ -1005,6 +1005,7 @@ pub(crate) async fn attempt(
         return Exit::Cancelled;
     }
     let mut command = tokio::process::Command::new(&executable);
+    // Pi resolves relative tool paths against this cwd; AH_PI_PROJECT_ROOT matches it.
     command
         .args(args(request, &prepared.extension))
         .current_dir(&request.project)
