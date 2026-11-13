@@ -123,7 +123,7 @@ Applies to current source on **macOS arm64, Pi 1.5.0**, `litellm.runtime: pi` an
 |---|---|---|
 | Route / runtime | `local-only` only; private `PI_CODING_AGENT_DIR`, synthetic `ah-litellm` provider; no `opencode.json` sync | D080, [deny launch](evidence/p8-2-pi-deny-launch.md) |
 | Authentication / HTTP | LiteLLM `api_base` + `api_key_env`; no Pi subscription client or credential copy | D060, [P8.3 acceptance](evidence/p8-3-pi-acceptance.md) |
-| Tools / permissions | Default `deny` (`--no-tools`); `trusted` offers six built-ins with extension UI allow-once grants; host privileges, no OS sandbox | [Trusted](evidence/p8-2-pi-trusted.md), D081 |
+| Tools / permissions | Default `deny` (`--no-tools`); `trusted` offers six built-ins with extension UI allow-once grants; harness extension blocks tool **path** fields and obvious `bash` traversal outside `AH_PI_PROJECT_ROOT` (best-effort, not OS sandbox) | [Trusted](evidence/p8-2-pi-trusted.md), D081, `pi_policy_boundary.mjs` |
 | Named primary / specialized role | Composed `AGENTS.md` + body + prompt; intersected `--tools`; non-default effort refuses | [Agents](evidence/p8-2-pi-agents.md), D082 |
 | Lifecycle / results | RPC preflight, `agent_settled` terminal, deadline/interrupt cleanup; trusted deny blocks tool calls at extension | [Deny launch](evidence/p8-2-pi-deny-launch.md), `pi.py` |
 | Live coding acceptance | Sample coder/reviewer on real LiteLLM; independent tests after coder; reviewer leaves project unchanged | [P8.3 acceptance](evidence/p8-3-pi-acceptance.md), `pi_live.py` |

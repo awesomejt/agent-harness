@@ -22,7 +22,7 @@ Command: `cargo build --locked`, export `LITELLM_API_KEY`, then `python3 scripts
 
 | Role | Seconds | Host prompts / grants | Tool events | Observed effects |
 |---|---:|---:|---:|---|
-| reviewer | 35.3 / 19.0 | 5 / 7 | 5 / 7 | Two passing runs on 2026-11-12: project unchanged; outside read blocked by harness project-root policy; `calc.py` defect cited. |
+| reviewer | 35.3 / 19.0 | 5 / 7 | 5 / 7 | Two passing runs on 2026-11-12: project unchanged; outside **read** blocked by trusted extension path checks (reviewer has no `bash`); `calc.py` defect cited. |
 | coder | 10.0 / 9.0 | 6 / 5 | 6 / 5 | Two passing runs: only `calc.py` changed; independent `test_calc.py` passed each time. |
 
 Every successful attempt must report Pi 1.5.0, `pi/MODEL`, the selected role, `agent_settled`, success, no protocol violation and confirmed cleanup. The coder row must change only `calc.py` and pass independent arithmetic tests. The reviewer row must leave the project unchanged (no `REVIEW.md`) and reference `calc.py` in the response. Timings and grant counts are observations, not performance claims.
@@ -39,4 +39,4 @@ On merge of this PR, record the driver and adapter fixes; mark **P8.3 complete**
 
 ## PR review closeout
 
-Feature [PR #100](https://github.com/awesomejt/agent-harness/pull/100) merged after Grok review (first pass and follow-up addressed). Live table filled after a follow-up adapter increment: trusted Pi policy blocks tool inputs outside `AH_PI_PROJECT_ROOT`, and attempt summaries expose `grants` like other runtimes.
+Feature [PR #100](https://github.com/awesomejt/agent-harness/pull/100) merged after Grok review (first pass and follow-up addressed). Live table filled after a follow-up adapter increment: trusted Pi extension checks tool path fields and obvious `bash` traversal against `AH_PI_PROJECT_ROOT` (best-effort host policy, not sandbox isolation), attempt summaries expose `grants` like other runtimes, and `pi_policy_boundary.mjs` covers the JavaScript offline.

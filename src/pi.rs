@@ -333,46 +333,7 @@ pub(crate) fn decide_ui(
 
 fn policy_extension(trusted: bool) -> &'static str {
     if trusted {
-        r#"import path from 'node:path';
-export default function(pi) {
-  const grantable = new Set((process.env.AH_PI_GRANTABLE || '').split(',').filter(Boolean));
-  const root = process.env.AH_PI_PROJECT_ROOT || '';
-  const inside = (target) => {
-    if (!root) return true;
-    if (typeof target !== 'string' || !target) return true;
-    const abs = path.isAbsolute(target) ? path.normalize(target) : path.resolve(root, target);
-    const rel = path.relative(root, abs);
-    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
-  };
-  const strings = (value, out = []) => {
-    if (typeof value === 'string') out.push(value);
-    else if (Array.isArray(value)) value.forEach((v) => strings(v, out));
-    else if (value && typeof value === 'object') Object.values(value).forEach((v) => strings(v, out));
-    return out;
-  };
-  const absolutePaths = (s) => {
-    const paths = [];
-    for (const m of s.matchAll(/\/[^\s;|&<>"']+/g)) paths.push(m[0]);
-    return paths;
-  };
-  const insideInput = (input) => {
-    if (!root || !input) return true;
-    for (const s of strings(input)) {
-      if (!inside(s)) return false;
-      for (const p of absolutePaths(s)) if (!inside(p)) return false;
-    }
-    return true;
-  };
-  const kindOf = (name) => ({read:'read',find:'search',grep:'search',ls:'search',edit:'edit',write:'edit',bash:'execute'}[name]);
-  pi.on('tool_call', async (event, ctx) => {
-    const kind = kindOf(event.toolName);
-    if (!kind || !grantable.has(kind)) return {block: true, reason: 'Harness policy'};
-    if (!insideInput(event.input)) return {block: true, reason: 'outside project root'};
-    const msg = JSON.stringify({toolName:event.toolName,toolCallId:event.toolCallId,input:event.input});
-    const ok = await ctx.ui.confirm('ah-permission', msg);
-    if (!ok) return {block: true, reason: 'denied by agent-harness policy'};
-  });
-}"#
+        include_str!("pi_trusted_policy.mjs")
     } else {
         r#"export default function(pi) {
   pi.on('tool_call', () => ({block: true, reason: 'Harness deny profile'}));
