@@ -7,7 +7,7 @@
 - **Included PRs:** P8.1–P8.4 implementation PRs per task cards; review PR [#105](https://github.com/awesomejt/agent-harness/pull/105) (`review/08-pi`) records assessments; remediation [#106](https://github.com/awesomejt/agent-harness/pull/106) (`patch/p8-5-review-fixes`) resolves every finding, including Grok follow-up on cancel grace and Rust path alignment (`266fe3e`).
 - **Mandatory scope:** P8.1–P8.4 and P8.5; D060/D065/D079–D084; F10 and AC01–AC11 regression constraints for shared launch paths.
 
-Review PR #105 merged under D042 with gate **changes required**. Remediation PR #106 merged after Grok review (`31dd078`) with two Concerns addressed on the same branch (`266fe3e`) before merge; the final review did not require a third pass because concerns were fixed pre-merge.
+Review PR #105 merged under D042 with gate **changes required**. Remediation PR #106 merged after one Grok follow-up review (`31dd078`); its two Concerns (and the realpath Nit) were addressed on the same branch in `266fe3e` before merge without a further review pass.
 
 ## Findings and resolution
 
