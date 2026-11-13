@@ -210,7 +210,7 @@ ah single "Summarize calc.py" --mode local-only --config ../ah.json --preview
 ah single "Fix the failing test in calc.py" --mode local-only --config ../ah.json --permissions trusted
 ```
 
-`deny` keeps `--no-tools`. `--permissions trusted` enables the fixed Pi built-in set with harness extension UI grants (D081). `--agent NAME` composes project `AGENTS.md`, the role body and the prompt, with intersected tools (D082); non-default effort refuses. Only `local-only` accepts `runtime: pi`; other modes reject during validation. Sequences and Ralph are not supported on Pi yet (P8.4). Opt-in regression: `python3 scripts/tests/pi_live.py` after build, with `LITELLM_API_KEY` set and optional `--endpoint` / `--model` matching your proxy.
+`deny` keeps `--no-tools`. `--permissions trusted` enables the fixed Pi built-in set with harness extension UI grants (D081). `--agent NAME` composes project `AGENTS.md`, the role body and the prompt, with intersected tools (D082); non-default effort refuses. Only `local-only` accepts `runtime: pi`; other modes reject during validation. `ah sequence` and `ah ralph` reuse the Pi single-run adapter with one fresh session per step or iteration ([P8.4 evidence](evidence/p8-4-pi-workflows.md)); pass `--permissions trusted` on resume when tools are required. Opt-in regression: `python3 scripts/tests/pi_live.py` after build, with `LITELLM_API_KEY` set and optional `--endpoint` / `--model` matching your proxy.
 
 ### Native cloud-only (P3.2)
 

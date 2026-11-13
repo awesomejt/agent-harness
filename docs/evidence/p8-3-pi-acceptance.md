@@ -31,7 +31,7 @@ Every successful attempt must report Pi 1.5.0, `pi/MODEL`, the selected role, `a
 
 Offline: `python3 -B scripts/tests/pi.py` (34 cases), full `offline.py` suite, `cargo test --locked`, fmt/clippy as in prior P8.2 slices. Live inference remains excluded from `offline.py`.
 
-Supported scope is `local-only` with `litellm.runtime: pi` only. Read-only role ceilings intersect tools but may still grant some extension UI prompts (unlike Claude D050); grant counts are recorded explicitly. No sequences, Ralph, `local-first`, subscription Pi clients or non-default effort. P8.4 workflow parity and P8.5 holistic review remain gated.
+Supported scope is `local-only` with `litellm.runtime: pi` only. Read-only role ceilings intersect tools but may still grant some extension UI prompts (unlike Claude D050); grant counts are recorded explicitly. Sequences and Ralph are [P8.4](p8-4-pi-workflows.md); `local-first`, subscription Pi clients and non-default effort stay refused. P8.5 holistic review remains gated.
 
 ## Next boundary
 
