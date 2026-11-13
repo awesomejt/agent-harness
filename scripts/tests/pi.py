@@ -131,7 +131,7 @@ for case, expected, prompted, extra in CASES:
             names = {l.split('=', 1)[0] for l in (project / 'env.txt').read_text().splitlines() if '=' in l}
             want = {'HOME', 'PATH', 'PI_CODING_AGENT_DIR', 'LOCAL_KEY'}
             if case.startswith('trusted') or case == 'agent-reviewer':
-                want.add('AH_PI_GRANTABLE')
+                want.update(('AH_PI_GRANTABLE', 'AH_PI_PROJECT_ROOT'))
             assert want <= names, (case, names)
             assert 'PI_CODING_AGENT_DIR' in names, case
             lines = [json.loads(l) for l in (project / 'stdin.jsonl').read_text().splitlines()]
