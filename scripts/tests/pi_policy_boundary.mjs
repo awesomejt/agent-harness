@@ -38,10 +38,13 @@ test('read parent traversal is blocked', () => {
   });
 });
 
-test('Pi ~ and @ path escapes are blocked', () => {
-  withProject(({ root }) => {
+test('Pi ~ path escapes are blocked; @ is stripped then checked', () => {
+  withProject(({ root, project }) => {
     assert.equal(boundaryBlocked(root, 'read', { path: '~/.ssh/id_rsa' }), true);
     assert.equal(boundaryBlocked(root, 'read', { path: '@/etc/passwd' }), true);
+    fs.mkdirSync(path.join(project, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(project, 'src', 'x.txt'), 'ok\n');
+    assert.equal(boundaryBlocked(root, 'read', { path: '@src/x.txt' }), false);
   });
 });
 
@@ -97,6 +100,14 @@ test('bash blocks parent traversal and absolute outside paths', () => {
     );
     assert.equal(
       boundaryBlocked(root, 'bash', { command: 'python3 -B test_calc.py' }),
+      false,
+    );
+    assert.equal(
+      boundaryBlocked(root, 'bash', { command: 'python3 -B test_calc.py 2>/dev/null' }),
+      false,
+    );
+    assert.equal(
+      boundaryBlocked(root, 'bash', { command: 'curl -s https://example.com/x' }),
       false,
     );
   });

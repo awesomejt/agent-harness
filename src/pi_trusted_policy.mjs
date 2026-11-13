@@ -21,24 +21,28 @@ function realRoot(root) {
   }
 }
 
-/** Fail closed on paths Pi would reinterpret (~, @, home env interpolation). */
+const SAFE_DEVICE = new Set(['/dev/null', '/dev/stdout', '/dev/stderr']);
+
+/** Fail closed on paths Pi would reinterpret (~, home env interpolation). */
 function pathUsesPiEscapeHatch(value) {
   if (typeof value !== 'string' || !value) return false;
   const v = value.trim().normalize('NFC');
-  return (
-    v.startsWith('@') ||
-    v.startsWith('~') ||
-    v.includes('$HOME') ||
-    v.includes('${HOME')
-  );
+  return v.startsWith('~') || v.includes('$HOME') || v.includes('${HOME');
+}
+
+function stripAtPrefix(value) {
+  const v = value.trim().normalize('NFC');
+  return v.startsWith('@') ? v.slice(1) : v;
 }
 
 function relativeInside(rootReal, target) {
   if (!rootReal || typeof target !== 'string' || !target) return true;
   if (pathUsesPiEscapeHatch(target)) return false;
-  const abs = path.isAbsolute(target)
-    ? path.normalize(target)
-    : path.resolve(rootReal, target);
+  const normalized = stripAtPrefix(target);
+  if (SAFE_DEVICE.has(normalized)) return true;
+  const abs = path.isAbsolute(normalized)
+    ? path.normalize(normalized)
+    : path.resolve(rootReal, normalized);
   let resolved = abs;
   try {
     if (fs.existsSync(abs)) {
@@ -67,7 +71,11 @@ function relativeInside(rootReal, target) {
 
 function absolutePathTokens(text) {
   const paths = [];
-  for (const m of text.matchAll(/(?:^|[\s"'=<>:])(\/[^\s;|&]+)/g)) paths.push(m[1]);
+  for (const m of text.matchAll(/(?:^|[\s"'=<>])(\/[^\s;|&]+)/g)) {
+    const token = m[1];
+    if (token.startsWith('//')) continue;
+    paths.push(token);
+  }
   for (const m of text.matchAll(/(?:^|[\s"'=])(~\/[^\s;|&]+)/g)) {
     paths.push(path.join(os.homedir(), m[1].slice(2)));
   }
@@ -77,6 +85,7 @@ function absolutePathTokens(text) {
 function bashEscapes(rootReal, command) {
   if (typeof command !== 'string' || !command) return false;
   if (pathUsesPiEscapeHatch(command) || /\$\{HOME/.test(command)) return true;
+  if (/(^|[\s"'=])~(?=$|[\s;&|/])/.test(command)) return true;
   if (/(^|[\s"'=:/])\.\.(?=$|[\s"'/;|&])/.test(command)) return true;
   if (/\/\.\.(\/|$)/.test(command)) return true;
   return absolutePathTokens(command).some((p) => !relativeInside(rootReal, p));
