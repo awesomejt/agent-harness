@@ -333,17 +333,7 @@ pub(crate) fn decide_ui(
 
 fn policy_extension(trusted: bool) -> &'static str {
     if trusted {
-        r#"export default function(pi) {
-  const grantable = new Set((process.env.AH_PI_GRANTABLE || '').split(',').filter(Boolean));
-  const kindOf = (name) => ({read:'read',find:'search',grep:'search',ls:'search',edit:'edit',write:'edit',bash:'execute'}[name]);
-  pi.on('tool_call', async (event, ctx) => {
-    const kind = kindOf(event.toolName);
-    if (!kind || !grantable.has(kind)) return {block: true, reason: 'Harness policy'};
-    const msg = JSON.stringify({toolName:event.toolName,toolCallId:event.toolCallId,input:event.input});
-    const ok = await ctx.ui.confirm('ah-permission', msg);
-    if (!ok) return {block: true, reason: 'denied by agent-harness policy'};
-  });
-}"#
+        include_str!("pi_trusted_policy.mjs")
     } else {
         r#"export default function(pi) {
   pi.on('tool_call', () => ({block: true, reason: 'Harness deny profile'}));
@@ -1000,6 +990,13 @@ pub(crate) async fn attempt(
     if request.permissions == Permissions::Trusted {
         let kinds = crate::opencode::grantable(request);
         env.push((OsString::from("AH_PI_GRANTABLE"), kinds.join(",").into()));
+        match std::fs::canonicalize(&request.project) {
+            Ok(root) => env.push((OsString::from("AH_PI_PROJECT_ROOT"), root.into_os_string())),
+            Err(_) => {
+                progress.reject("project path unavailable for Pi trust boundary");
+                return Exit::Invalid;
+            }
+        }
     }
     if let Err(exit) = crate::worktree::report(&request.project, deadline, progress).await {
         return exit;
@@ -1008,6 +1005,7 @@ pub(crate) async fn attempt(
         return Exit::Cancelled;
     }
     let mut command = tokio::process::Command::new(&executable);
+    // Pi resolves relative tool paths against this cwd; AH_PI_PROJECT_ROOT matches it.
     command
         .args(args(request, &prepared.extension))
         .current_dir(&request.project)
@@ -1047,7 +1045,7 @@ pub(crate) async fn attempt(
         "tool_events": observed.tools,
         "protocol_violation": observed.violation,
         "permission_requests": observed.permissions,
-        "permission_grants": observed.grants,
+        "grants": observed.grants,
     });
     progress.event(format!(
         "cleanup={cleanup}; protocol_violation={}; tool events: {}; stderr_bytes={}",

@@ -1,6 +1,6 @@
 # P8.3 — Pi single-run live acceptance
 
-Date: 2026-11-12. Task: [P8.3](../../tasks/08-pi.md#p8-3). Consolidates installed Pi **1.5.0** adapter slices D080–D082 with live primary/specialized use. **P8.3 checkboxes stay open** until two passing `pi_live.py` runs on the operator proxy; sequence/Ralph parity stays P8.4. The [capability matrix](../FRAMEWORKS.md#p83-pi-capability-matrix) and [setup](../OPERATIONS.md#pi-local-only-p83) describe the supported surface.
+Date: 2026-11-12. Task: [P8.3](../../tasks/08-pi.md#p8-3). Consolidates installed Pi **1.5.0** adapter slices D080–D082 with live primary/specialized use. Two passing `pi_live.py` runs on the operator proxy closed live acceptance; sequence/Ralph parity stays P8.4. The [capability matrix](../FRAMEWORKS.md#p83-pi-capability-matrix) and [setup](../OPERATIONS.md#pi-local-only-p83) describe the supported surface.
 
 ## Accepted surface and evidence
 
@@ -22,8 +22,8 @@ Command: `cargo build --locked`, export `LITELLM_API_KEY`, then `python3 scripts
 
 | Role | Seconds | Host prompts / grants | Tool events | Observed effects |
 |---|---:|---:|---:|---|
-| reviewer | — | — | — | **Blocked on this host (2026-11-12):** Pi reached `agent_settled` with no assistant text ~0.2 s after `disposition: started`; exit 1 after adapter fix. `single_runtime.py --live` on the same alias timed out uncertain (≈92 s). Operator must re-run `pi_live.py` when LiteLLM and the Pi `ah-litellm` provider return a non-empty completion. |
-| coder | — | — | — | Not attempted after reviewer failure. |
+| reviewer | 35.3 / 19.0 | 5 / 7 | 5 / 7 | Two passing runs on 2026-11-12: project unchanged; outside **read** blocked by trusted extension path checks (reviewer has no `bash`); `calc.py` defect cited. |
+| coder | 10.0 / 9.0 | 6 / 5 | 6 / 5 | Two passing runs: only `calc.py` changed; independent `test_calc.py` passed each time. |
 
 Every successful attempt must report Pi 1.5.0, `pi/MODEL`, the selected role, `agent_settled`, success, no protocol violation and confirmed cleanup. The coder row must change only `calc.py` and pass independent arithmetic tests. The reviewer row must leave the project unchanged (no `REVIEW.md`) and reference `calc.py` in the response. Timings and grant counts are observations, not performance claims.
 
@@ -39,4 +39,4 @@ On merge of this PR, record the driver and adapter fixes; mark **P8.3 complete**
 
 ## PR review closeout
 
-Feature [PR #100](https://github.com/awesomejt/agent-harness/pull/100) merged after Grok review (first pass and follow-up addressed). Live run table remains pending two passing operator runs. P8.3 PROJECT checkbox stays open until the table is filled per [GIT_WORKFLOW](../GIT_WORKFLOW.md).
+Feature [PR #100](https://github.com/awesomejt/agent-harness/pull/100) merged after Grok review (first pass and follow-up addressed). Live table filled after a follow-up adapter increment: trusted Pi extension checks tool path fields and obvious `bash` traversal against `AH_PI_PROJECT_ROOT` (best-effort host policy, not sandbox isolation), attempt summaries expose `grants` like other runtimes, and `pi_policy_boundary.mjs` covers the JavaScript offline.

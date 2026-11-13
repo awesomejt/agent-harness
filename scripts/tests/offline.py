@@ -28,6 +28,7 @@ SUITES = [
     ['scripts/tests/native_runtime.py'],
     ['scripts/tests/claude.py'],
     ['scripts/tests/pi.py'],
+    ['node', '--test', 'scripts/tests/pi_policy_boundary.mjs'],
     ['scripts/tests/codex_feasibility_cases.py'],
     ['scripts/tests/grok_feasibility_cases.py'],
     ['scripts/tests/antigravity_feasibility_cases.py'],
