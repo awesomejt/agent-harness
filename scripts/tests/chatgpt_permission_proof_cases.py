@@ -23,18 +23,23 @@ def trusted_cases():
              'request': {'settings': {}, 'headers': {}, 'body': {}},
              'permissions': list(permission.TRUSTED_RULES)}
     permission.validate_trusted_agent(agent, model, permission.TRUSTED_RULES)
-    prefixed = list(permission.DENY_RULES) + list(permission.TRUSTED_RULES)
-    permission.validate_trusted_agent({**agent, 'permissions': prefixed}, model, permission.TRUSTED_RULES)
+    prefixed_deny = list(permission.DENY_RULES) + list(permission.TRUSTED_RULES)
+    permission.validate_trusted_agent({**agent, 'permissions': prefixed_deny}, model, permission.TRUSTED_RULES)
+    prefixed_allow = [{'action': 'builtin', 'resource': '*', 'effect': 'allow'}] + list(permission.TRUSTED_RULES)
+    permission.validate_trusted_agent({**agent, 'permissions': prefixed_allow}, model, permission.TRUSTED_RULES)
+    rejects(lambda: permission.validate_trusted_agent(
+        {**agent, 'permissions': list(permission.TRUSTED_RULES) + list(permission.DENY_RULES)},
+        model, permission.TRUSTED_RULES))
     for mutation in (
             {'id': 'other'},
             {'model': None},
             {'model': {'id': 'other', 'providerID': 'openai'}},
             {'request': {'settings': {'secret': 1}, 'headers': {}, 'body': {}}},
             {'permissions': list(permission.DENY_RULES)},
-            {'permissions': prefixed + [{'action': 'shell', 'resource': '*', 'effect': 'allow'}]},
+            {'permissions': prefixed_deny + [{'action': 'shell', 'resource': '*', 'effect': 'allow'}]},
     ):
         rejects(lambda: permission.validate_trusted_agent({**agent, **mutation}, model, permission.TRUSTED_RULES))
-    print('PASS: trusted agent validation requires exact ask profile', flush=True)
+    print('PASS: trusted agent validation requires harness ask tail', flush=True)
 
 
 def merge_cases():

@@ -10,7 +10,8 @@ On a retained root that has passed D085 login preflight (and typically D086 on t
 prove
 without network that merged global deny rules and a named trusted agent (`trusted-coder`) surface
 through `debug agents` on a contained boot. Require deny-default tails on every default agent and
-an exact harness trusted ask profile on the named agent. No credential fields are read or printed.
+the harness trusted ask profile as the effective-permission tail on the named agent (no
+trailing deny or allow overrides). No credential fields are read or printed.
 
 **Result:** see **Validation** below. Unauthenticated roots are refused; authenticated installed
 proof needs the operator session from D085.

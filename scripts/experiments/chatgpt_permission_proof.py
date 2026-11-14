@@ -52,17 +52,18 @@ TRUSTED_AGENT_ID = 'trusted-coder'
 
 
 def validate_trusted_agent(agent, model, rules):
-    """Require the harness trusted ask profile as a sublist; refuse any allow effect."""
+    """Require the harness trusted ask profile as the permission tail with no allow overrides."""
     check(isinstance(agent, dict) and agent.get('id') == TRUSTED_AGENT_ID)
     resolved = {'id': model['model'], 'providerID': model['providerID']}
     check(agent.get('model') == resolved)
     check(agent['request'] == {'settings': {}, 'headers': {}, 'body': {}})
     effective = agent['permissions']
     serialized = list(rules)
-    matches = [index for index in range(len(effective)) if effective[index:index + len(serialized)] == serialized]
-    check(matches)
-    check(all(rule['effect'] in ('deny', 'ask') for rule in effective))
-    check('allow' not in {rule['effect'] for rule in effective})
+    check(len(effective) >= len(serialized))
+    tail = effective[-len(serialized):]
+    check(tail == serialized)
+    check(all(rule['effect'] in ('deny', 'ask') for rule in tail))
+    check('allow' not in {rule['effect'] for rule in tail})
 
 
 def merge_permission_config(env, helper, deny_rules, trusted_rules):
