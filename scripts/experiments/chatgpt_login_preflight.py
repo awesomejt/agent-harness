@@ -33,6 +33,29 @@ from chatgpt_retained_state import (
     root_shape,
 )
 
+PREPARE_RECORD = '.ah-prepare.json'
+
+
+class LoginPreflightRefusal(RuntimeError):
+    """Login-mode preflight invariant failures; message holds violation labels only."""
+
+
+def write_prepare_record(parent, work, token):
+    path = parent / PREPARE_RECORD
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, 'w') as handle:
+        json.dump({'work': str(work.resolve()), 'token': token}, handle)
+
+
+def read_prepare_record(parent, work):
+    path = parent / PREPARE_RECORD
+    check(path.is_file() and not path.is_symlink())
+    payload = json.loads(path.read_text())
+    check(payload.get('work') == str(work.resolve()))
+    token = payload.get('token')
+    check(isinstance(token, str) and token)
+    return token
+
 
 def operator_login_command(executable, work, project):
     """D077 allowlisted environment; the operator runs this outside harness containment."""
@@ -55,33 +78,46 @@ def operator_login_command(executable, work, project):
     return f'cd {shlex.quote(str(project))} && {body}'
 
 
+def prepare_parent(parent):
+    parent = parent.resolve()
+    if parent.exists():
+        check(parent.is_dir() and parent.stat().st_mode & 0o777 == 0o700
+              and parent.stat().st_uid == os.getuid())
+    parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    check(parent.stat().st_mode & 0o777 == 0o700 and parent.stat().st_uid == os.getuid())
+
+
 def prepare(parent, runtime_path):
     """Create a fresh owned root and print the operator login command."""
     check(runtime_path.is_file())
     check(hashlib.sha256(runtime_path.read_bytes()).hexdigest() == SHA256)
-    parent = parent.resolve()
-    parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    prepare_parent(parent)
     work, token = create_root(parent)
+    work = work.resolve()
     home, project, env, _ = build(work, False, False)
+    check(not root_shape(work, token, env))
     static_guards(work, home, project, env)
+    write_prepare_record(parent, work, token)
     return work, token, project, operator_login_command(runtime_path, work, project)
 
 
 def attach(work, runtime_path, builtin):
     """Load an operator-prepared owned root for contained preflight boots."""
     work = work.resolve()
+    expected = read_prepare_record(work.parent, work)
     marker = work / OWNER
     check(marker.is_file() and not marker.is_symlink())
-    token = marker.read_text()
     runtime = runtime_path.resolve()
     check(runtime.is_file())
     check(hashlib.sha256(runtime.read_bytes()).hexdigest() == SHA256)
     home, project, env = env_from_owned_root(work, False, True)
     check(home.is_dir() and project.is_dir())
+    env.pop('OPENCODE_PASSWORD', None)
+    violations = root_shape(work, expected, env)
+    if violations:
+        raise RuntimeError(f'root shape refused: {violations}')
     static_guards(work, home, project, env)
-    env.pop('OPENCODE_PASSWORD')
-    check(not root_shape(work, token, env))
-    return {'runtime': runtime, 'work': work, 'home': home, 'project': project, 'env': env, 'token': token,
+    return {'runtime': runtime, 'work': work, 'home': home, 'project': project, 'env': env, 'token': expected,
             'builtin': builtin}
 
 
@@ -104,7 +140,7 @@ def run_preflight(ctx):
     expected_set = frozenset(first['after'][1])
     login_refusals = evaluate(first['after'], expected_set, ctx['builtin'])[1]
     if login_refusals:
-        raise RuntimeError(f'login preflight failed: {login_refusals!r}; complete operator login first')
+        raise LoginPreflightRefusal(f'login preflight failed: {login_refusals!r}; complete operator login first')
     return {'boots': 2, 'identical': True, 'lock': ['refused', 'acquired'],
             'preflight_login': login_refusals, 'integration_count': len(expected_set)}
 
@@ -126,7 +162,7 @@ def main():
         check(hashlib.sha256(runtime.read_bytes()).hexdigest() == SHA256)
         if args.prepare is not None:
             parent = args.prepare.resolve()
-            parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            prepare_parent(parent)
             pinned = parent / 'opencode-cli'
             shutil.copy2(runtime, pinned)
             work, _, _, command = prepare(parent, pinned)
@@ -150,6 +186,9 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except LoginPreflightRefusal as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)
     except Exception:
         print('Login preflight failed; raw diagnostics withheld', file=sys.stderr)
         sys.exit(1)

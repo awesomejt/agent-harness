@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline login-preflight command, prepare and attach refusals; no OpenCode or network."""
-import os
+import hashlib
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -8,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'experiments'))
 import chatgpt_login_preflight as login
 import chatgpt_retained_state as retained
+from chatgpt_feasibility import SHA256
 
 
 def rejects(action):
@@ -42,21 +44,21 @@ def prepare_cases():
         runtime = parent / 'opencode-cli'
         runtime.write_bytes(b'\x00' * 8)
         rejects(lambda: login.prepare(parent, runtime))
-        # Wrong digest is refused before root creation.
-        parent.joinpath('work').mkdir(exist_ok=True)
+        assert not (parent / 'work').exists()
     print('PASS: prepare refuses a byte-drifted executable before root creation', flush=True)
 
 
 def attach_cases():
     with tempfile.TemporaryDirectory(prefix='ah-login-attach-') as directory:
         parent = Path(directory)
-        work, token = retained.create_root(parent)
-        home, project, env, _ = __import__('chatgpt_installed_observer', fromlist=['build']).build(work, False, False)
+        installed = shutil.which('opencode')
+        assert installed is not None
         runtime = parent / 'opencode-cli'
-        runtime.write_bytes(b'x' * 3)
-        rejects(lambda: login.attach(work, runtime, {}))
-        marker = work / retained.OWNER
-        marker.write_text('wrong')
+        shutil.copy2(installed, runtime)
+        assert hashlib.sha256(runtime.read_bytes()).hexdigest() == SHA256
+        work, token, _, _ = login.prepare(parent, runtime)
+        assert login.attach(work, runtime, {})['token'] == token
+        (work / retained.OWNER).write_text('wrong-marker')
         rejects(lambda: login.attach(work, runtime, {}))
     print('PASS: attach refuses marker drift and unpinned executable bytes', flush=True)
 

@@ -350,6 +350,13 @@ def static_guards(root, home, project, env):
     for path in root.rglob('*'):
         if path.name == 'opencode-cli' or root / 'denied-bin' in path.parents:
             continue
+        try:
+            relative = path.relative_to(root)
+        except ValueError:
+            relative = None
+        if relative is not None and relative.parts == ('DATA', 'opencode', 'auth.json'):
+            check(not os.path.lexists(path))  # Name-only; never read credential-shaped files.
+            continue
         check(not path.is_symlink())
         check(path.name not in ('plugin', 'plugins', 'AGENTS.md', 'CLAUDE.md'))
         if path.suffix in ('.json', '.jsonc'):

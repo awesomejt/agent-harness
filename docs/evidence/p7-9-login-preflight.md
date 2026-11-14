@@ -67,7 +67,8 @@ directory. It reuses the D077 boot, lock, integration-redaction and login invari
 - **Unauthenticated installed:** On a prepared root before login, the preflight exits 1 with
   withheld diagnostics; bound controls still print their PASS lines.
 - **Authenticated installed:** Pending operator OAuth into a dedicated root on this host;
-  record redacted JSON summary and three consecutive passing runs here before PR merge.
+  record redacted JSON summary and **two consecutive** passing `--root` runs (each runs two
+  contained boots) here before PR merge.
 
 ## Limits
 
