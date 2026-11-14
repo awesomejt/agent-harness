@@ -23,14 +23,16 @@ from chatgpt_feasibility import SHA256
 from chatgpt_installed_observer import BODY_LIMIT, REQUEST_TIMEOUT, static_guards, verify_source
 from chatgpt_login_preflight import LoginPreflightRefusal, attach, boundary_controls
 from chatgpt_retained_state import (
-    INTEGRATION,
     PreflightObserver,
+    PUBLISHED_INTEGRATION_COUNT,
+    PUBLISHED_INTEGRATION_DIGEST,
     acquire,
     ancestor_denials,
     combined_profile,
     database_path,
     evaluate,
     fresh_port,
+    integration_digest,
     lock_probe,
     resources_ready,
     root_shape,
@@ -79,10 +81,7 @@ class MethodProofObserver(PreflightObserver):
         return data
 
 
-def pinned_expectations(packages):
-    path = packages / CHATGPT_SOURCE
-    check(hashlib.sha256(path.read_bytes()).hexdigest() == CHATGPT_SHA256)
-    text = path.read_text()
+def expectations_from_source(text):
     method = re.search(r'const methodID = Integration\.MethodID\.make\("([^"]+)"\)', text)
     resource = re.search(r'const resource = "([^"]+)"', text)
     provider = re.search(r'const providerID = Provider\.ID\.(\w+)', text)
@@ -93,6 +92,12 @@ def pinned_expectations(packages):
     check('gpt-6.1-sol' in models)
     return {'method_id': method.group(1), 'resource': resource.group(1),
             'provider_id': provider.group(1), 'helper_model': 'gpt-6.1-sol', 'package_id': PACKAGE_ID}
+
+
+def pinned_expectations(packages):
+    path = packages / CHATGPT_SOURCE
+    check(hashlib.sha256(path.read_bytes()).hexdigest() == CHATGPT_SHA256)
+    return expectations_from_source(path.read_text())
 
 
 def merge_helper_config(env, helper):
@@ -108,8 +113,7 @@ def redact_provider(info, expected_resource):
     settings = info.get('settings') or {}
     check(isinstance(settings, dict))
     cleaned = {key: settings[key] for key in settings if key in SAFE_PROVIDER_SETTINGS}
-    if 'baseURL' in cleaned:
-        check(cleaned['baseURL'] == expected_resource)
+    check(cleaned.get('baseURL') == expected_resource)
     package = info.get('package')
     check(package == PACKAGE_ID)
     return {'id': 'openai', 'package': package, 'activation': info.get('activation'), 'settings': cleaned}
@@ -121,7 +125,10 @@ def openai_method_proof(integration, expected):
     check(('oauth', expected['method_id']) in methods)
     connections = integration.get('connections', [])
     check(len(connections) == 1 and connections[0].get('type') == 'credential')
-    check(connections[0].get('method', 'oauth') == 'oauth' and 'status' not in connections[0])
+    check(connections[0].get('method') == 'oauth' and 'status' not in connections[0])
+    method_id = connections[0].get('methodID')
+    if method_id is not None:
+        check(method_id == expected['method_id'])
 
 
 def model_default_proof(data, helper):
@@ -147,6 +154,8 @@ def method_proof_boot(ctx, expected):
         check(observer.locations() == [])
         resources, integrations, identities = settle_view(observer, owned, resources_ready(builtin))
         check(observer.locations() == [str(project)])
+        check(integration_digest(integrations) == PUBLISHED_INTEGRATION_DIGEST)
+        check(len(integrations) == PUBLISHED_INTEGRATION_COUNT)
         login_refusals = evaluate((resources, integrations, identities, set()), frozenset(integrations), builtin)[1]
         if login_refusals:
             raise LoginPreflightRefusal(
@@ -159,10 +168,10 @@ def method_proof_boot(ctx, expected):
         model_default_proof(model_default, expected)
         summary = {
             'method': expected['method_id'],
-            'resource': expected['resource'],
+            'resource': redacted['settings']['baseURL'],
             'package': redacted['package'],
-            'helper_model': expected['helper_model'],
-            'provider_id': expected['provider_id'],
+            'helper_model': model_default.get('modelID') or model_default.get('id'),
+            'provider_id': model_default.get('providerID'),
         }
     return summary
 
@@ -186,15 +195,15 @@ def main():
         check(hashlib.sha256(runtime.read_bytes()).hexdigest() == SHA256)
         boundary = boundary_controls(args.root.resolve())
         ctx = attach(args.root, runtime, builtin)
-        ctx['env'] = merge_helper_config(ctx['env'], expected)
         static_guards(ctx['work'], ctx['home'], ctx['project'], ctx['env'], login_state=True)
         held = acquire(ctx['work'])
         check(held is not None)
         try:
-            check(lock_probe(ctx['work']) in ('refused', 'acquired'))
+            check(lock_probe(ctx['work']) == 'refused')
             summary = method_proof_boot(ctx, expected)
         finally:
             os.close(held)
+        check(lock_probe(ctx['work']) == 'acquired')
     print('PASS: method, endpoint and helper selection match pinned ChatGPT plugin constants', flush=True)
     print(json.dumps({'origin_boundary': boundary, 'proof': summary}, indent=1, sort_keys=True))
     print('LIMIT: retained-login metadata only; deny/trusted, account credits-off and D034 remain open')

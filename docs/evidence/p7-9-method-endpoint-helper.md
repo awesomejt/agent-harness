@@ -52,6 +52,8 @@ python3 -B scripts/tests/chatgpt_method_endpoint_helper_cases.py
 
 - Proof uses HTTP metadata routes only; deny/trusted grants, account credits-off and D034 remain
   separate gates. Full P7.9/P7.10 remain unchecked and P7.11/P7.12 blocked.
+- `model.default` confirms the explicit helper selection merged into `OPENCODE_CONFIG_CONTENT`
+  for this boot; it does not prove ChatGPT catalog fetch or live model availability.
 
 ## Next boundary
 
