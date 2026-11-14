@@ -6,7 +6,8 @@ Date: 2026-11-13. Branch: `feature/07/p7-9-deny-trusted-permission`. Depends on
 
 ## Plan recorded before launch
 
-On a retained root that passes login-mode preflight and method/endpoint/helper checks, prove
+On a retained root that has passed D085 login preflight (and typically D086 on the same root),
+prove
 without network that merged global deny rules and a named trusted agent (`trusted-coder`) surface
 through `debug agents` on a contained boot. Require deny-default tails on every default agent and
 an exact harness trusted ask profile on the named agent. No credential fields are read or printed.

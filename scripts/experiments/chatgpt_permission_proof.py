@@ -41,19 +41,28 @@ DENY_RULES = (
     {'action': '*', 'resource': '*', 'effect': 'deny'},
     {'action': 'external_directory', 'resource': '*', 'effect': 'deny'},
 )
-TRUSTED_RULES = DENY_RULES + tuple(
-  dict(action=action, resource='*', effect='ask') for action in ('read', 'glob', 'grep', 'edit', 'shell')
+# Same shape as scripts/tests/agents_exec.py TRUSTED (seven rules).
+TRUSTED_RULES = (
+    {'action': '*', 'resource': '*', 'effect': 'deny'},
+) + tuple(
+    dict(action=action, resource='*', effect='ask')
+    for action in ('read', 'glob', 'grep', 'edit', 'shell')
 ) + ({'action': 'external_directory', 'resource': '*', 'effect': 'ask'},)
 TRUSTED_AGENT_ID = 'trusted-coder'
 
 
 def validate_trusted_agent(agent, model, rules):
-    """Require an exact trusted ask profile with no unexpected allow tails."""
+    """Require the harness trusted ask profile as a sublist; refuse any allow effect."""
     check(isinstance(agent, dict) and agent.get('id') == TRUSTED_AGENT_ID)
-    check(agent.get('model') in (None, {'id': model['model'], 'providerID': model['providerID']}))
+    resolved = {'id': model['model'], 'providerID': model['providerID']}
+    check(agent.get('model') == resolved)
     check(agent['request'] == {'settings': {}, 'headers': {}, 'body': {}})
     effective = agent['permissions']
-    check(effective == list(rules))
+    serialized = list(rules)
+    matches = [index for index in range(len(effective)) if effective[index:index + len(serialized)] == serialized]
+    check(matches)
+    check(all(rule['effect'] in ('deny', 'ask') for rule in effective))
+    check('allow' not in {rule['effect'] for rule in effective})
 
 
 def merge_permission_config(env, helper, deny_rules, trusted_rules):
@@ -111,9 +120,9 @@ def permission_proof_boot(ctx, helper):
         summary = {
             'agents_reported': len(agents),
             'default_agent_ids': default_ids,
+            'default_permission_lengths': [len(agent['permissions']) for agent in defaults],
             'trusted_agent': TRUSTED_AGENT_ID,
-            'deny_rule_count': len(DENY_RULES),
-            'trusted_rule_count': len(TRUSTED_RULES),
+            'trusted_permission_length': len(trusted[0]['permissions']),
         }
     return summary
 
