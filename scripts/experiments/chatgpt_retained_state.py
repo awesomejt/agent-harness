@@ -58,6 +58,8 @@ MARKER = 'AH_SYNTHETIC_NON_SECRET_CONSOLE_MARKER'
 OWNER = '.ah-owner'
 LOCK = '.ah-lock'
 ID_SHAPE = re.compile(r'[a-z0-9][a-z0-9._-]*')
+PUBLISHED_INTEGRATION_COUNT = 236
+PUBLISHED_INTEGRATION_DIGEST = '2cd1b632219bbd635a2f7a5911d6c0e36d7205d75cc4c85d751cb90081de73af'
 # Warnings a seeded boot is expected to log; every other WARN/ERROR line fails the run.
 WELLKNOWN_WARNING = ('WARN', 'failed to load wellknown manifest')       # core/src/wellknown.ts
 WELLKNOWN_CONFIG = ('WARN', 'failed to load wellknown config')           # core/src/config.ts: no credential
@@ -249,6 +251,24 @@ def create_root(parent):
     with os.fdopen(descriptor, 'w') as marker:
         marker.write(token)
     return work, token
+
+
+def env_from_owned_root(work, project_on=False, claude_skills_off=True):
+    """Rebuild the D076/D077 boot environment for an existing owned root."""
+    home = work / 'home'
+    project = home / 'repo' / 'project'
+    password = secrets.token_urlsafe(32)
+    env = {'HOME': str(home), 'TMPDIR': str(work), 'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
+           'NO_COLOR': '1', 'TERM': 'dumb', 'OPENCODE_DISABLE_MODELS_FETCH': 'true',
+           'OPENCODE_DISABLE_AUTOUPDATE': 'true', 'OPENCODE_PASSWORD': password,
+           'OPENCODE_CONFIG_CONTENT': json.dumps({'update': 'disable', 'share': 'disabled'})}
+    for kind in ('CONFIG', 'DATA', 'CACHE', 'STATE'):
+        env['XDG_' + kind + '_HOME'] = str(work / kind)
+    if not project_on:
+        env['OPENCODE_DISABLE_PROJECT_CONFIG'] = 'true'
+    if claude_skills_off:
+        env['OPENCODE_DISABLE_CLAUDE_CODE_SKILLS'] = 'true'
+    return home, project, env
 
 
 def acquire(work):
