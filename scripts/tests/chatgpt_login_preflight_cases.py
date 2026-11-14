@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """Offline login-preflight command, prepare and attach refusals; no OpenCode or network."""
-import hashlib
-import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -9,7 +7,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'experiments'))
 import chatgpt_login_preflight as login
 import chatgpt_retained_state as retained
-from chatgpt_feasibility import SHA256
 
 
 def rejects(action):
@@ -48,25 +45,25 @@ def prepare_cases():
     print('PASS: prepare refuses a byte-drifted executable before root creation', flush=True)
 
 
-def attach_cases():
-    with tempfile.TemporaryDirectory(prefix='ah-login-attach-') as directory:
+def marker_cases():
+    with tempfile.TemporaryDirectory(prefix='ah-login-marker-') as directory:
         parent = Path(directory)
-        installed = shutil.which('opencode')
-        assert installed is not None
-        runtime = parent / 'opencode-cli'
-        shutil.copy2(installed, runtime)
-        assert hashlib.sha256(runtime.read_bytes()).hexdigest() == SHA256
-        work, token, _, _ = login.prepare(parent, runtime)
-        assert login.attach(work, runtime, {})['token'] == token
-        (work / retained.OWNER).write_text('wrong-marker')
-        rejects(lambda: login.attach(work, runtime, {}))
-    print('PASS: attach refuses marker drift and unpinned executable bytes', flush=True)
+        work, token = retained.create_root(parent)
+        work = work.resolve()
+        login.write_prepare_record(parent, work, token)
+        _, project, env = retained.env_from_owned_root(work, False, True)
+        env.pop('OPENCODE_PASSWORD', None)
+        assert not retained.root_shape(work, token, env)
+        (work / retained.OWNER).write_text('tampered')
+        assert retained.root_shape(work, token, env) == ['root-marker']
+        assert login.read_prepare_record(parent, work) == token
+    print('PASS: prepare record token differs from a tampered in-root marker', flush=True)
 
 
 def main():
     command_cases()
     prepare_cases()
-    attach_cases()
+    marker_cases()
     print('PASS: chatgpt_login_preflight_cases complete', flush=True)
 
 

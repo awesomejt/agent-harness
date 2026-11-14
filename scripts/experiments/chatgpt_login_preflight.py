@@ -116,7 +116,10 @@ def attach(work, runtime_path, builtin):
     violations = root_shape(work, expected, env)
     if violations:
         raise RuntimeError(f'root shape refused: {violations}')
-    static_guards(work, home, project, env)
+    pinned = work.parent / 'opencode-cli'
+    if pinned.is_file():
+        check(hashlib.sha256(pinned.read_bytes()).hexdigest() == SHA256)
+    static_guards(work, home, project, env, login_state=True)
     return {'runtime': runtime, 'work': work, 'home': home, 'project': project, 'env': env, 'token': expected,
             'builtin': builtin}
 
