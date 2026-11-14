@@ -753,3 +753,10 @@ D025 Git policy: version managed `opencode.json` and its ownership receipt toget
 - **Selection**: The harness never runs, wraps or observes OAuth. Installed pass requires the operator to complete login personally into the prepared root, then run the helper with network denied under the D076 composed profile. Connection metadata is redacted as in D078; credential stores are never read.
 - **Limits**: Authenticated installed proof on the acceptance host is recorded in the evidence when the operator session completes. A global OpenCode login does not substitute. Method, endpoint, helper, deny/trusted, account credits-off and D034 remain gates. Full P7.9/P7.10 remain unchecked and P7.11/P7.12 blocked.
 - **Next**: After login-mode preflight passes, continue P7.9 method/endpoint/helper proof under retained login state.
+
+## 2026-11-13 — D086: Retained-login method, endpoint and helper proof helper
+
+- **Evidence**: The [method/endpoint/helper increment](docs/evidence/p7-9-method-endpoint-helper.md) adds `chatgpt_method_endpoint_helper.py`, which attaches to a D085 root, merges an explicit `openai`/`gpt-6.1-sol` helper selection into inert config content, and under network denial reads `integration.get`, `provider.get` and `model.default` with redacted summaries. Expectations are decoded from the pinned `chatgpt.ts` constants (`chatgpt-token-sharing`, `https://api.openai.com/v1`, `opencode.provider.chatgpt`).
+- **Selection**: Installed pass requires the same operator-login root as D085. The harness never exports credentials and keeps provider settings to non-secret endpoint fields only.
+- **Limits**: Authenticated installed proof on the acceptance host is recorded when the operator session completes. Deny/trusted, account credits-off and D034 remain gates. Full P7.9/P7.10 remain unchecked and P7.11/P7.12 blocked.
+- **Next**: Continue P7.9 deny/trusted permission proof under retained login after this increment passes on an authenticated root.
