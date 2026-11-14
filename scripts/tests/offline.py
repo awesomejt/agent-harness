@@ -39,6 +39,7 @@ SUITES = [
     ['scripts/tests/chatgpt_retained_cases.py'],
     ['scripts/tests/chatgpt_login_preflight_cases.py'],
     ['scripts/tests/chatgpt_method_endpoint_helper_cases.py'],
+    ['scripts/tests/chatgpt_permission_proof_cases.py'],
     ['scripts/tests/agents_runtime.py'],
     ['scripts/tests/agent_emission_runtime.py'],
     ['scripts/tests/local_first.py'],

@@ -58,4 +58,5 @@ python3 -B scripts/tests/chatgpt_method_endpoint_helper_cases.py
 ## Next boundary
 
 After this increment passes on an authenticated root, P7.9 continues with
-deny/trusted permission proofs under retained login. P7.10 and Pi remain independent.
+deny/trusted permission proofs under retained login — see
+[permission proof](p7-9-permission-proof.md) (D087). P7.10 and Pi remain independent.

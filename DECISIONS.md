@@ -760,3 +760,10 @@ D025 Git policy: version managed `opencode.json` and its ownership receipt toget
 - **Selection**: Installed pass requires the same operator-login root as D085. The harness never exports credentials and keeps provider settings to non-secret endpoint fields only.
 - **Limits**: Authenticated installed proof on the acceptance host is recorded when the operator session completes. Deny/trusted, account credits-off and D034 remain gates. Full P7.9/P7.10 remain unchecked and P7.11/P7.12 blocked.
 - **Next**: Continue P7.9 deny/trusted permission proof under retained login after this increment passes on an authenticated root.
+
+## 2026-11-13 — D087: Retained-login deny and trusted permission proof helper
+
+- **Evidence**: The [permission proof](docs/evidence/p7-9-permission-proof.md) increment adds `chatgpt_permission_proof.py`, which attaches to a D085 root, merges global deny rules plus a named `trusted-coder` ask profile into inert config content, and under network denial reads `debug agents` with the D076 composed profile. Default agents must carry deny tails; the trusted agent must match the harness ask profile exactly.
+- **Selection**: Installed pass requires the same operator-login root as D085/D086. No session, model turn or credential export.
+- **Limits**: Authenticated installed proof on the acceptance host is recorded when the operator session completes. Account credits-off and D034 remain gates. Full P7.9/P7.10 remain unchecked and P7.11/P7.12 blocked.
+- **Next**: Continue P7.9 account credits-off assertion under retained login after this increment passes on an authenticated root.
