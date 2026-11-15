@@ -767,3 +767,10 @@ D025 Git policy: version managed `opencode.json` and its ownership receipt toget
 - **Selection**: Installed pass requires the same operator-login root as D085/D086. No session, model turn or credential export.
 - **Limits**: Authenticated installed proof on the acceptance host is recorded when the operator session completes. Account credits-off and D034 remain gates. Full P7.9/P7.10 remain unchecked and P7.11/P7.12 blocked.
 - **Next**: Continue P7.9 account credits-off assertion under retained login after this increment passes on an authenticated root.
+
+## 2026-11-14 — D088: Retained-login ChatGPT post-limit credits-off assertion helper
+
+- **Evidence**: The [credits-off assertion](docs/evidence/p7-9-credits-off.md) increment adds `chatgpt_credits_off.py`, which accepts operator attestation JSON, pins `usage-limits` source scope, and under network denial reads `experimental.usage.limits` as `null` on a D085 root with ChatGPT-only login.
+- **Selection**: Installed pass requires the same operator-login root as D085–D087 plus a same-session operator attestation that post-limit app credits are off (D067). No session, model turn or credential export.
+- **Limits**: Attestation is point-in-time; pinned APIs do not expose the ChatGPT post-limit credits toggle. D034 remains a gate. Full P7.9/P7.10 remain unchecked and P7.11/P7.12 blocked.
+- **Next**: Continue P7.9 toward feasibility closeout and explicit route design after D034 and remaining live gates are separately evidenced.
