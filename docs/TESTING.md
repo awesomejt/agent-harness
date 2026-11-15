@@ -144,3 +144,12 @@ The P7.9 feasibility/containment helpers above deliberately retain their **2.2.5
 P7.9’s `python3 -B scripts/experiments/chatgpt_230_source_audit.py --source <clean-v2.3.0-checkout>` verifies the new public-source manifest and re-derives the unchanged 236-ID gate plus built-in plugins. It performs no OpenCode/state/network access. `chatgpt_230_source_cases.py` covers source and registration refusals in the offline suite. See [source qualification and next observer/containment contract](evidence/p7-9-230-source-requalification.md); old experimental pins remain unchanged.
 
 P7.9’s opt-in `python3 -B scripts/experiments/chatgpt_230_observer.py --source <clean-v2.3.0-checkout>` accepts no retained-root argument and requires setup review before installed execution. Its new `chatgpt_230_observer_cases.py` suite covers startup-only retry, unsafe-before-readiness refusals, provider discard and strict built-in skill URIs without launching OpenCode. See [disposable controls and outcome](evidence/p7-9-230-disposable-observer.md). Existing 2.2.5 helpers remain pinned.
+
+P7.9’s D095 disposable warning diagnostic is opt-in:
+`python3 -B scripts/experiments/chatgpt_230_warning_diagnostic.py --source <clean-v2.3.0-checkout>`.
+Its helper/setup review precedes installed execution. The offline
+`chatgpt_230_warning_log_cases.py` and `chatgpt_230_warning_diagnostic_cases.py`
+suites exercise strict parsing/provenance/redaction, owned log-file refusals,
+private pipe supervision/cleanup and control-before-denial ordering; neither
+launches installed OpenCode. Every WARN/ERROR still refuses. See the
+[diagnostic helper and outcome](evidence/p7-9-230-warning-diagnostic.md).

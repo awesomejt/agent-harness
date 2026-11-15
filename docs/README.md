@@ -34,3 +34,5 @@ Before implementing a phase, finalize its designated choices in DECISIONS.md and
 - [P7.9 disposable OpenCode 2.3.0 observer](evidence/p7-9-230-disposable-observer.md) — separately pinned helper, setup-review boundary and installed qualification evidence.
 
 - [P7.9 warning assessment and diagnostic plan](evidence/p7-9-230-warning-assessment.md) — shared-log writer attribution, pinned source candidates and the next offline-tested helper/review boundary (D095).
+
+- [P7.9 disposable warning diagnostic](evidence/p7-9-230-warning-diagnostic.md) — offline classifier, bounded writer supervision, setup-review gate and installed outcome (D096).
