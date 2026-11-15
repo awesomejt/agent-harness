@@ -99,3 +99,5 @@ A task is done only after its card's deliverable/evidence exists, relevant contr
 After the first slice and each usable increment, record actual project task, tested versions/route/model, outcome, manual interventions, setup friction, direct-tool comparison and follow-ups in PROJECT.md. Reprioritize from that evidence while preserving MVP policy/constraints. No time estimates or delivery dates are asserted before initial integration provides a basis.
 
 D093 supplies the [2.3.0 public-source/plugin qualification and observer contract](evidence/p7-9-230-source-requalification.md). Consume that manifest in a separately reviewed disposable observer/containment helper before installed qualification, catalog proof or authenticated expansion. Source-only acceptance does not migrate existing helper pins.
+
+The [D094 disposable observer](evidence/p7-9-230-disposable-observer.md) records a reviewed installed attempt and its required warning stop. Consume a separately reviewed source-first warning assessment/diagnostic plan before further installed attempts; neither partial fresh-state passes nor the merged helper unblock catalog or authenticated qualification.

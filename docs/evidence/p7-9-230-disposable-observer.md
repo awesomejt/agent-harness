@@ -118,7 +118,67 @@ A real-wrapper regression verifies exactly two barrier attempts. The log claim
 was narrowed to match its path-classification gate; labelled owned/ancestor
 watch inventories still require review after installed execution.
 
-Installed execution is pending helper/setup review. No containment pass,
-source-equivalence pass or catalog/retained/authenticated acceptance is claimed
-by the initial helper revision. Review findings, installed results and the
-next boundary will be recorded here before merge.
+### Reviewed installed attempt and stop
+
+Grok's initial setup review of `9ad82af` on
+[PR #120](https://github.com/awesomejt/agent-harness/pull/120) completed with
+**0 blockers, 0 concerns, 0 nits**, before any installed execution. Independent
+safety review also verified the two corrections above. The reviewed helper was
+then run once against the clean official source and the exact installed hash.
+
+The installed attempt exited **1**, with this sanitized progression:
+
+```text
+PASS: ignored-stdio spawn failure and literal /dev/null correction
+PASS: owned TCP echo; other TCP/binds, external TCP, UDP, Unix and filesystem denials
+PASS: occupied port refused without a connection
+PASS: absent and wrong private-server passwords refused
+PASS: Bun read/stat/list/realpath/watch, symlink, late-root and replacement denials
+PASS: Bun listing/fallback discovery branches and candidate read denials paired
+PASS: disposable resource/inventory case 1
+PASS: disposable resource/inventory case 2
+START: disposable resource/inventory case 3
+REFUSED: runtime-warning
+```
+
+| Installed row | Result |
+|---|---|
+| Exact source and executable guards | Passed before launch. |
+| Spawn and `/dev/null` pair | Passed, including embedded Bun 1.4.4. |
+| Inherited network/operator-home read/outside-write boundary | Passed. |
+| Occupied port, wrong/absent server password | Passed. |
+| Bun file/watch/symlink/late-root/replacement controls | Passed. As before, `existsSync` sees existence through denial; the allowed parent watch omits the denied late root. |
+| Synthetic listing/fallback × candidate-read-denial pairs | All four passed. |
+| Resource case 1 | Passed: project/Claude off, global/home-agent sentinels and reload; fixed 236 IDs, zero connections, exact active built-ins and all log gates. |
+| Resource case 2 | Passed: project on/Claude off, ordinary listing; exact documents/parent-agent canaries, deny tails, fixed inventory and all log gates. |
+| Resource case 3 | **Refused** at `logs()`'s WARN/ERROR gate after its resource/integration settling, document and deny-tail checks completed. No overall case pass. |
+| Cases 4–6 | Not run after the stop. |
+| Full installed qualification / catalog / retained / authenticated | Not accepted. |
+
+The listing-denied root is fresh and distinct from cases 1–2. Its warning gate
+ran after server shutdown; root/lock/process cleanup completed. No raw runtime
+logs, provider bodies or skill content were emitted or retained. The helper's
+sanitized code does not identify the WARN/ERROR message or cause. Therefore this
+report does not attribute the warning to a specific watcher or assert that its
+failure is harmless. Successful per-case watcher inventories are checked inside
+the helper, but the final aggregate summary was not emitted because execution
+stopped; their detailed labels are not independently recorded here.
+
+The refusal is the required stop condition, not evidence to weaken the gate.
+No warning allowlist, broader filesystem/network allowance, catalog override,
+operator-root access or further installed attempt was added after the stop.
+Production behavior and all old helper pins remain unchanged. This helper and
+blocker-record increment may close on review/merge; it does not close D093's
+installed qualification or full P7.9.
+
+### Next reviewed boundary
+
+Next perform a source-first assessment of warning paths reachable under the
+literal parent-listing denial, then design a bounded static-code classifier
+that withholds raw log fields/content. Review that diagnostic/setup increment
+before another disposable installed attempt. Determine the actual warning and
+its control impact before deciding whether to change the experiment. Do not
+rerun case 3, advance cases 4–6 or migrate/run the catalog helper under this
+record alone. Remaining rows and both catalog/retained/authenticated gates stay
+pending; P7.11 remains blocked. A **fresh context** is preferred for this new
+diagnostic boundary, using D093/D094 and this exact stop record.
