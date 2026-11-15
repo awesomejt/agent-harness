@@ -101,3 +101,6 @@ After the first slice and each usable increment, record actual project task, tes
 D093 supplies the [2.3.0 public-source/plugin qualification and observer contract](evidence/p7-9-230-source-requalification.md). Consume that manifest in a separately reviewed disposable observer/containment helper before installed qualification, catalog proof or authenticated expansion. Source-only acceptance does not migrate existing helper pins.
 
 The [D094 disposable observer](evidence/p7-9-230-disposable-observer.md) records a reviewed installed attempt and its required warning stop. Consume a separately reviewed source-first warning assessment/diagnostic plan before further installed attempts; neither partial fresh-state passes nor the merged helper unblock catalog or authenticated qualification.
+
+
+The [D095 source-first warning assessment and diagnostic plan](evidence/p7-9-230-warning-assessment.md) establishes shared-log ownership across the server and both debug clients without diagnosing D094’s deleted warning. Next implement the strict, offline-tested diagnostic helper and obtain setup review before its bounded disposable control/denial pair. The warning refusal and all later installed/catalog/authenticated gates remain unchanged.
