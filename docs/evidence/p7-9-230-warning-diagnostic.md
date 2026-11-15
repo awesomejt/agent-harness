@@ -69,7 +69,11 @@ messages, paths, argv, run IDs, causes, stacks or content digests are emitted.
 Warnings produce a sanitized summary followed by `REFUSED: runtime-warning`
 and nonzero exit. The existing non-warning log/watch/spawn/node_modules/MCP-command gates run
 before emitting a summary for either a clean or warning case. A containment
-refusal takes precedence over reporting only `runtime-warning`. Resource inventory, zero connections,
+refusal takes precedence over reporting only `runtime-warning`. Deliberately,
+if a non-warning containment check fails, the already-private warning
+classification is not printed: only the final static containment refusal is
+recorded. This loses classification evidence in that branch and requires a
+separately reviewed continuation; it never implies the warning was absent. Resource inventory, zero connections,
 provider activation, exact sentinels/documents and deny tails remain mandatory.
 
 ## Offline verification
@@ -95,7 +99,14 @@ runtime has run during this offline preparation.
 
 ## Installed outcome and next boundary
 
-Pending helper/setup review; no installed diagnostic has run in this increment.
+Grok's setup review of `2dea092` on
+[PR #122](https://github.com/awesomejt/agent-harness/pull/122) completed with
+**0 blockers, 0 concerns, 1 nit**. The nit is addressed by explicitly documenting
+the deliberate suppression of warning classification when another containment
+gate fails. The reviewed helper/test bytes remain unchanged; no further setup
+review is required for that documentation clarification. Independent safety
+review also cleared the final implementation. Installed execution follows this
+review; its result will be recorded below.
 A classified warning identifies its source family and writer only; it does not
 identify an opaque OS error or establish harmlessness. Record any stop without
 changing containment or warning policy. Any remedy needs a separately reviewed
