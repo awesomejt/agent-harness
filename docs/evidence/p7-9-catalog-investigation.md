@@ -116,3 +116,7 @@ The source audit and all three synthetic ID projections pass. Existing retained-
 state, login-preflight and endpoint/helper offline fixtures, documentation links/
 anchors, anchor fixtures and `git diff --check` pass. No production Rust or
 dependency changed; no runtime/login/session/model call ran.
+
+[PR #116](https://github.com/awesomejt/agent-harness/pull/116): Grok reviewed
+`9a396a3` with 0 blockers, 0 concerns and 0 nits. No re-review was required.
+This source-investigation increment is effective on merge; it does not pass P7.9.
