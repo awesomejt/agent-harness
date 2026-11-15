@@ -90,7 +90,10 @@ Offline guard and metadata cases, source audit and targeted regression suites pa
 Independent read-only safety review found no actionable defects. Grok reviewed
 `8543915` on [PR #117](https://github.com/awesomejt/agent-harness/pull/117):
 0 blockers, 0 concerns, 1 nit. The nit is addressed with the distinct pre-existing
-key refusal and post-explicit cache-only controls, without generic database reads.
+key refusal and post-explicit cache-only controls, without generic database reads. Grok’s follow-up review of `630cb0e` confirms
+the nit is addressed and records **0 blockers, 0 concerns, 0 nits**. This helper
+and blocker-record increment is effective on PR #117 merge; installed proof
+remains pending.
 
 The installed attempt stopped at the executable hash check, before boundary
 probes, OpenCode launch, root creation, cache seeding or integration observation.
