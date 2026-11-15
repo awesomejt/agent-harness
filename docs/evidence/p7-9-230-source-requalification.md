@@ -125,5 +125,7 @@ a fresh operator credits-off attestation. No authenticated expansion is selected
 The clean official-source audit passes. The new offline refusal cases and
 existing observer, retained-state and catalog-control suites pass. Production
 Rust and runtime files are unchanged; no live provider or installed runtime
-experiment is used as evidence in this increment. Required PR review/merge and
-any findings are recorded here before closeout.
+experiment is used as evidence in this increment. Independent review found that two directly consumed inputs were only included
+through the D092 manifest union. Both are now explicit in the consumed-file set;
+actual-source negative checks removing either manifest entry refuse. Required
+PR review/merge and any findings are recorded here before closeout.

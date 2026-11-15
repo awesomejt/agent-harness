@@ -40,6 +40,8 @@ def derive(packages):
         seen |= {module_file(packages, path, spec) for spec, _ in table.values()
                  if spec.startswith('.') and spec.endswith('.js')}
     seen |= set(packages.glob('*/package.json'))
+    # These are read by literal_integrations/provider_constants and snapshot_providers.
+    seen |= {packages / 'schema/src/provider.ts', packages / 'core/src/models-dev/snapshot.txt'}
     names = literal_integrations(packages, plugin_files)
     # 2.3.0 moved five web-search integrations into this shared registration factory.
     # Its body is hash-pinned along with every call site; this is a finite source
