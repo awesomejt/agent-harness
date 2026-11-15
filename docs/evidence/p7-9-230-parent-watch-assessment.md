@@ -106,6 +106,11 @@ permission expansion, alternative backend or retry.
    behavior. An owned fixture writer creates/updates/deletes a named inert
    candidate after a private readiness signal. Require a bounded matching event
    for each sequential phase, empty stderr and clean watcher/process shutdown.
+   Match using the phase handshake and (`filename === candidate` or
+   `filename == null`); ignore eventType, as the source does. A null filename
+   fans out to all watched names in the source callback, so it can match the
+   phase's candidate but cannot establish which name actually changed. Do not
+   require create/update/delete-specific eventType or a non-null filename.
    Duplicate/coalesced events are not counted as separate operations; phase
    handshakes prevent pre-acquisition or cross-phase events from passing.
 2. **Listing-denied leg, only after the control passes:** require listing refusal
@@ -129,7 +134,9 @@ against the owned root, refuse links/escapes/identity changes and retain no
 child-supplied strings. Fixture writes are owned synthetic data only. Offline
 adversarial cases must cover success, sync/async errors, unknown/secret-bearing
 fields, listing/probe mismatch, premature/missing/wrong-target events, timeouts,
-pipe overflow and cleanup on every exit. No raw output may escape exceptions.
+pipe overflow and cleanup on every exit. Include null-filename callbacks and
+swapped rename/change eventType cases so source-accepted notifications do not
+spuriously fail the listing-allowed control. No raw output may escape exceptions.
 Setup review must assess those fixtures and exact helper bytes before execution.
 The pair has no retry; the first unexpected observation stops all later work.
 A recognized synchronous denial ends the planned pair with an incompatibility
@@ -155,3 +162,21 @@ including recognized codes, separately from synchronous incompatibility.
 All checks pass: D093/D095 qualification, **34/34** parent-watch hashes,
 Markdown links/anchor fixtures and whitespace. Grok review/result and final task
 handoff are recorded here before merge.
+
+
+### Grok review and closeout
+
+[PR #123](https://github.com/awesomejt/agent-harness/pull/123) received Grok's
+completed review of `b508d7d`: **0 blockers, 0 concerns, 1 nit**. The nit is
+addressed by explicitly matching phase-handshaken candidate or null filenames,
+ignoring eventType like the pinned source, documenting null-filename fanout's
+limits and requiring null/swapped-eventType offline fixtures in the next helper.
+No runtime/helper code changed. Exact source/hash reproduction, Markdown
+links/anchor fixtures and whitespace checks pass again. No further review is
+required for this documentation nit under the Git workflow.
+
+The source-assessment increment is complete on merge; full P7.9 stays open.
+Next implement the selected offline primitive helper, then obtain setup review
+before its one bounded installed pair. **Continue current context** for this
+closely related implementation; this evidence and manifest also support a
+clean-context handoff.
