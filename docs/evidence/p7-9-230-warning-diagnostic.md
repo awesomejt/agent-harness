@@ -119,18 +119,22 @@ than inferring the historical warning. Cleanup is unconditional.
 
 The reviewed helper was run once after the setup review, using the clean
 official source and exact D094 executable hash. The process exited **1**.
-The only recorded runtime summary was sanitized by the reviewed helper:
+Literal sanitized output from the reviewed helper (stdout and stderr combined;
+`REFUSED: runtime-warning` is emitted on stderr):
 
 ```text
-PASS: inherited transport/network/filesystem/password/port controls
-PASS: Bun filesystem/watch/symlink/late-root/replacement controls
-PASS: synthetic listing/fallback discovery and candidate-denial pairs
+START: pinned disposable transport/containment controls
+PASS: ignored-stdio spawn failure and literal /dev/null correction
+PASS: owned TCP echo; other TCP/binds, external TCP, UDP, Unix and filesystem denials
+PASS: occupied port refused without a connection
+PASS: absent and wrong private-server passwords refused
+PASS: Bun read/stat/list/realpath/watch, symlink, late-root and replacement denials; existsSync still true when denied; allowed parent watch omits the denied late root
+PASS: Bun listing/fallback discovery branches and candidate read denials paired
 START: listing-allowed diagnostic control
-processes=3 records=85 warnings=[]
+{"diagnostic": {"processes": 3, "records": 85, "warnings": []}, "listing_denied": false}
 PASS: listing-allowed diagnostic control
 START: listing-denied case-3 diagnostic
-processes=3 records=85
-warning: process=SERVER family=WATCH_START target=PARENT_REPO count=3
+{"diagnostic": {"processes": 3, "records": 85, "warnings": [{"count": 3, "family": "WATCH_START", "process": "SERVER", "target": "PARENT_REPO"}]}, "listing_denied": true}
 REFUSED: runtime-warning
 ```
 
@@ -177,3 +181,16 @@ retry the diagnostic, advance cases 4–6 or migrate/run catalog/authenticated
 helpers under this record. The helper/result increment can close after result
 review/merge without passing full installed qualification or P7.9. Use a
 **fresh context** for the next control/remedy design boundary.
+
+
+## Result review and closeout
+
+Grok reviewed the installed-result record at `93b6aba` in
+[PR #122](https://github.com/awesomejt/agent-harness/pull/122):
+**0 blockers, 0 concerns, 1 nit**. The nit is addressed by replacing the condensed
+transcription above with the literal sanitized combined-stream output. No helper
+or test bytes changed after setup review. Independent result-record review also
+cleared the evidence and its source/control limits. Repository link/diff checks
+pass. Both Grok reviews are complete; these documentation-only nit corrections
+require no further review. This helper/result increment is effective on merge,
+with full installed qualification and P7.9 still open.
