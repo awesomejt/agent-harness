@@ -36,3 +36,5 @@ Before implementing a phase, finalize its designated choices in DECISIONS.md and
 - [P7.9 warning assessment and diagnostic plan](evidence/p7-9-230-warning-assessment.md) — shared-log writer attribution, pinned source candidates and the next offline-tested helper/review boundary (D095).
 
 - [P7.9 disposable warning diagnostic](evidence/p7-9-230-warning-diagnostic.md) — offline classifier, bounded writer supervision, setup-review gate and installed outcome (D096).
+
+- [P7.9 parent-watch assessment](evidence/p7-9-230-parent-watch-assessment.md) — source-pinned coverage/control findings and separately reviewed primitive compatibility plan (D097).
