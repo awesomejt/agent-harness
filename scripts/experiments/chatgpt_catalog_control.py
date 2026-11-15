@@ -216,16 +216,21 @@ def run(runtime, packages, builtin, baseline_ids):
             owned_file(db, ctx['work'])
             # mode=rw cannot silently create another database. SQL and key are fixed.
             with closing(sqlite3.connect(db.as_uri() + '?mode=rw', uri=True)) as connection, connection:
-                connection.execute('INSERT INTO kv (key,value,time_created,time_updated) VALUES (?,?,?,?)',
-                                   (KEY, json.dumps({'updatedAt': 1, 'body': cached.decode()}), 1, 1))
+                try:
+                    connection.execute('INSERT INTO kv (key,value,time_created,time_updated) VALUES (?,?,?,?)',
+                                       (KEY, json.dumps({'updatedAt': 1, 'body': cached.decode()}), 1, 1))
+                except sqlite3.IntegrityError:
+                    raise RuntimeError('synthetic catalog key pre-exists') from None
             # Prove the seed is effective (not merely a syntactically accepted write).
             cache_a = boot(ctx, digest(explicit), mode='cached', cached=True)
             cache_b = boot(ctx, digest(explicit), mode='cached', cached=True)
             check(cache_a == cache_b and cache_a['metadata_sha256'] != first['metadata_sha256'])
             # Same retained synthetic database, now with the explicit file, across two boots.
             explicit_a = boot(ctx, digest(explicit))
+            check(boot(ctx, digest(explicit), mode='cached', cached=True) == cache_a)
             explicit_b = boot(ctx, digest(explicit))
             check(first == explicit_a == explicit_b)
+            check(boot(ctx, digest(explicit), mode='cached', cached=True) == cache_a)
             check(lock_probe(ctx['work']) == 'refused')
         finally:
             os.close(held)
@@ -252,7 +257,8 @@ def main():
         parent = Path(directory).resolve()
         runtime = parent / 'opencode-cli'
         shutil.copy2(installed, runtime)
-        check(digest(runtime.read_bytes()) == SHA256)
+        if digest(runtime.read_bytes()) != SHA256:
+            raise RuntimeError('executable pin mismatch')
         boundary_controls(parent)
         results = run(runtime, packages, builtin, baseline_ids)
     print(json.dumps(results, indent=2, sort_keys=True))
@@ -262,6 +268,7 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except Exception:
-        print('Catalog control proof failed; raw diagnostics withheld', file=sys.stderr)
+    except Exception as error:
+        reason = str(error) if str(error) in {'synthetic catalog key pre-exists', 'executable pin mismatch'} else 'raw diagnostics withheld'
+        print('Catalog control proof failed; ' + reason, file=sys.stderr)
         sys.exit(1)
