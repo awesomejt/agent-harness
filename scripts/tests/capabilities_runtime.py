@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P4.8 installed OpenCode 2.2.5 inherited-capability matrix; local model stub only.
+"""P4.8 installed OpenCode 2.3.0 inherited-capability matrix; local model stub only.
 
 A project is planted with every tested capability source: root, parent and
 nested AGENTS.md, CLAUDE.md, an `instructions` entry, skills in `.opencode/`,
@@ -10,7 +10,7 @@ single` runs against a loopback stub that records, in memory only, which
 markers and tools each model request carries and replays scripted tool calls.
 
 Direct ACP probes first record the runtime facts behind D040: with project
-configuration disabled 2.2.5 loads no AGENTS.md unless the document names its
+configuration disabled 2.3.0 loads no AGENTS.md unless the document names its
 absolute path, and the session advertises only the built-in slash commands.
 The native fallback check uses the native_runtime.py shim, which intercepts
 the prompt; native request contents are not observed (no native inference).
@@ -167,7 +167,7 @@ def direct(runtime, base, name, instructions, prompt_port):
 
 def main():
     runtime = shutil.which('opencode')
-    assert runtime, 'OpenCode 2.2.5 required'
+    assert runtime, 'OpenCode 2.3.0 required'
     runtime = str(Path(runtime).resolve())
     server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
     server.daemon_threads = True
@@ -269,7 +269,7 @@ def main():
                    'NATIVE_KEY': 'unused-native-key'}
             p = ah(project, 'Never forwarded to provider', '--agent', 'reviewer', '--permissions', 'trusted', env=env)
             assert p.returncode == 0, (p.returncode, p.stderr)
-            assert 'attempt=2 local-first fallback via OpenCode 2.2.5; model opencode/gpt-5.4' in p.stderr, p.stderr
+            assert 'attempt=2 local-first fallback via OpenCode 2.3.0; model opencode/gpt-5.4' in p.stderr, p.stderr
             assert (project / 'intercepted-native-prompt').exists()
             assert not any(sentinels.iterdir())
             checks.append('local-first native fallback: preflight with instructions entry passes; prompt intercepted')
@@ -278,7 +278,7 @@ def main():
         server.server_close()
     for check in checks:
         print('PASS', check)
-    print(f'PASS installed OpenCode 2.2.5 inherited capabilities: {len(checks)} checks; local model stub only')
+    print(f'PASS installed OpenCode 2.3.0 inherited capabilities: {len(checks)} checks; local model stub only')
 
 
 if __name__ == '__main__':

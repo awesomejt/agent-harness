@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P2.2 public CLI fixtures against fake OpenCode 2.2.5; no model traffic. Build target/debug/ah first."""
+"""P2.2 public CLI fixtures against fake OpenCode 2.3.0; no model traffic. Build target/debug/ah first."""
 import json
 import os
 import re
@@ -119,7 +119,7 @@ def check(case, expected, trusted=False, source='inline', grouped=False):
                 option = result['result']['outcome'].get('optionId')
                 assert option == ('once' if trusted and case in ['read','edit','execute','search','external','triplicate','unexpected-write'] else 'reject'), (case,result)
         if case == 'external':
-            # Both byte-identical 2.2.5 requests receive their own one-shot grant.
+            # Both byte-identical 2.3.0 requests receive their own one-shot grant.
             results=[json.loads(l) for l in (base/'permission-results.jsonl').read_text().splitlines()]
             assert [r['result']['outcome']['optionId'] for r in results] == ['once','once'],results
         assert not (base/'rogue').exists()
@@ -157,7 +157,7 @@ def check(case, expected, trusted=False, source='inline', grouped=False):
         print('PASS',case,source,'trusted' if trusted else 'deny',flush=True)
 
 
-for case in ['version','route','widened','agent-widened','agent-reversed','empty','project-source','subagent-widened','agent-model',
+for case in ['version','version-old','version-new','route','widened','agent-widened','agent-reversed','empty','project-source','subagent-widened','agent-model',
              'inherit-agent','inherit-subagent','inherit-mode','inherit-provider']:
     check(case,2)
 check('text',2,source='missing')
@@ -165,7 +165,7 @@ for source in ['inline','file','stdin']:
     check('text',0,source=source)
 for case in ['read','edit','execute','search','external']:
     check(case,0,trusted=True)
-# 2.2.5 ends the turn with stopReason=cancelled after any rejected permission.
+# 2.3.0 ends the turn with stopReason=cancelled after any rejected permission.
 for case in ['other','worktree','no-once','kind-mismatch','unbound','argument-mismatch','empty-metadata','omitted-metadata']:
     check(case,3,trusted=True)
 check('deny',3)

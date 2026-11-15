@@ -26,8 +26,8 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), Trap) as trap:
     thread.start()
     endpoint = f'http://127.0.0.1:{trap.server_port}/v1'
     cases = [(case, 2) for case in ['native-model-missing', 'catalog-foreign', 'route', 'native-provider', 'native-enabled', 'native-agent',
-                                    'widened', 'agent-widened', 'subagent-widened', 'agent-model', 'project-source', 'version']]
-    # 2.2.5 ends the turn with stopReason=cancelled after a rejected permission.
+                                    'widened', 'agent-widened', 'subagent-widened', 'agent-model', 'project-source', 'version', 'version-old', 'version-new']]
+    # 2.3.0 ends the turn with stopReason=cancelled after a rejected permission.
     cases += [('success', 0), ('read', 0), ('deny', 3), ('cancel-deadline', 3), ('session-model', 1), ('rpc-error', 4), ('preview', 0), ('missing-key', 2)]
     count = 0
     for case, expected in cases:

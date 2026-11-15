@@ -98,7 +98,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
     let restricted = request.agent.is_some();
     let permission_kinds = grantable.clone();
     let agent = request.agent.as_ref().map(|a| a.name().to_owned());
-    // 2.2.5 `acp` takes no project flags: the working directory and
+    // 2.3.0 `acp` takes no project flags: the working directory and
     // session/new cwd select the project, and it spawns its own private
     // `serve --stdio` child inside the owned process group.
     let mut command = runtime.command(project, &["acp"]);
@@ -213,7 +213,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                                 state.calls.remove(id);
                             }
                         }
-                        // 2.2.5 reports `in_progress` while parsing arguments, before
+                        // 2.3.0 reports `in_progress` while parsing arguments, before
                         // availability is checked; only completion proves execution.
                         // An unknown kind under a named role fails closed.
                         if value["update"]["status"].as_str() == Some("completed")
@@ -323,7 +323,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
         )
         .on_receive_request(
             {
-                // 2.2.5 sends no editor synchronization; client-side I/O is never offered.
+                // 2.3.0 sends no editor synchronization; client-side I/O is never offered.
                 let failure = violation.clone();
                 async move |_request: WriteTextFileRequest, _responder, _cx| {
                     Err::<(), _>(failure.fail())
@@ -398,7 +398,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
             if models.len() != 1 || models[0]["currentValue"] != target {
                 return Err(agent_client_protocol::Error::internal_error());
             }
-            // 2.2.5 silently falls back to `build` when the default agent is
+            // 2.3.0 silently falls back to `build` when the default agent is
             // unusable; a named role must be the session's selected mode.
             if let Some(agent) = &agent {
                 let modes: Vec<&Value> = value["configOptions"]
@@ -553,7 +553,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
 }
 
 /// A grant binds one request to the latest announced arguments of the same
-/// tool call. Only the verified 2.2.5 built-in kinds qualify; `other` (for
+/// tool call. Only the verified 2.3.0 built-in kinds qualify; `other` (for
 /// example worktree removal) is always refused. Titles are never interpreted.
 fn bound(permission: &Value, descriptor: Option<&Value>) -> bool {
     descriptor.is_some_and(|tool| {

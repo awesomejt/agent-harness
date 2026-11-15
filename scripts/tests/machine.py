@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P4.7 version-1 machine output fixtures (D039) against fake OpenCode 2.2.5; no model traffic.
+"""P4.7 version-1 machine output fixtures (D039) against fake OpenCode 2.3.0; no model traffic.
 
 The validator below is written as an independent consumer would: it relies only
 on the documented contract, never on harness internals. Build target/debug/ah first.

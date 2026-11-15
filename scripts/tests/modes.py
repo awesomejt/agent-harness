@@ -170,7 +170,7 @@ def assert_records(records, route, endpoint, key, trusted=False):
         assert 'poison' not in text and AMBIENT not in text, (route, text)
         assert REACHABLE not in text or (route == 'local' and endpoint == REACHABLE), (route, text)
         if route == 'native':
-            assert cfg['providers'] == {}, cfg
+            assert cfg['providers'] == {'opencode': {'settings': {'apiKey': '{env:AH_RUNTIME_API_KEY}'}}}, cfg
             assert 'ah-litellm' not in text and endpoint not in text, cfg
         else:
             assert list(cfg['providers']) == ['ah-litellm'], cfg
@@ -206,7 +206,7 @@ for mode in MODES:
             assert s['launched'] == ([route] if expected != 2 else []), (*where, s['launched'], err)
             assert {r for r in s['launched']} <= {route} and len(s['launched']) <= 1, where
             assert s['records'], where  # preflight always reaches the runtime
-            assert_records(s['records'], route, endpoint, 'OPENCODE_API_KEY' if route == 'native' else 'AH_RUNTIME_API_KEY',
+            assert_records(s['records'], route, endpoint, 'AH_RUNTIME_API_KEY',
                            trusted=case in TRUSTED)
             assert listener.settle(before, probes) == probes, (*where, listener.connections - before)
             assert listener.received == b'', listener.received
@@ -237,7 +237,7 @@ for configured, selected in [('cloud-only', 'local-only'), ('local-only', 'cloud
             where = (configured, selected, endpoint == REACHABLE, case)
             assert code == expected and s['launched'] == ([route] if expected == 0 else []), (*where, code, s['launched'], err)
             assert ('attempt=2' in err) == (selected == 'local-first' and endpoint == UNREACHABLE), (*where, err)
-            assert_records(s['records'], route, endpoint, 'OPENCODE_API_KEY' if route == 'native' else 'AH_RUNTIME_API_KEY')
+            assert_records(s['records'], route, endpoint, 'AH_RUNTIME_API_KEY')
             assert listener.settle(before, probes) == probes, where
             count += 1
 print('PASS --mode override selects the same effective routes', flush=True)
@@ -249,7 +249,7 @@ for mode in MODES:
         code, err, s = run(case, config(mode, UNREACHABLE), extra=['--no-sync'])
         if mode == 'cloud-only':
             assert code == expected and s['launched'] == (['native'] if expected == 0 else []), (mode, case, code, err)
-            assert_records(s['records'], 'native', UNREACHABLE, 'OPENCODE_API_KEY')
+            assert_records(s['records'], 'native', UNREACHABLE, 'AH_RUNTIME_API_KEY')
         else:
             # The static plan rejects before any probe, runtime or fallback.
             assert code == 2 and s['launched'] == [] and s['records'] == [], (mode, case, code, err)

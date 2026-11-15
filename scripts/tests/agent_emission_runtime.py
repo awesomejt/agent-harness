@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P4.2 OpenCode 2.2.5 emission/collision probe. No ACP/model prompt or key.
+"""P4.2 OpenCode 2.3.0 emission/collision probe. No ACP/model prompt or key.
 
 Loads the exact golden files emitted by `ah` (tests/fixtures/opencode-agents)
 from a disposable project's `.opencode/agents/`, and confirms every project
@@ -46,9 +46,9 @@ def write(project, path, text):
 
 def main():
     runtime = shutil.which('opencode')
-    assert runtime, 'OpenCode 2.2.5 required'
+    assert runtime, 'OpenCode 2.3.0 required'
     version = subprocess.run([runtime, '--version'], capture_output=True, text=True, timeout=10)
-    assert version.returncode == 0 and version.stdout.strip() == 'opencode v2.2.5'
+    assert version.returncode == 0 and version.stdout.strip() == 'opencode v2.3.0'
 
     golden = sorted(GOLDEN.glob('*.md'))
     assert [g.stem for g in golden] == ['coder', 'reviewer']
@@ -88,7 +88,7 @@ def main():
     # Canonical project sources are not an OpenCode agent source.
     assert agents(runtime, lambda p: write(p, 'agents/reviewer.md',
                                            (ROOT/'agents'/'reviewer.md').read_text())) == {}
-    print('PASS OpenCode 2.2.5: emitted coder/reviewer load with mode, description, system, '
+    print('PASS OpenCode 2.3.0: emitted coder/reviewer load with mode, description, system, '
           'model and ask/deny ceiling rules; 5 collision sources define agents; '
           'project agents/ not loaded; 8 probes; 0 model prompts')
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P4.4 live named-role acceptance on installed OpenCode 2.2.5.
+"""P4.4 live named-role acceptance on installed OpenCode 2.3.0.
 
 Runs the example coder and reviewer roles through a recording forwarder to the
 existing LiteLLM proxy and through the native OpenCode API-key route, plus a

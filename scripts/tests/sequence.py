@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P5.2 ordered prompt execution (D044) against fake OpenCode 2.2.5 and fake checks; no model traffic.
+"""P5.2 ordered prompt execution (D044) against fake OpenCode 2.3.0 and fake checks; no model traffic.
 
 Covers numeric order, fresh per-step runtimes, the in-memory snapshot, per-step
 agent and check metadata, stopping dependent steps after a failed step or gate,

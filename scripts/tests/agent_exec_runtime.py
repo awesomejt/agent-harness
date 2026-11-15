@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P4.3 installed OpenCode 2.2.5 named-role preflight and ACP session; no model prompt forwarded.
+"""P4.3 installed OpenCode 2.3.0 named-role preflight and ACP session; no model prompt forwarded.
 
 Real OpenCode runs the version/sources/agents/catalog checks and ACP setup
 through the native_runtime.py shim, which intercepts session/prompt. Passing
@@ -58,7 +58,7 @@ def session_mode(runtime, base, mode):
 
 def main():
     runtime = shutil.which('opencode')
-    assert runtime, 'OpenCode 2.2.5 required'
+    assert runtime, 'OpenCode 2.3.0 required'
     runtime = str(Path(runtime).resolve())
     with tempfile.TemporaryDirectory(prefix='ah-agent-exec-runtime-') as d:
         base = Path(d).resolve()
@@ -99,12 +99,12 @@ def main():
                 assert 'unused-' not in p.stdout + p.stderr
                 assert f'; agent {agent} (' in p.stderr, p.stderr
                 if mode == 'local-first':
-                    assert 'attempt=2 local-first fallback via OpenCode 2.2.5; model opencode/gpt-5.4' in p.stderr, p.stderr
+                    assert 'attempt=2 local-first fallback via OpenCode 2.3.0; model opencode/gpt-5.4' in p.stderr, p.stderr
                     assert not (project / '.opencode').exists()
                 else:
                     assert (project / '.opencode/agents' / (agent + '.md')).exists()
                 runs += 1
-    print(f'PASS installed OpenCode 2.2.5 named roles: {runs} preflight+session runs (local reviewer trusted/deny, coder, '
+    print(f'PASS installed OpenCode 2.3.0 named roles: {runs} preflight+session runs (local reviewer trusted/deny, coder, '
           'local-first native fallback); session mode is the role; subagent default falls back to build; 0 prompts forwarded')
 
 

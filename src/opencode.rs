@@ -1,4 +1,4 @@
-//! Pinned OpenCode 2.2.5 runtime surface (D035): native-schema config for both
+//! Pinned OpenCode 2.3.0 runtime surface (D092; supersedes D035): native-schema config for both
 //! routes, project agent emission, named-role mapping (D038), and pure
 //! validators for its configuration sources, agents and catalog.
 use crate::agents::{self, Agent, Capacity, Effort, Tool};
@@ -6,7 +6,7 @@ use crate::config::{Invalid, Mode, Permissions, Resolved};
 use serde_json::{Value, json};
 use std::path::Path;
 
-pub(crate) const VERSION: &str = "2.2.5";
+pub(crate) const VERSION: &str = "2.3.0";
 const LOCAL: &str = "ah-litellm";
 const NATIVE: &str = "opencode";
 
@@ -104,7 +104,7 @@ pub(crate) fn grantable(request: &Resolved) -> Vec<&'static str> {
         .collect()
 }
 
-/// Required capabilities the pinned runtime cannot enforce. 2.2.5 advertises
+/// Required capabilities the pinned runtime cannot enforce. 2.3.0 advertises
 /// an `effort` session option, but no mapping to provider requests has been
 /// verified, so only `default` is supported (D038).
 pub(crate) fn supports(agent: &Agent) -> Result<(), Invalid> {
@@ -112,12 +112,12 @@ pub(crate) fn supports(agent: &Agent) -> Result<(), Invalid> {
         Ok(())
     } else {
         Err(Invalid(
-            "agent effort is unsupported by OpenCode 2.2.5; only default effort runs",
+            "agent effort is unsupported by OpenCode 2.3.0; only default effort runs",
         ))
     }
 }
 
-/// 2.2.5 runs a prompt whose first word is `/NAME` as a runtime command
+/// 2.3.0 runs a prompt whose first word is `/NAME` as a runtime command
 /// (ACP advertises built-ins `init`, `review`, `goal` and `compact`; project
 /// commands are not loaded). Such a turn can report `end_turn` with an empty
 /// response and no model request, so command prompts are unsupported (D040).
@@ -152,12 +152,12 @@ pub(crate) fn agent_markdown(agent: &Agent, request: &Resolved) -> String {
 
 /// Complete runtime configuration passed via OPENCODE_CONFIG_CONTENT. Only the
 /// selected provider may be used; the title helper is pinned to the same model.
-/// Project instructions are the one absolute `AGENTS.md` path, or none: 2.2.5
+/// Project instructions are the one absolute `AGENTS.md` path, or none: 2.3.0
 /// loads no project instructions with project configuration disabled (D040).
 /// Skills, MCP servers and plugins stay empty or denied by the rules.
 /// Global rules are the effective rules, so built-in helpers and subagents
 /// never exceed a selected agent. The harness invokes that agent directly as
-/// the default agent, so its entry is always `primary`: 2.2.5 silently falls
+/// the default agent, so its entry is always `primary`: 2.3.0 silently falls
 /// back to `build` for a `subagent` default (D038).
 pub(crate) fn config(request: &Resolved) -> Value {
     let provider = provider(request);
@@ -168,7 +168,9 @@ pub(crate) fn config(request: &Resolved) -> Value {
             "models": {&request.model: {"name": request.model}},
         }})
     } else {
-        json!({})
+        // Settings-only overlay keeps built-in models/endpoints while avoiding
+        // an env-discovered Console connection and its remote resources (D092).
+        json!({NATIVE: {"settings": {"apiKey": "{env:AH_RUNTIME_API_KEY}"}}})
     };
     let mut agents = json!({"title": {"model": model(request)}});
     if let Some(agent) = &request.agent {
@@ -344,7 +346,10 @@ mod tests {
             native["model"],
             json!({"providerID": "opencode", "model": "gpt-5.4"})
         );
-        assert_eq!(native["providers"], json!({}));
+        assert_eq!(
+            native["providers"],
+            json!({"opencode": {"settings": {"apiKey": "{env:AH_RUNTIME_API_KEY}"}}})
+        );
         assert!(!native.to_string().contains("litellm"));
         let trusted = profile(Permissions::Trusted);
         assert_eq!(

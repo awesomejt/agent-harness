@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P4.3 named-role execution against fake OpenCode 2.2.5; no model traffic. Build target/debug/ah first.
+"""P4.3 named-role execution against fake OpenCode 2.3.0; no model traffic. Build target/debug/ah first.
 
 Checks the generated runtime document (default agent, effective global/agent
 rules, primary entry, exact system text), harness-side grants and completion
@@ -115,7 +115,7 @@ assert r['launched'] and not r['prompted']
 for effort in ['low', 'medium', 'high', 'max']:
     r = expect('read', 2, effort=effort)
     assert not r['configs'] and not r['launched'] and not r['emitted'], effort
-    assert 'agent effort is unsupported by OpenCode 2.2.5' in r['stderr']
+    assert 'agent effort is unsupported by OpenCode 2.3.0' in r['stderr']
 assert expect('read', 0, effort='default')['selected'] == 'once'
 
 # Local-first fallback carries the same role and effective rules natively.
