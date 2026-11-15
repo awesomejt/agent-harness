@@ -66,9 +66,12 @@ directory. It reuses the D077 boot, lock, integration-redaction and login invari
   byte-drift refusal and attach marker/executable refusals; it joins `offline.py`.
 - **Unauthenticated installed:** On a prepared root before login, the preflight exits 1 with
   withheld diagnostics; bound controls still print their PASS lines.
-- **Authenticated installed:** Pending operator OAuth into a dedicated root on this host;
-  record redacted JSON summary and **two consecutive** passing `--root` runs (each runs two
-  contained boots) here before P7.9 feasibility acceptance. The helper-only PR does not satisfy this gate (D089).
+- **Authenticated-root attempt (2026-11-14):** The operator reported successful official login;
+  the contained preflight refused the fixed integration-ID inventory (336 observed versus 236
+  expected). [Sanitized evidence and continuation](p7-9-authenticated-inventory-refusal.md).
+  Login-mode invariants were not reached, so authenticated installed acceptance remains pending.
+  Record **two consecutive** passing `--root` runs (each runs two contained boots) before P7.9
+  feasibility acceptance; the helper-only PR does not satisfy this gate (D089).
 
 ## Limits
 
