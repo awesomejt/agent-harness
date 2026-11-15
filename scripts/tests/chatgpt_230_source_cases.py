@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Offline source-audit refusal cases; no OpenCode process, credentials or network."""
 import hashlib
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -52,7 +53,29 @@ def main():
             with patch.object(helper.subprocess, 'run', side_effect=git), patch.object(helper, 'derive') as derive:
                 rejects(lambda: helper.audit(packages))
                 derive.assert_not_called()
-    print('PASS: websearch registration projection, source byte/path refusals and revision/dirty-tree gates')
+        source = packages / 'checkout'
+        inputs = source / 'packages'
+        inputs.mkdir(parents=True)
+        tracked = inputs / 'tracked.ts'
+        tracked.write_bytes(b'public source')
+        observation = {'plugins': {'ids': ['synthetic']}}
+        manifest = packages / 'manifest.json'
+        manifest.write_text(json.dumps({'kind': 'p7-9-230-source/v1',
+            'source_commit': helper.PIN, 'observation': observation,
+            'files': {'tracked.ts': digest}}))
+        def clean_git(args, **kwargs):
+            from subprocess import CompletedProcess
+            return CompletedProcess(args, 0, helper.PIN if 'rev-parse' in args else '', '')
+        with patch.object(helper, 'MANIFEST', manifest), patch.object(helper.subprocess, 'run', side_effect=clean_git):
+            with patch.object(helper, 'derive', return_value=(observation, {tracked})):
+                assert helper.audit(source)['verified_files'] == 1
+            # Matching observations cannot excuse an unpinned consumed input.
+            with patch.object(helper, 'derive', return_value=(observation, {tracked, inputs / 'unrecorded.ts'})):
+                rejects(lambda: helper.audit(source))
+            # Complete coverage cannot excuse a changed effective observation.
+            with patch.object(helper, 'derive', return_value=({'plugins': {'ids': ['changed']}}, {tracked})):
+                rejects(lambda: helper.audit(source))
+    print('PASS: registration, byte/path, revision/dirty-tree, consumed coverage and observation refusals')
 
 
 if __name__ == '__main__':

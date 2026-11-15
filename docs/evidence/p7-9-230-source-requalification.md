@@ -127,5 +127,11 @@ existing observer, retained-state and catalog-control suites pass. Production
 Rust and runtime files are unchanged; no live provider or installed runtime
 experiment is used as evidence in this increment. Independent review found that two directly consumed inputs were only included
 through the D092 manifest union. Both are now explicit in the consumed-file set;
-actual-source negative checks removing either manifest entry refuse. Required
-PR review/merge and any findings are recorded here before closeout.
+actual-source negative checks removing either manifest entry refuse. [PR #119](https://github.com/awesomejt/agent-harness/pull/119): Grok reviewed
+`a0f1ed4` with **0 blockers, 0 concerns, 1 nit**. The nit requested automated
+coverage for consumed-input/manifest refusal. Added a tiny clean-source fixture
+that passes through real file hashing, then independently refuses an unrecorded
+consumed input and an observation mismatch. The six targeted offline suites and
+real-source audit pass after the correction. No re-review is required for this
+minor finding. This bounded increment is effective on PR #119 merge; installed
+containment, catalog and authenticated feasibility gates remain open.
