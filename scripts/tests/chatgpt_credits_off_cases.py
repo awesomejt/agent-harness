@@ -89,7 +89,8 @@ def inventory_cases():
             write_pkg(merged)
             credits.inventory_from_source(pkg)
 
-        rejects(lambda: inventory_with(**{'protocol/src/groups/usage.ts': 'post-limit credits after'}))
+        rejects(lambda: inventory_with(**{'protocol/src/groups/usage.ts': snippet_group + ' post-limit'}))
+        rejects(lambda: inventory_with(**{'protocol/src/groups/usage.ts': snippet_group + ' credits after'}))
         rejects(lambda: inventory_with(**{'protocol/src/groups/usage.ts': 'unrelated description'}))
         rejects(lambda: inventory_with(**{'core/src/usage-limits.ts': 'integrations.connection.active("other")'}))
     print('PASS: usage inventory refuses missing Console scope and post-limit wording', flush=True)
