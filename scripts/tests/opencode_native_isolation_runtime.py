@@ -27,6 +27,10 @@ ROOT = Path(__file__).resolve().parents[2]
 LIMIT = 256 * 1024
 
 
+class NotReady(RuntimeError):
+    """Only a missing activation marker may be retried; unsafe connections fail immediately."""
+
+
 def port():
     with socket.socket() as probe:
         probe.bind(('127.0.0.1', 0))
@@ -67,9 +71,13 @@ def get(server_port, password, project, path):
 def integrations(server_port, password, project):
     """Wait for plugin activation, then require a stable no-connection list."""
     providers = get(server_port, password, project, '/api/provider')
-    assert isinstance(providers, list) and any(item.get('id') == 'opencode' for item in providers if isinstance(item, dict))
+    assert isinstance(providers, list)
+    if not any(item.get('id') == 'opencode' for item in providers if isinstance(item, dict)):
+        raise NotReady('provider activation pending')
     entries = get(server_port, password, project, '/api/integration')
-    assert isinstance(entries, list) and entries
+    assert isinstance(entries, list)
+    if not entries:
+        raise NotReady('integration activation pending')
     connections = {}
     methods = set()
     for entry in entries:
@@ -85,7 +93,9 @@ def integrations(server_port, password, project):
     shape = sorted((item['id'], len(item['connections'])) for item in repeated
                    if isinstance(item, dict) and isinstance(item.get('id'), str) and isinstance(item.get('connections'), list))
     assert shape == sorted(connections.items())
-    assert 'opencode' in connections and {'oauth', 'key'} <= methods and all(value == 0 for value in connections.values())
+    assert all(value == 0 for value in connections.values())
+    if 'opencode' not in connections or not {'oauth', 'key'} <= methods:
+        raise NotReady('Console integration methods pending')
     return {'integrations': len(connections), 'connections': 0}
 
 
@@ -108,8 +118,9 @@ def observe(runtime):
             try:
                 summary = integrations(server_port, password, project)
                 break
-            except (ConnectionRefusedError, TimeoutError, http.client.HTTPException):
-                assert child.poll() is None and time.monotonic() < deadline
+            except (NotReady, ConnectionRefusedError, ConnectionResetError, TimeoutError, http.client.HTTPException):
+                if child.poll() is not None or time.monotonic() >= deadline:
+                    raise
                 time.sleep(.05)
         (project / 'native-isolation-observation.json').write_text(json.dumps(summary, sort_keys=True))
     finally:

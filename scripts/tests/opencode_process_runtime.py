@@ -28,12 +28,17 @@ ROOT = Path(__file__).resolve().parents[2]
 def command_for(project, marker):
     parent = project / 'synthetic-parent.pid'
     child = project / 'synthetic-child.pid'
+    child_code = (
+        'import os,pathlib,sys,time; p=pathlib.Path(sys.argv[1]); '
+        't=p.with_suffix(".tmp"); t.write_text(str(os.getpid())); '
+        't.replace(p); time.sleep(600)'
+    )
     code = (
         'import pathlib,subprocess,sys,time; '
         'root=pathlib.Path(sys.argv[1]); marker=sys.argv[2]; '
-        '(root / "synthetic-parent.pid").write_text(str(__import__("os").getpid())); '
-        'child=subprocess.Popen([sys.executable,"-c",'
-        '"import os,pathlib,sys,time; pathlib.Path(sys.argv[1]).write_text(str(os.getpid())); time.sleep(600)",'
+        'p=root / "synthetic-parent.pid"; t=p.with_suffix(".tmp"); '
+        't.write_text(str(__import__("os").getpid())); t.replace(p); '
+        'child=subprocess.Popen([sys.executable,"-c",' + repr(child_code) + ','
         'str(root / "synthetic-child.pid"),marker]); '
         'time.sleep(600)'
     )
