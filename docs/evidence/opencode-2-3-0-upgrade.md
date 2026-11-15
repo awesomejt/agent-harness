@@ -42,7 +42,7 @@ string does not establish the P7.9 binary/source containment qualification.
 | Background subagents are now the default; fork notices and new MCP event tools join built-ins | Harness roles still execute directly and effective rules deny subagent/MCP capabilities. Installed inherited-capability tests check those restrictions. No background delegation is selected. |
 | Shell commands survive server handoffs; process handling and interruption changed | Add a real in-flight shell cancellation test with a labelled synthetic Python parent/child. It must observe both gone before its fallback reaper runs, and require the harness's confirmed cleanup/state-removal terminal fields. |
 | Config discovery uses directory listings, concurrent resolution, explicit missing entries and a fallback when ancestor listing is denied | Existing production source/agent checks and inherited-capability tests are rerun. P7.9's macOS source-denial pairs must be requalified separately; old file fingerprints are not sufficient. |
-| Console can fetch workspace instruction/skill lists, cache downloads and watch updates | Independent review found that the old child `OPENCODE_API_KEY` activates a Console connection and exposes remote instructions/skills outside config-source checks. The fix uses only private `AH_RUNTIME_API_KEY` and a settings-only native provider key overlay, preserving built-in routing without a Console connection. An installed metadata-only regression must verify zero connections in the actual generated runtime environment. P7.9 forbids Console connections and retains that invariant; its containment/observer qualification must precede any refreshed installed proof. |
+| Console can fetch workspace instruction/skill lists, cache downloads and watch updates | Independent review found that the old child `OPENCODE_API_KEY` activates a Console connection and exposes remote instructions/skills outside config-source checks. The fix uses only private `AH_RUNTIME_API_KEY` and a settings-only native provider key overlay, preserving built-in routing without a Console connection. The installed metadata-only regression verifies zero connections after plugin activation in the actual generated runtime environment. P7.9 forbids Console connections and retains that invariant; its containment/observer qualification must precede any refreshed installed proof. |
 | OAuth redirect submission, cancellation and refresh changed; integration listing no longer awaits plugin activation in its handler | Do not update authenticated helpers by replacing hashes. New-plugin derivation and settling rules need review before fresh installed proofs, followed by separately authorized same-root D085–D088 evidence. |
 | Models.dev adds freeform capability handling and HTTP refresh changes | Source snapshot bytes, KV implementation/table and CLI model-file/fetch option wiring are unchanged. This supports retaining the conceptual explicit-file/cache experiment, not claiming it passed on 2.3.0. |
 | Provider TLS and experimental MCP/background-shell options exist | The harness adds no settings or flags for them. Exact configuration checks and effective permission ceilings remain required. |
@@ -86,8 +86,9 @@ Results before Grok PR review:
 
 - `cargo build --locked` and `cargo test --locked`: pass on the existing Rust
   1.88.0 toolchain (151 tests). No dependency or lockfile change.
-- Full 42-suite run: **42/42 passed**. The added native-isolation regression also
-  passes independently; the final 43-suite run is in progress.
+- Final full offline suite: **43/43 passed**. After the test-only Grok fixes,
+  both new installed regressions pass again (**2/2**); incomplete activation and
+  unsafe-connection negative checks confirm only readiness may retry.
 - `cargo fmt --check`, strict Clippy and release build: pass.
 - New `opencode_process_runtime.py`: passes against installed 2.3.0, with actual
   parent/child execution and cleanup observed before the fallback reaper.
@@ -104,5 +105,18 @@ Results before Grok PR review:
   any live provider inference; they do not prove account-dependent remote config.
 
 Independent review identified the high-severity Console connection issue above;
-the native key fix and installed regression resolve it. Final Grok review and
-43-suite results will be recorded before merge.
+the native key fix and installed regression resolve it. The local archive from `1de6a49` also passes the complete installation smoke:
+checksum, upgrade/rollback, version/help, sample previews, redaction and
+config/login-store preservation with no toolchain/runtime/service on PATH.
+No release asset is uploaded or replaced.
+
+[PR #118](https://github.com/awesomejt/agent-harness/pull/118): Grok reviewed twice.
+Initial review of `1de6a49`: 0 blockers, 0 concerns, 2 nits (readiness retry and
+PID-file publication). Follow-up of `276b21b`: 0 blockers, 0 concerns, 1 additional
+nit (check activation before comparing a stable list). All three are fixed:
+retry only explicit missing-readiness states and connection resets, publish PID
+files atomically, and reject unsafe connections before retrying incomplete
+activation. Installed regressions pass after the final correction. The last
+finding is minor and does not require another review under the Git workflow.
+This production upgrade is effective on PR #118 merge; separate P7.9
+requalification and later live/account gates remain open.

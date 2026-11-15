@@ -88,14 +88,14 @@ def integrations(server_port, password, project):
             assert isinstance(entry.get('methods'), list)
             methods = {item.get('type') for item in entry['methods'] if isinstance(item, dict)}
     assert len(connections) == len(entries)
+    assert all(value == 0 for value in connections.values())
+    if 'opencode' not in connections or not {'oauth', 'key'} <= methods:
+        raise NotReady('Console integration methods pending')
     time.sleep(.2)
     repeated = get(server_port, password, project, '/api/integration')
     shape = sorted((item['id'], len(item['connections'])) for item in repeated
                    if isinstance(item, dict) and isinstance(item.get('id'), str) and isinstance(item.get('connections'), list))
     assert shape == sorted(connections.items())
-    assert all(value == 0 for value in connections.values())
-    if 'opencode' not in connections or not {'oauth', 'key'} <= methods:
-        raise NotReady('Console integration methods pending')
     return {'integrations': len(connections), 'connections': 0}
 
 
