@@ -68,7 +68,7 @@ directory. It reuses the D077 boot, lock, integration-redaction and login invari
   withheld diagnostics; bound controls still print their PASS lines.
 - **Authenticated installed:** Pending operator OAuth into a dedicated root on this host;
   record redacted JSON summary and **two consecutive** passing `--root` runs (each runs two
-  contained boots) here before PR merge.
+  contained boots) here before P7.9 feasibility acceptance. The helper-only PR does not satisfy this gate (D089).
 
 ## Limits
 

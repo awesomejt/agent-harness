@@ -774,3 +774,11 @@ D025 Git policy: version managed `opencode.json` and its ownership receipt toget
 - **Selection**: Installed pass requires the same operator-login root as D085–D087 plus a same-session operator attestation that post-limit app credits are off (D067). The helper refuses attestations older than one hour or dated in the future. No session, model turn or credential export.
 - **Limits**: Attestation is point-in-time; pinned APIs do not expose the ChatGPT post-limit credits toggle. D034 remains a gate. Full P7.9/P7.10 remain unchecked and P7.11/P7.12 blocked.
 - **Next**: Continue P7.9 toward feasibility closeout and explicit route design after D034 and remaining live gates are separately evidenced.
+
+
+## 2026-11-14 — D089: Separate P7.9 feasibility closeout from P7.11 live acceptance
+
+- **Decision**: The [closeout assessment](docs/evidence/p7-9-feasibility-closeout.md) maps the accumulated source, synthetic and installed evidence to its consuming gate. Merged D085–D088 helpers do not substitute for authenticated installed passes on the same dedicated operator-login root. P7.9 remains unpassed until those results are recorded and a reviewed closeout accepts feasibility; P7.11 remains blocked.
+- **D034 boundary**: D034 is an existing compatibility constraint, not a new P7.9 model-turn or exhaustion experiment. No fallback expansion is selected. P7.11 must preserve the pre-submission-only policy in consuming contracts and refusal fixtures; unsupported subscription combinations and uncertain post-submission outcomes must stop.
+- **Live boundary**: P7.9 metadata observations do not prove actual tool grants, model availability or inference routing. P7.11 separately gates production contracts, implementation and bounded own-account/operator-started live coding/constrained review; P7.13 still owns portfolio workflows. No model turn is authorized by this assessment.
+- **Limits and next**: D088's operator assertion is point-in-time; null usage limits is not account-toggle verification. Next is the operator-run D085 login and D085–D088 network-denied installed evidence chain. No auth-store access, production change, new provider support, Pi change or Go gate waiver.
