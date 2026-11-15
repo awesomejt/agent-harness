@@ -30,3 +30,5 @@ Before implementing a phase, finalize its designated choices in DECISIONS.md and
 [P7.9 pinned catalog investigation](evidence/p7-9-catalog-investigation.md) (D090) separates catalog-derived integration IDs from built-in definitions and plans a disposable no-auth catalog-control experiment after the authenticated inventory refusal.
 
 - [P7.9 OpenCode 2.3.0 source qualification](evidence/p7-9-230-source-requalification.md) — public-source/plugin manifest, unchanged integration gate and next observer/containment contract.
+
+- [P7.9 disposable OpenCode 2.3.0 observer](evidence/p7-9-230-disposable-observer.md) — separately pinned helper, setup-review boundary and installed qualification evidence.
