@@ -105,8 +105,7 @@ Grok's setup review of `2dea092` on
 the deliberate suppression of warning classification when another containment
 gate fails. The reviewed helper/test bytes remain unchanged; no further setup
 review is required for that documentation clarification. Independent safety
-review also cleared the final implementation. Installed execution follows this
-review; its result will be recorded below.
+review also cleared the final implementation. The one installed attempt followed that review, with the result below.
 A classified warning identifies its source family and writer only; it does not
 identify an opaque OS error or establish harmlessness. Record any stop without
 changing containment or warning policy. Any remedy needs a separately reviewed
@@ -114,3 +113,67 @@ decision before another installed attempt. Complete matrix, catalog proof and
 revised authenticated controls remain separate gates. If the helper stops at
 an observation/parser/provenance check, record that exact static refusal rather
 than inferring the historical warning. Cleanup is unconditional.
+
+
+### Reviewed installed attempt and required stop
+
+The reviewed helper was run once after the setup review, using the clean
+official source and exact D094 executable hash. The process exited **1**.
+The only recorded runtime summary was sanitized by the reviewed helper:
+
+```text
+PASS: inherited transport/network/filesystem/password/port controls
+PASS: Bun filesystem/watch/symlink/late-root/replacement controls
+PASS: synthetic listing/fallback discovery and candidate-denial pairs
+START: listing-allowed diagnostic control
+processes=3 records=85 warnings=[]
+PASS: listing-allowed diagnostic control
+START: listing-denied case-3 diagnostic
+processes=3 records=85
+warning: process=SERVER family=WATCH_START target=PARENT_REPO count=3
+REFUSED: runtime-warning
+```
+
+| Installed check | Result |
+|---|---|
+| D093 source, D095 supplemental hashes/message tuples and D094 executable pin | Passed before launch. |
+| Inherited spawn/stdio, owned TCP versus denied network/filesystem, occupied port and wrong/absent password | Passed. |
+| Bun filesystem/watch/symlink/late-root/replacement and four listing/fallback × candidate-read pairs | Passed, with inherited existsSync/parent-watch limitations unchanged. |
+| Fresh listing-allowed control, project on/Claude off/no reload | Passed all gates, 3 attributed writers, 85 bounded records, zero warnings and empty stderr. |
+| Fresh listing-denied diagnostic, same fixture options | Resource/integration settlement, exact documents/agent canaries/deny tails and every non-warning log/filesystem gate passed. 3 attributed writers and 85 bounded records; empty stderr. Required **runtime-warning** refusal from three SERVER/WATCH_START/PARENT_REPO events. No case pass. |
+| Complete matrix, catalog and retained/authenticated continuation | Not run or accepted. |
+
+Both resource cases enforced the unchanged 236-ID digest, zero integration
+connections/metadata, exact active built-ins/resources, machine-parent watcher,
+spawn allowlist and absence of node_modules/MCP commands. The reviewed parser
+accepted actual installed formatting, unique startup/run ownership, server/CLI
+roles and observed launcher-lifetime windows. All writer processes exited
+cleanly; pipe threads/groups were reaped, locks released and temporary roots
+deleted before the command returned. No raw log, stderr,
+cause, dynamic path, argv or provider/resource content was retained in evidence.
+
+### Source attribution and control impact
+
+`WATCH_START` is the exact ERROR tuple for `failed to watch directory` in
+`core/src/filesystem/watcher.ts:nativeLayer`, with the `path` privately matched
+to the owned parent-repo fixture. It identifies the server's entry/file watch
+startup failure, rather than a debug-client warning or the silent
+`ConfigDiscovery.discover` listing fallback. The source's non-ENOENT catch logs
+this error and returns no subscription, so affected subscriber streams can
+end without watch coverage. Direct config probes and stable initial resource
+views do not replace that coverage. Three matching log events do not identify
+three distinct subscriptions or establish their cause/retry ordering.
+
+The underlying error/cause was opaque and discarded. This does not assert an
+OS error code, identify which named candidate watchers were affected or prove
+the failure harmless. It provides source-family/writer/owned-target attribution
+and a control-impact bound for this new listing-denied stop under D094's
+fixture options. The deleted historical D094 warning remains unattributed. No exception, broader
+filesystem/network permission, catalog override or rerun was introduced.
+
+Next is a **source-first parent-watch control/remediation assessment and a
+separately reviewed continuation decision**, using this exact result. Do not
+retry the diagnostic, advance cases 4–6 or migrate/run catalog/authenticated
+helpers under this record. The helper/result increment can close after result
+review/merge without passing full installed qualification or P7.9. Use a
+**fresh context** for the next control/remedy design boundary.
