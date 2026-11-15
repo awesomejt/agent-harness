@@ -15,7 +15,7 @@ import shutil
 import sys
 import tempfile
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from antigravity_feasibility import check
@@ -50,6 +50,7 @@ SOURCE_FINGERPRINTS = {
     'protocol/src/groups/usage.ts': '14bc0fe11fdd5fef9fa4a5a68b56da5a0717b0ef679e184817d9660b4b433e2d',
 }
 CONSOLE_ACTIVE = 'integrations.connection.active(Integration.ID.make("opencode")'
+MAX_ATTESTATION_AGE = timedelta(hours=1)
 
 
 class CreditsOffObserver(PreflightObserver):
@@ -112,6 +113,9 @@ def validate_attestation(record):
     check(isinstance(asserted, str))
     parsed = datetime.fromisoformat(asserted.replace('Z', '+00:00'))
     check(parsed.tzinfo is not None)
+    now = datetime.now(timezone.utc)
+    stamp = parsed.astimezone(timezone.utc)
+    check(timedelta(0) <= now - stamp <= MAX_ATTESTATION_AGE)
     check(record['post_limit_app_credits_off'] is True)
     check(record['setting_name'] == POST_LIMIT_SETTING)
 

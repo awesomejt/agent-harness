@@ -2,7 +2,7 @@
 """Offline ChatGPT credits-off attestation and usage-source inventory checks; no OpenCode or network."""
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'experiments'))
@@ -31,6 +31,10 @@ def attestation_cases():
     rejects(lambda: credits.validate_attestation({**good, 'workspace_label': 'bad@host'}))
     rejects(lambda: credits.validate_attestation({**good, 'asserted_at': 'not-a-time'}))
     rejects(lambda: credits.validate_attestation({**good, 'extra': 'field'}))
+    stale = {**good, 'asserted_at': (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()}
+    rejects(lambda: credits.validate_attestation(stale))
+    future = {**good, 'asserted_at': (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()}
+    rejects(lambda: credits.validate_attestation(future))
     print('PASS: attestation schema requires post-limit credits off and bounded label', flush=True)
 
 
@@ -67,7 +71,28 @@ def inventory_cases():
         inventory = credits.inventory_from_source(pkg)
         assert inventory['console_only_inventory'] is True
         assert inventory['post_limit_setting_name'] == credits.POST_LIMIT_SETTING
-    print('PASS: usage inventory rejects ChatGPT post-limit fields in pinned OpenAPI text', flush=True)
+
+        def write_pkg(files):
+            for rel, text in files.items():
+                path = pkg / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text)
+
+        base = {
+            'core/src/usage-limits.ts': snippet_limits,
+            'server/src/handlers/usage.ts': 'usage.limits UsageLimits.Service',
+            'protocol/src/groups/usage.ts': snippet_group,
+        }
+
+        def inventory_with(**overrides):
+            merged = {**base, **overrides}
+            write_pkg(merged)
+            credits.inventory_from_source(pkg)
+
+        rejects(lambda: inventory_with(**{'protocol/src/groups/usage.ts': 'post-limit credits after'}))
+        rejects(lambda: inventory_with(**{'protocol/src/groups/usage.ts': 'unrelated description'}))
+        rejects(lambda: inventory_with(**{'core/src/usage-limits.ts': 'integrations.connection.active("other")'}))
+    print('PASS: usage inventory refuses missing Console scope and post-limit wording', flush=True)
 
 
 def main():

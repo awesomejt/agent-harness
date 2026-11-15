@@ -40,7 +40,8 @@ python3 -B scripts/tests/chatgpt_credits_off_cases.py
 - Reuses D076 composed profile, D085 root attach rules and login-mode invariants before the
   usage route read.
 - Network fully denied; no session or model turn.
-- Attestation is point-in-time operator evidence; the harness does not scrape ChatGPT Settings.
+- Attestation is point-in-time operator evidence with a one-hour freshness bound at run time; the
+  harness does not scrape ChatGPT Settings.
 - Pinned source shows `usage.limits` resolves OpenCode Console budgets/Go only, not post-limit
   app credits.
 - No production route, dependency or D034 change.
