@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P4.1 OpenCode 2.2.5 destination/schema probe. No ACP/model prompt or key.
+"""P4.1 OpenCode 2.3.0 destination/schema probe. No ACP/model prompt or key.
 
 Candidate documents here prove destinations only; production emission belongs
 in P4.2 and constraint enforcement/live role use belongs in P4.3/P4.4.
@@ -14,9 +14,9 @@ import tempfile
 
 def main():
     runtime = shutil.which('opencode')
-    assert runtime, 'OpenCode 2.2.5 required'
+    assert runtime, 'OpenCode 2.3.0 required'
     version = subprocess.run([runtime, '--version'], capture_output=True, text=True, timeout=10)
-    assert version.returncode == 0 and version.stdout.strip() == 'opencode v2.2.5'
+    assert version.returncode == 0 and version.stdout.strip() == 'opencode v2.3.0'
     rules = [dict(action='*', resource='*', effect='deny'),
              dict(action='external_directory', resource='*', effect='deny')]
     with tempfile.TemporaryDirectory(prefix='ah-agent-destination-') as d:
@@ -61,7 +61,7 @@ def main():
                 starts = [i for i in range(len(effective)-len(rules)+1) if effective[i:i+len(rules)] == rules]
                 assert starts and all(r['effect'] == 'deny' for r in effective[starts[-1]+len(rules):])
                 assert actual['request'] == dict(settings={}, headers={}, body={})
-    print('PASS OpenCode 2.2.5: native agents.NAME and project .opencode/agents/NAME.md; '
+    print('PASS OpenCode 2.3.0: native agents.NAME and project .opencode/agents/NAME.md; '
           'primary/subagent/all, system, description, model and deny rules; 6 probes; 0 model prompts')
 
 

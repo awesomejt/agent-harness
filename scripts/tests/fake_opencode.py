@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fake OpenCode 2.2.5 version/debug/models/ACP executable, used only via a disposable PATH.
+"""Fake OpenCode 2.3.0 version/debug/models/ACP executable, used only via a disposable PATH.
 
 Emulates the surfaces recorded in docs/evidence/p3-7-opencode-2-baseline.md: a
 sources list from `debug config`, per-agent rules from `debug agents`, `path`
@@ -34,9 +34,9 @@ native = provider == 'opencode'
 assert config['policies'] == [dict(action='provider.use', resource='*', effect='deny'),
                               dict(action='provider.use', resource=provider, effect='allow')]
 if native:
-    assert config['providers'] == {}
-    assert 'AH_RUNTIME_API_KEY' not in os.environ
-    assert os.environ['OPENCODE_API_KEY'] == 'SECRET_SENTINEL'
+    assert config['providers'] == {'opencode': {'settings': {'apiKey': '{env:AH_RUNTIME_API_KEY}'}}}
+    assert 'OPENCODE_API_KEY' not in os.environ
+    assert os.environ['AH_RUNTIME_API_KEY'] == 'SECRET_SENTINEL'
     assert config['model'] == config['agents']['title']['model'] == dict(providerID='opencode', model='fixture')
     assert 'TEST_KEY' not in os.environ and 'LITELLM_API_KEY' not in os.environ
 else:
@@ -49,7 +49,8 @@ if sys.argv[1:] != ['acp']:
     assert '--standalone' in sys.argv, sys.argv
 if '--version' in sys.argv:
     if case=='preflight-deadline': time.sleep(10)
-    print('wrong' if case == 'version' else 'opencode v2.2.5')
+    print({'version': 'wrong', 'version-old': 'opencode v2.2.5',
+           'version-new': 'opencode v2.3.1'}.get(case, 'opencode v2.3.0'))
     sys.exit()
 if 'models' in sys.argv:
     assert native
@@ -159,7 +160,7 @@ for line in sys.stdin:
             continue
         reply(m['id'], dict(protocolVersion=1, agentCapabilities={}))
     elif method == 'session/new':
-        # 2.2.5 silently selects `build` when the default agent is unusable.
+        # 2.3.0 silently selects `build` when the default agent is unusable.
         default = 'build' if case == 'named-mode-fallback' else config.get('default_agent', 'build')
         reply(m['id'], dict(sessionId=sid, configOptions=[dict(
             id='model', name='Model', category='model', type='select', currentValue='other' if case == 'session-model' else target,
@@ -217,7 +218,7 @@ for line in sys.stdin:
             reply(prompt_id, dict(stopReason='end_turn'))
             continue
         if case in ['deny-progress', 'deny-completed', 'named-completed-edit', 'named-completed-read', 'named-completed-unknown']:
-            # 2.2.5 reports in_progress while parsing arguments, then fails an unavailable tool.
+            # 2.3.0 reports in_progress while parsing arguments, then fails an unavailable tool.
             kind = 'edit' if case == 'named-completed-edit' else 'read'
             update(sessionUpdate='tool_call', toolCallId='t', **({} if case == 'named-completed-unknown' else dict(kind=kind)), status='pending', rawInput={})
             for status in ['in_progress', 'failed' if case == 'deny-progress' else 'completed']:
@@ -311,5 +312,5 @@ for line in sys.stdin:
             send(dict(jsonrpc='2.0',id=100+requests,method='session/request_permission',params=permission))
             requests += 1
         else:
-            # 2.2.5 ends the turn with stopReason=cancelled after a rejected permission.
+            # 2.3.0 ends the turn with stopReason=cancelled after a rejected permission.
             reply(prompt_id, dict(stopReason='cancelled' if case=='cancel-permission' or selected != 'once' else 'end_turn'))

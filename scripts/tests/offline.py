@@ -26,6 +26,8 @@ SUITES = [
     ['scripts/tests/single_runtime.py', '--refuse'],
     ['scripts/tests/native.py'],
     ['scripts/tests/native_runtime.py'],
+    ['scripts/tests/opencode_process_runtime.py'],
+    ['scripts/tests/opencode_native_isolation_runtime.py'],
     ['scripts/tests/claude.py'],
     ['scripts/tests/pi.py'],
     ['node', '--test', 'scripts/tests/pi_policy_boundary.mjs'],

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P2.2 installed OpenCode 2.2.5 edit/test check. Default uses a local model stub.
+"""P2.2 installed OpenCode 2.3.0 edit/test check. Default uses a local model stub.
 
 --live forwards only the explicitly selected alias to the existing LiteLLM host;
 credentials and raw requests/responses remain in memory, never printed.
@@ -32,7 +32,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = json.loads(raw)
             assert body['model'] == self.server.alias
             tools = [t['function']['name'] for t in body.get('tools',[])]
-            # 2.2.5 also offers gated `skill` and a built-in worktree tool (D035).
+            # 2.3.0 also offers gated `skill` and a built-in worktree tool (D035).
             assert set(tools) <= {'read','glob','grep','edit','write','shell','skill','opencode_worktree_remove'}
             self.server.records.append(dict(model=body['model'],tools=tools))
             if self.server.upstream:
@@ -165,7 +165,7 @@ def main():
                     assert v['status']=='passed' and v['agent_outcome']=='succeeded' and v['exit_code']==0 and v['cleanup_confirmed'], v
         print('Observed project effects:',json.dumps(dict(edited='return a + b' in (cwd/'calc.py').read_text(), verified=(cwd/'verified').exists())),flush=True)
         if args.refuse:
-            # 2.2.5 ends the turn with stopReason=cancelled after a rejected permission.
+            # 2.3.0 ends the turn with stopReason=cancelled after a rejected permission.
             assert p.returncode == 3 and not s.failed and s.stage == 1, (p.returncode, s.stage)
             assert 'grants: 0' in stderr and 'backend terminal=cancelled' in stderr
             assert (s.outside/'outside.txt').exists() and 'return a - b' in (cwd/'calc.py').read_text()

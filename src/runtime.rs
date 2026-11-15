@@ -1,4 +1,4 @@
-//! Local and native OpenCode 2.2.5 isolation and effective capability preflight.
+//! Local and native OpenCode 2.3.0 isolation and effective capability preflight.
 use crate::{
     config::{Exit, Mode, Resolved},
     process::OwnedChild,
@@ -57,7 +57,7 @@ impl Runtime {
                 home.path().join(kind).into(),
             ));
         }
-        // 2.2.5 no longer recognizes OPENCODE_DISABLE_DEFAULT_PLUGINS; the
+        // 2.3.0 no longer recognizes OPENCODE_DISABLE_DEFAULT_PLUGINS; the
         // `plugins: []` document and the sources check stand in for it.
         for name in [
             "OPENCODE_DISABLE_MODELS_FETCH",
@@ -68,15 +68,10 @@ impl Runtime {
         }
         // Copy only the value to a reserved name: arbitrary user-selected names
         // such as DYLD_INSERT_LIBRARIES must never become runtime controls.
-        env.push((
-            if request.mode == Mode::LocalOnly {
-                "AH_RUNTIME_API_KEY"
-            } else {
-                "OPENCODE_API_KEY"
-            }
-            .into(),
-            key,
-        ));
+        // A provider-recognized env key activates a Console integration in 2.3.0,
+        // including remote instructions/skills. Supply inference credentials only
+        // through the explicit provider setting in our isolated document (D092).
+        env.push(("AH_RUNTIME_API_KEY".into(), key));
         Ok(Self {
             config,
             home,

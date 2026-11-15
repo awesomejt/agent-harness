@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P5.2 installed OpenCode 2.2.5 sequence check against a local deterministic model stub.
+"""P5.2 installed OpenCode 2.3.0 sequence check against a local deterministic model stub.
 
 Four gated steps run through `ah sequence run`: steps 1 and 2 create files
 through the real shell tool (step 2 only if step 1's file exists), step 3's
@@ -120,7 +120,7 @@ def main():
         three = r['steps'][2]['attempts'][0]
         assert three['agent_outcome'] == 'succeeded' and three['verification']['status'] == 'failed'
         assert three['backends'][0]['prompt_submitted'] is True
-        print('PASS installed OpenCode 2.2.5 sequence: ordered gated steps, filesystem continuity, '
+        print('PASS installed OpenCode 2.3.0 sequence: ordered gated steps, filesystem continuity, '
               'failed gate stopped step 4 before launch; durable record matches; local deterministic model stub', flush=True)
 
 

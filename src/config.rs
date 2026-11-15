@@ -233,7 +233,7 @@ pub(crate) fn bounded(mut reader: impl Read) -> Result<String> {
 
 /// Project instructions the isolated runtime may load (D040): only the
 /// project-root `AGENTS.md`, resolving to a regular file inside the project.
-/// OpenCode 2.2.5 skips project instructions once project configuration is
+/// OpenCode 2.3.0 skips project instructions once project configuration is
 /// disabled, so the harness names this one path. The Pi runtime reads and
 /// bounds it when composing the RPC prompt (D082); other routes pass the path only.
 pub(crate) fn instructions(project: &Path) -> Result<Option<PathBuf>> {

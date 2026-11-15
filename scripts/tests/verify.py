@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P5.5 trusted verification gates (D043) against fake OpenCode 2.2.5 and fake checks; no model traffic.
+"""P5.5 trusted verification gates (D043) against fake OpenCode 2.3.0 and fake checks; no model traffic.
 
 Distinguishes agent success, no verification, passed/failed/timed-out/cancelled
 verification and untrusted-check rejection. Build target/debug/ah first.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P5.3 durable sequence records, lock, show and resume (D044) against fake OpenCode 2.2.5.
+"""P5.3 durable sequence records, lock, show and resume (D044) against fake OpenCode 2.3.0.
 
 Covers the record's content and privacy, crash and write-failure windows,
 competing writers, cancellation, changed inputs and schema, explicit

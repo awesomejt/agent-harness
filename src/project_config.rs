@@ -202,7 +202,7 @@ fn directory(path: &Path) -> Result<bool> {
     }
 }
 
-/// Every project source OpenCode 2.2.5 loads agents from (D037). Names compare
+/// Every project source OpenCode 2.3.0 loads agents from (D037). Names compare
 /// case-insensitively: a case-insensitive filesystem would otherwise overwrite
 /// a differently spelled user file. Only the exact emitted path is exempt; its
 /// ownership is decided by the receipt. Global/user sources are never read.

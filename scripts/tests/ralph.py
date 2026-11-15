@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""P6.2/P6.3 Ralph loops (D045) and the P6.5 review fixes against fake OpenCode 2.2.5.
+"""P6.2/P6.3 Ralph loops (D045) and the P6.5 review fixes against fake OpenCode 2.3.0.
 
 Covers fresh runtime context and private state per iteration, the fixed
 header and prompt snapshot, durable records and their privacy, both bounds,
