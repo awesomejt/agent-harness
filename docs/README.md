@@ -26,3 +26,5 @@ These documents are implementation contracts and planning records. Phase 2 imple
 Before implementing a phase, finalize its designated choices in DECISIONS.md and update the relevant contracts with concrete schemas, flags, examples, and supported versions. Later unresolved choices do not block the first slice. Before closing a phase, replace planned instructions with tested ones and link evidence from PROJECT.md.
 
 [P7.9 feasibility closeout assessment](evidence/p7-9-feasibility-closeout.md) (D089) maps D085–D088 authenticated installed prerequisites, the unchanged D034 boundary and separate P7.11 live acceptance. PROJECT.md owns current status.
+
+[P7.9 pinned catalog investigation](evidence/p7-9-catalog-investigation.md) (D090) separates catalog-derived integration IDs from built-in definitions and plans a disposable no-auth catalog-control experiment after the authenticated inventory refusal.
