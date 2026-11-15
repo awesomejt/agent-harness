@@ -107,3 +107,5 @@ The [D095 source-first warning assessment and diagnostic plan](evidence/p7-9-230
 
 
 The [D096 disposable warning diagnostic](evidence/p7-9-230-warning-diagnostic.md) implements D095. Helper/setup review precedes its inherited controls and fresh listing-allowed/denied pair; any unexpected result stops and requires a separately reviewed continuation. This does not complete the matrix or unblock catalog/authenticated work.
+
+The [D097 parent-watch assessment](evidence/p7-9-230-parent-watch-assessment.md) rejects global watcher disable and warning exceptions as remedies. Next is a separate offline-tested primitive listing/watch helper, setup review, then one bounded disposable pair; no OpenCode rerun or case 4–6/catalog/authenticated advancement follows from this source-only record. Any primitive result needs a separately reviewed remedy/OpenCode continuation decision.
