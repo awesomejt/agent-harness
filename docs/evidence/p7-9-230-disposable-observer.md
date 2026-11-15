@@ -174,7 +174,10 @@ installed qualification or full P7.9.
 ### Next reviewed boundary
 
 Next perform a source-first assessment of warning paths reachable under the
-literal parent-listing denial, then design a bounded static-code classifier
+literal parent-listing denial in the server and the `debug config`/`debug agents`
+client invocations, including every process that may write the shared data-root
+log. Establish log ownership and process attribution rather than assuming the
+server emitted the warning. Then design a bounded static-code classifier
 that withholds raw log fields/content. Review that diagnostic/setup increment
 before another disposable installed attempt. Determine the actual warning and
 its control impact before deciding whether to change the experiment. Do not
@@ -182,3 +185,16 @@ rerun case 3, advance cases 4–6 or migrate/run the catalog helper under this
 record alone. Remaining rows and both catalog/retained/authenticated gates stay
 pending; P7.11 remains blocked. A **fresh context** is preferred for this new
 diagnostic boundary, using D093/D094 and this exact stop record.
+
+
+## Result review and closeout
+
+Grok reviewed the installed-result record at `37e3002` in PR #120:
+**0 blockers, 0 concerns, 1 nit**. The nit is addressed by explicitly including
+the server and both debug client invocations in the next warning-path and
+log-writer assessment. No attribution to one process is accepted. Independent
+review confirmed the partial evidence, unchanged reviewed helper/test bytes
+and cleanup; its tracker-date nit is also corrected. Documentation links and
+diff checks pass. Both Grok reviews are complete; these minor documentation
+corrections require no further review. This helper and stop-record increment
+is effective on PR #120 merge, with installed qualification and full P7.9 open.
