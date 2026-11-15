@@ -104,3 +104,6 @@ The [D094 disposable observer](evidence/p7-9-230-disposable-observer.md) records
 
 
 The [D095 source-first warning assessment and diagnostic plan](evidence/p7-9-230-warning-assessment.md) establishes shared-log ownership across the server and both debug clients without diagnosing D094’s deleted warning. Next implement the strict, offline-tested diagnostic helper and obtain setup review before its bounded disposable control/denial pair. The warning refusal and all later installed/catalog/authenticated gates remain unchanged.
+
+
+The [D096 disposable warning diagnostic](evidence/p7-9-230-warning-diagnostic.md) implements D095. Helper/setup review precedes its inherited controls and fresh listing-allowed/denied pair; any unexpected result stops and requires a separately reviewed continuation. This does not complete the matrix or unblock catalog/authenticated work.
