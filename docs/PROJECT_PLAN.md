@@ -113,3 +113,5 @@ The [D097 parent-watch assessment](evidence/p7-9-230-parent-watch-assessment.md)
 The [D098 primitive helper](evidence/p7-9-230-parent-watch-primitive.md) implements D097. Setup review precedes one disposable listing/watch pair and result review precedes merge. Either result still requires a separately reviewed remedy/OpenCode continuation and does not advance cases 4–6, catalog or authenticated gates.
 
 The [D099 created-state inventory](evidence/p7-9-230-state-inventory.md) follows D098's `state-created` stop. It keeps that refusal and adds a metadata-only inventory before one setup-reviewed attempt; any remedy for created state needs a further reviewed decision and cases 4–6, catalog and authenticated gates stay unchanged.
+
+The [D100 Bun cache control](evidence/p7-9-230-bun-cache-control.md) reruns D099 with Bun's runtime transpiler cache disabled, keeping the state gate exact, so the D098 denied leg can run once after setup review. Any primitive result still needs a separately reviewed continuation; cases 4–6, catalog and authenticated gates stay unchanged.
