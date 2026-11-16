@@ -85,6 +85,13 @@ def digest_owned(path):
         os.close(fd)
 
 
+def metadata(path):
+    """Cheap in-window drift check: any content write changes ctime, which callers cannot restore."""
+    identity(path)
+    info = path.lstat()
+    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+
+
 class Channel:
     """Selector-driven private pipes with a whole-process deadline and total byte bound."""
     def __init__(self, child, nonce, timeout=TIMEOUT):
@@ -188,10 +195,17 @@ class Fixture:
         self.dirs = {p: identity(p, True) for p in
                      (work, home, self.parent, project,
                       *(work / name for name in ('CONFIG', 'DATA', 'CACHE', 'STATE')))}
-        self.files = {p: (identity(p), digest_owned(p)) for p in (runtime, script, self.direct, work / '.ah-owner', work / '.ah-lock')}
+        self.files = {p: (identity(p), digest_owned(p)) for p in (script, self.direct, work / '.ah-owner', work / '.ah-lock')}
+        # The large runtime is fully hashed before launch and after child exit (full=True);
+        # in-window phase checks compare identity/size/mtime/ctime instead of re-hashing it.
+        self.runtime = runtime
+        self.runtime_meta, self.runtime_digest = metadata(runtime), digest_owned(runtime)
         self.target_id = None
 
-    def check(self, phase):
+    def check(self, phase, full=False):
+        require(metadata(self.runtime) == self.runtime_meta, 'file-drift')
+        if full:
+            require(digest_owned(self.runtime) == self.runtime_digest, 'file-drift')
         require(all(identity(p, True) == expected for p, expected in self.dirs.items()), 'directory-drift')
         require(set(self.work.iterdir()) == {self.work / name for name in
                 ('.ah-owner', '.ah-lock', 'home', 'CONFIG', 'DATA', 'CACHE', 'STATE',
@@ -297,7 +311,7 @@ def run_case(executable, denied):
             with supervised(command, project, dict(env, BUN_BE_BUN='1'), nonce) as channel:
                 result = observe(channel, fixture, denied)
             # No service/state/extra executable/resource side effects are accepted.
-            fixture.check(0 if result['watch'] == 'INCOMPATIBLE' else 3)
+            fixture.check(0 if result['watch'] == 'INCOMPATIBLE' else 3, full=True)
             require(all(not any((work / name).iterdir()) for name in ('CONFIG', 'DATA', 'CACHE', 'STATE')),
                     'state-created')
         finally:

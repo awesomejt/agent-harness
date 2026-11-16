@@ -104,7 +104,22 @@ def fixture_identity_cases():
         runtime.write_bytes(b'R'); script.write_bytes(b'S')
         try:
             fixture = helper.Fixture(work, home, project, runtime, script)
-            fixture.check(0); fixture.mutate(1); fixture.mutate(2); fixture.mutate(3)
+            # In-window phase checks never re-hash the runtime; the post-exit full check does.
+            real, hashed = helper.digest_owned, []
+            def counting(path):
+                hashed.append(path)
+                return real(path)
+            with patch.object(helper, 'digest_owned', side_effect=counting):
+                fixture.check(0); fixture.mutate(1); fixture.mutate(2); fixture.mutate(3)
+                assert runtime not in hashed
+                fixture.check(3, full=True)
+                assert hashed.count(runtime) == 1
+            # A same-size in-place rewrite with mtime restored still changes ctime and refuses.
+            before = runtime.stat()
+            time.sleep(.01)
+            runtime.write_bytes(b'X')
+            os.utime(runtime, ns=(before.st_atime_ns, before.st_mtime_ns))
+            rejects(lambda: fixture.check(3), 'file-drift')
             runtime.unlink(); runtime.symlink_to(script)
             rejects(lambda: fixture.check(3), 'owned-path')
         finally:
