@@ -160,3 +160,10 @@ D097's parent-watch primitive is opt-in and setup-review gated:
 Its offline `chatgpt_230_parent_watch_cases.py` suite uses inert subprocesses and
 owned fixtures; it never launches installed OpenCode. See the
 [primitive controls and result](evidence/p7-9-230-parent-watch-primitive.md).
+
+
+D099's created-state inventory is opt-in and setup-review gated:
+`python3 -B scripts/experiments/chatgpt_230_state_inventory.py --source <clean-v2.3.0-checkout>`.
+Its offline `chatgpt_230_state_inventory_cases.py` suite uses synthetic owned
+roots and never launches installed OpenCode. See the
+[inventory contract and result](evidence/p7-9-230-state-inventory.md).
