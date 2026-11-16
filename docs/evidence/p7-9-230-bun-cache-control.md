@@ -123,3 +123,8 @@ does not establish D096's opaque cause, OpenCode readiness/reload behaviour or
 event coverage, and it neither passes case 3 nor accepts a warning exception.
 Per D098, the next step is a separately reviewed source-boundary/remedy decision
 before any OpenCode continuation. No retry.
+
+Result review (Grok follow-up on `3cc29c7`): **0 blockers, concerns or nits**. It
+also confirmed the cache inference: a Bun misreading `0` as a relative path would
+have written under the child's cwd, which `Fixture.check` requires to stay empty.
+Closeout is effective on PR #126 merge.
