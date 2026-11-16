@@ -167,3 +167,10 @@ D099's created-state inventory is opt-in and setup-review gated:
 Its offline `chatgpt_230_state_inventory_cases.py` suite uses synthetic owned
 roots and never launches installed OpenCode. See the
 [inventory contract and result](evidence/p7-9-230-state-inventory.md).
+
+
+D100's cache-controlled rerun is opt-in and setup-review gated:
+`python3 -B scripts/experiments/chatgpt_230_cache_control.py --source <clean-v2.3.0-checkout>`.
+Its offline `chatgpt_230_cache_control_cases.py` suite never launches installed
+OpenCode and fails if its `run_case` diverges from D099's beyond the child
+environment. See the [source findings and result](evidence/p7-9-230-bun-cache-control.md).
