@@ -44,3 +44,5 @@ Before implementing a phase, finalize its designated choices in DECISIONS.md and
 - [P7.9 created-state inventory](evidence/p7-9-230-state-inventory.md) — metadata-only, digest-labelled inventory of D098 created state and its bounded installed attempt (D099).
 
 - [P7.9 Bun cache control](evidence/p7-9-230-bun-cache-control.md) — source-pinned Bun transpiler-cache findings and the cache-disabled D099 rerun (D100).
+
+- [P7.9 case 3 retirement](evidence/p7-9-230-retire-case-3.md) — source chain for the listing-denied watch failure, retired row, coverage gap and watched-directory listing invariant (D101).
