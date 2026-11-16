@@ -102,3 +102,41 @@ entry output. Completing the suite fixed a test-string syntax error and an
 async fixture ordering assumption, and the child's `stop()` was hardened so a
 failed close can never silence the protocol or emit a success label. No
 installed OpenCode, sandbox or source checkout was used.
+
+Setup review ([PR #124](https://github.com/awesomejt/agent-harness/pull/124),
+Grok at `5113e5e`): **0 blockers/concerns, 1 nit** — repeated full hashing of the
+231 MB copied runtime inside the timed phase window (~0.09 s per hash, ~1.2 s per
+leg). Disposition: **valid, addressed** in `2a57e49`. The runtime is fully hashed
+before launch and after child exit; in-window checks compare identity, size,
+mtime and ctime (any content write changes ctime, which user space cannot
+restore). Tests assert no in-window runtime hashing and ctime detection of a
+same-size rewrite with restored mtime. Containment and protocol are unchanged,
+so per the nit rule no re-review is required; do not reopen this nit.
+
+### Installed outcome (single attempt, 2026-11-15, `2a57e49`)
+
+Inputs: Homebrew `opencode v2.3.0` whose SHA-256 equals the D094 pin
+(`95af97f3…2db7`); fresh shallow public clone of tag `v2.3.0` at exactly
+`a6b15d33daf6ab7d35569f6d711fdb630b9f04e7` with a clean tree. Source
+qualification passed (it precedes launch).
+
+```text
+REFUSED: state-created
+exit 1
+```
+
+The listing-**allowed** control leg refused at the post-exit state gate; no leg
+summary was printed and the **denied leg never ran**. By helper ordering, this
+gate follows a successful `observe()` (three phases plus `CLOSED`, exit 0) and
+a passing post-exit full fixture/runtime check, so the control's watch protocol
+completed and only the private CONFIG/DATA/CACHE/STATE emptiness invariant
+failed. The disposable root was removed as designed; which directory and what
+entries were written is unobserved. A Bun runtime cache under the private XDG
+roots is a hypothesis only, not a finding.
+
+Per the stop rule there is no retry. This is **not** a primitive compatibility
+result in either direction: the denied-leg parent-watch question is unanswered,
+and nothing here informs D096's cause. Continuation requires a separately
+reviewed decision — for example, a finite, content-free name/type inventory of
+created state before cleanup, or a reviewed Bun cache-path control — before any
+further installed attempt. All D098 boundaries and later gates are unchanged.
