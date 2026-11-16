@@ -84,3 +84,29 @@ inventory to a generic `control-gate` refusal. Disposition: **valid, addressed**
 by recording unreadable directories/roots and unstatable entries as above, with
 an offline `chmod 0` subdirectory and root case. Containment and protocol are
 unchanged, so no re-review is required; do not reopen this nit.
+
+### Installed outcome (single attempt, 2026-11-15, `1b7b4e1`)
+
+Inputs unchanged from D098: Homebrew `opencode v2.3.0` matching the D094 pin and
+a clean public `v2.3.0` clone at exactly `a6b15d33daf6ab7d35569f6d711fdb630b9f04e7`;
+source qualification passed.
+
+```text
+{"entries": [{"depth": 1, "name": "N:bun", "root": "CACHE", "type": "DIR"}, {"depth": 2, "name": "N:@t@", "root": "CACHE", "type": "DIR"}, {"depth": 3, "name": "H:47a527899a79328b", "root": "CACHE", "size": "LE_1M", "type": "FILE"}], "listing": "ALLOWED", "state": "CREATED", "truncated": false, "unreadable_roots": []}
+REFUSED: state-created
+exit 1
+```
+
+The listing-allowed control again completed its watch protocol and post-exit
+fixture check and refused only at the state gate. Created state is exactly one
+chain, `CACHE/bun/@t@/<file>` with one file of 4 KiB–1 MiB; CONFIG, DATA and
+STATE stayed empty, nothing was unreadable and the walk was not truncated. The
+denied leg did not run; no retry.
+
+Interpretation, bounded: `bun/@t@` under `$XDG_CACHE_HOME` matches the layout of
+Bun's runtime transpiler cache. That is a structural match, not an established
+writer or trigger, and the file's name and contents remain unobserved. The
+primitive parent-watch question is still unanswered. Whether a pinned cache
+control (for example Bun's documented transpiler-cache path setting, verified
+against the pinned runtime first) may be applied, or the gate scoped to this
+exact entry, requires a separately reviewed decision; D099 selects neither.
