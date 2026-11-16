@@ -110,3 +110,10 @@ primitive parent-watch question is still unanswered. Whether a pinned cache
 control (for example Bun's documented transpiler-cache path setting, verified
 against the pinned runtime first) may be applied, or the gate scoped to this
 exact entry, requires a separately reviewed decision; D099 selects neither.
+
+Result review (Grok follow-up on `dc0e0c8`): **0 blockers/concerns, 1 nit** — the
+`chmod 0` offline case fails under an effective root user, who bypasses mode
+bits; the helper is unaffected. Disposition: **valid, addressed** by injecting
+`PermissionError` through patched `scandir`/`iterdir` instead of chmod, which also
+adds an `UNSTATABLE` entry case. Test-only, so no re-review is required; do not
+reopen. Result review is otherwise clean; closeout is effective on PR #125 merge.

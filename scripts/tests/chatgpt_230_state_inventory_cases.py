@@ -87,36 +87,61 @@ def limit_cases():
 
 def unreadable_cases():
     """Unreadable created state is recorded, never escalated to a generic control-gate refusal."""
-    with tempfile.TemporaryDirectory() as directory:
+    # PermissionError is injected rather than produced with chmod, which an effective
+    # root user bypasses; the case is then independent of privilege and filesystem.
+    real_scandir, real_iterdir = os.scandir, Path.iterdir
+    denied = set()
+    def scandir(path):
+        if Path(path) in denied:
+            raise PermissionError('injected')
+        return real_scandir(path)
+    def iterdir(self):
+        if self in denied:
+            raise PermissionError('injected')
+        return real_iterdir(self)
+    with tempfile.TemporaryDirectory() as directory, \
+         patch.object(helper.os, 'scandir', scandir), patch.object(Path, 'iterdir', iterdir):
         work = owned_roots(directory)
         locked = work / 'CACHE' / 'bun'
         (locked / 'hidden').mkdir(parents=True)
         root = work / 'STATE'
         (root / 'inner').mkdir()
+        denied.add(locked)
         try:
-            locked.chmod(0)
+            helper.settle(work)
+            raise AssertionError('created state accepted')
+        except helper.StateCreated as error:
+            summary = error.summary
+        assert summary['entries'] == [
+            {'root': 'CACHE', 'depth': 1, 'type': 'DIR', 'name': 'N:bun', 'unreadable': True},
+            {'root': 'STATE', 'depth': 1, 'type': 'DIR', 'name': helper.label('inner')},
+        ], summary['entries']
+        # A whole root that cannot be listed is reported, and is not provably empty.
+        denied.clear()
+        locked.joinpath('hidden').rmdir(); locked.rmdir(); (root / 'inner').rmdir()
+        denied.add(root)
+        try:
+            helper.settle(work)
+            raise AssertionError('unreadable root accepted as empty')
+        except helper.StateCreated as error:
+            assert error.summary == {'entries': [], 'truncated': False, 'unreadable_roots': ['STATE']}
+        # An entry that cannot be lstat'ed is typed, never fatal.
+        denied.clear()
+        (work / 'DATA' / 'gone').mkdir()
+        class Unstatable:
+            def __init__(self, item): self.name, self.path = item.name, item.path
+            def stat(self, **_kwargs): raise PermissionError('injected')
+        class Wrapped:
+            def __init__(self, path): self.inner = real_scandir(path)
+            def __enter__(self): return [Unstatable(item) for item in self.inner.__enter__()]
+            def __exit__(self, *args): return self.inner.__exit__(*args)
+        with patch.object(helper.os, 'scandir', lambda path: Wrapped(path) if Path(path) == work / 'DATA' else real_scandir(path)):
             try:
                 helper.settle(work)
                 raise AssertionError('created state accepted')
             except helper.StateCreated as error:
-                summary = error.summary
-            assert summary['entries'] == [
-                {'root': 'CACHE', 'depth': 1, 'type': 'DIR', 'name': 'N:bun', 'unreadable': True},
-                {'root': 'STATE', 'depth': 1, 'type': 'DIR', 'name': helper.label('inner')},
-            ], summary['entries']
-            # A whole root made unreadable is reported, and is not provably empty.
-            locked.chmod(0o700)
-            locked.joinpath('hidden').rmdir(); locked.rmdir(); (root / 'inner').rmdir()
-            root.chmod(0)
-            try:
-                helper.settle(work)
-                raise AssertionError('unreadable root accepted as empty')
-            except helper.StateCreated as error:
-                assert error.summary == {'entries': [], 'truncated': False, 'unreadable_roots': ['STATE']}
-        finally:
-            for path in (locked, root):
-                if path.exists():
-                    path.chmod(0o700)
+                assert error.summary['entries'] == [
+                    {'root': 'DATA', 'depth': 1, 'name': helper.label('gone'), 'type': 'UNSTATABLE'}]
 
 
 def pair_ordering():
