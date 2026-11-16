@@ -90,3 +90,36 @@ Offline tests cover the exact environment addition and collision refusal, the
 D099 source mirror, inventory printing and stop-before-denied ordering, the
 clean pair, incompatible denial and sanitized entry output. Setup review, the
 single installed result and result review will be recorded below.
+
+Setup review ([PR #126](https://github.com/awesomejt/agent-harness/pull/126),
+Grok at `63a402b`): **0 blockers, concerns or nits**.
+
+### Installed outcome (single attempt, 2026-11-15, `63a402b`)
+
+Inputs unchanged: Homebrew `opencode v2.3.0` matching the D094 pin and a clean
+public `v2.3.0` clone at exactly `a6b15d33daf6ab7d35569f6d711fdb630b9f04e7`;
+source qualification passed.
+
+```text
+{"listing": "ALLOWED", "phases": 3, "watch": "COMPATIBLE"}
+{"code": "EPERM", "listing": "DENIED", "stage": "SYNC", "watch": "INCOMPATIBLE"}
+REFUSED: parent-watch-incompatible
+exit 1
+```
+
+- **Cache control**: the listing-allowed control completed all three phases and
+  passed the unchanged state gate, so no state was created; the pinned
+  executable honoured `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0`. This closes the
+  D098/D099 `state-created` stop for this primitive.
+- **Primitive result**: with the owned parent's `file-read-data` denied, its
+  direct probes succeeded and the nonrecursive parent `fs.watch` failed
+  **synchronously with EPERM**. That is D098's designed incompatible outcome:
+  each leg's summary is printed only after its fixture/runtime, state and
+  cleanup gates pass, and the nonzero exit is by design, not a failed run.
+
+Bounded interpretation: under this sandbox listing denial, the source-faithful
+parent-watch primitive cannot be acquired. This concerns the primitive only. It
+does not establish D096's opaque cause, OpenCode readiness/reload behaviour or
+event coverage, and it neither passes case 3 nor accepts a warning exception.
+Per D098, the next step is a separately reviewed source-boundary/remedy decision
+before any OpenCode continuation. No retry.
