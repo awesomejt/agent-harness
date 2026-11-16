@@ -24,8 +24,8 @@ direct-probe fallback. The parent is already harness-owned and empty apart from
 fixtures; the denial is the purpose of the case, not a protection.
 
 The chain below is pinned to OpenCode `v2.3.0`
-(`a6b15d33daf6ab7d35569f6d711fdb630b9f04e7`); both files are hash-checked by
-the [D097 manifest](p7-9-230-parent-watch-source-manifest.json), and source
+(`a6b15d33daf6ab7d35569f6d711fdb630b9f04e7`); all three source files are
+hash-checked by the [D097 manifest](p7-9-230-parent-watch-source-manifest.json), and source
 qualification against a clean clone passed for this record.
 
 1. `core/src/config/discovery.ts:discover` lists each parent and, on failure,
@@ -78,3 +78,11 @@ change. This record selects neither. A first-run stop applies as before.
 Retiring the row is not a pass. D094 installed qualification, full P7.9, the
 fixed 236-ID inventory, D034/D089, the catalog/retained/authenticated gates and
 Go gates are unchanged; P7.11 stays blocked. No D096 rerun.
+
+## Review and closeout
+
+[PR #127](https://github.com/awesomejt/agent-harness/pull/127): Grok reviewed
+`191a458` with **0 blockers, 0 concerns, 1 nit**. The source-chain text said
+"both files" while citing three; all three (`discovery.ts`, `watch.ts`,
+`watcher.ts`) are in the D097 manifest, so only the count was wrong. Fixed.
+Wording-only, so no re-review is required. Effective on merge.
