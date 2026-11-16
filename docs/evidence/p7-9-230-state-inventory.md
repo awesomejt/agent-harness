@@ -47,6 +47,10 @@ way. One installed attempt; the first unexpected observation stops without retry
   because those bytes are the helper's own. Any other name is emitted only as
   `H:` plus the first 16 hex digits of its SHA-256, so later hypotheses can be
   checked offline without a rerun; raw child-influenced names never appear.
+- Unreadable state is recorded, never escalated: a directory that cannot be
+  listed is marked `unreadable`, an unlistable root is named in
+  `unreadable_roots` (and is not treated as empty), and an entry that cannot
+  be `lstat`ed has type `UNSTATABLE`.
 - Bounds: depth 6 and 128 entries, after which `truncated` is set. Entries are
   sorted by name within each directory for reproducible output.
 
@@ -72,3 +76,11 @@ root refusal, no file opens during inventory, printing only after root deletion,
 stop-before-denied-leg ordering, the unchanged clean pair and sanitized entry
 output. Setup review, the single installed result and result review will be
 recorded below.
+
+Setup review ([PR #125](https://github.com/awesomejt/agent-harness/pull/125),
+Grok at `9205aa0`): **0 blockers/concerns, 1 nit**. An unreadable created
+directory would raise `PermissionError`, bypass `StateCreated` and lose the
+inventory to a generic `control-gate` refusal. Disposition: **valid, addressed**
+by recording unreadable directories/roots and unstatable entries as above, with
+an offline `chmod 0` subdirectory and root case. Containment and protocol are
+unchanged, so no re-review is required; do not reopen this nit.

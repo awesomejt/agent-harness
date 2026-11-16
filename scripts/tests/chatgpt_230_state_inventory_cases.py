@@ -47,7 +47,7 @@ def inventory_cases():
                 summary = error.summary
         text = json.dumps(summary)
         assert SECRET not in text and '/etc/hosts' not in text
-        assert not summary['truncated']
+        assert not summary['truncated'] and summary['unreadable_roots'] == []
         assert summary['entries'] == [
             {'root': 'DATA', 'depth': 1, 'type': 'LINK', 'name': helper.label('link')},
             {'root': 'CACHE', 'depth': 1, 'type': 'DIR', 'name': 'N:bun'},
@@ -83,6 +83,40 @@ def limit_cases():
             raise AssertionError('linked root accepted')
         except helper.Refusal as error:
             assert str(error) == 'owned-path'
+
+
+def unreadable_cases():
+    """Unreadable created state is recorded, never escalated to a generic control-gate refusal."""
+    with tempfile.TemporaryDirectory() as directory:
+        work = owned_roots(directory)
+        locked = work / 'CACHE' / 'bun'
+        (locked / 'hidden').mkdir(parents=True)
+        root = work / 'STATE'
+        (root / 'inner').mkdir()
+        try:
+            locked.chmod(0)
+            try:
+                helper.settle(work)
+                raise AssertionError('created state accepted')
+            except helper.StateCreated as error:
+                summary = error.summary
+            assert summary['entries'] == [
+                {'root': 'CACHE', 'depth': 1, 'type': 'DIR', 'name': 'N:bun', 'unreadable': True},
+                {'root': 'STATE', 'depth': 1, 'type': 'DIR', 'name': helper.label('inner')},
+            ], summary['entries']
+            # A whole root made unreadable is reported, and is not provably empty.
+            locked.chmod(0o700)
+            locked.joinpath('hidden').rmdir(); locked.rmdir(); (root / 'inner').rmdir()
+            root.chmod(0)
+            try:
+                helper.settle(work)
+                raise AssertionError('unreadable root accepted as empty')
+            except helper.StateCreated as error:
+                assert error.summary == {'entries': [], 'truncated': False, 'unreadable_roots': ['STATE']}
+        finally:
+            for path in (locked, root):
+                if path.exists():
+                    path.chmod(0o700)
 
 
 def pair_ordering():
@@ -152,6 +186,7 @@ def entry_sanitizes():
 def main():
     inventory_cases()
     limit_cases()
+    unreadable_cases()
     pair_ordering()
     print_after_cleanup()
     entry_sanitizes()

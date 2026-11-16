@@ -41,39 +41,58 @@ def size_bucket(size):
 
 def inventory(work):
     """Metadata only: lstat/scandir without following links; no file is ever opened."""
-    entries, truncated = [], False
+    entries, truncated, unreadable_roots = [], False, []
 
-    def visit(directory, root, depth):
+    def visit(directory, root, depth, parent):
         nonlocal truncated
-        with os.scandir(directory) as items:
-            children = sorted(items, key=lambda item: os.fsencode(item.name))
+        try:
+            with os.scandir(directory) as items:
+                children = sorted(items, key=lambda item: os.fsencode(item.name))
+        except OSError:
+            # Record, never fail: losing the inventory to a generic refusal defeats D099.
+            if parent is None:
+                unreadable_roots.append(root)
+            else:
+                parent['unreadable'] = True
+            return
         for item in children:
             if len(entries) >= MAX_ENTRIES:
                 truncated = True
                 return
-            info = item.stat(follow_symlinks=False)
-            mode = info.st_mode
-            kind = ('DIR' if stat.S_ISDIR(mode) else 'FILE' if stat.S_ISREG(mode) else
-                    'LINK' if stat.S_ISLNK(mode) else 'OTHER')
-            entry = {'root': root, 'depth': depth, 'type': kind, 'name': label(item.name)}
-            if kind == 'FILE':
-                entry['size'] = size_bucket(info.st_size)
+            entry = {'root': root, 'depth': depth, 'name': label(item.name)}
             entries.append(entry)
-            if kind == 'DIR':
+            try:
+                info = item.stat(follow_symlinks=False)
+            except OSError:
+                entry['type'] = 'UNSTATABLE'
+                continue
+            mode = info.st_mode
+            entry['type'] = ('DIR' if stat.S_ISDIR(mode) else 'FILE' if stat.S_ISREG(mode) else
+                             'LINK' if stat.S_ISLNK(mode) else 'OTHER')
+            if entry['type'] == 'FILE':
+                entry['size'] = size_bucket(info.st_size)
+            if entry['type'] == 'DIR':
                 if depth >= MAX_DEPTH:
                     truncated = True
                 else:
-                    visit(item.path, root, depth + 1)
+                    visit(item.path, root, depth + 1, entry)
 
     for root in ROOTS:
         watch.identity(work / root, True)
-        visit(work / root, root, 1)
-    return {'entries': entries, 'truncated': truncated}
+        visit(work / root, root, 1, None)
+    return {'entries': entries, 'truncated': truncated, 'unreadable_roots': unreadable_roots}
+
+
+def empty(path):
+    try:
+        return not any(path.iterdir())
+    except OSError:
+        return False  # unreadable is not provably empty; inventory records it
 
 
 def settle(work):
     """D098 emptiness gate, unchanged except that a refusal carries the inventory."""
-    if all(not any((work / name).iterdir()) for name in ROOTS):
+    if all(empty(work / name) for name in ROOTS):
         return
     raise StateCreated(inventory(work))
 
