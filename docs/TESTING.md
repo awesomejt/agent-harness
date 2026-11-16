@@ -153,3 +153,10 @@ suites exercise strict parsing/provenance/redaction, owned log-file refusals,
 private pipe supervision/cleanup and control-before-denial ordering; neither
 launches installed OpenCode. Every WARN/ERROR still refuses. See the
 [diagnostic helper and outcome](evidence/p7-9-230-warning-diagnostic.md).
+
+
+D097's parent-watch primitive is opt-in and setup-review gated:
+`python3 -B scripts/experiments/chatgpt_230_parent_watch.py --source <clean-v2.3.0-checkout>`.
+Its offline `chatgpt_230_parent_watch_cases.py` suite uses inert subprocesses and
+owned fixtures; it never launches installed OpenCode. See the
+[primitive controls and result](evidence/p7-9-230-parent-watch-primitive.md).
