@@ -80,7 +80,9 @@ def run_cases():
 
 def order_cases():
     events = []
+    # Pin the platform/interpreter gate so the missing-executable path is exercised on any host.
     with patch.object(sys, 'argv', ['x', '--source', '/unused']), \
+         patch.object(sys, 'platform', 'darwin'), patch.object(d094.old, 'PYTHON', sys.executable), \
          patch.object(d094, 'audit', side_effect=lambda _: events.append('audit') or
                       {'source_commit': 'c', 'plugins': {'ids': []}}), \
          patch.object(helper.shutil, 'which', return_value=None), \
@@ -89,9 +91,9 @@ def order_cases():
         try:
             helper.main()
             raise AssertionError('missing executable accepted')
-        except Exception:
-            pass
-    assert events == ['audit'] or sys.platform != 'darwin'
+        except RuntimeError as error:  # check() on a missing executable; AssertionError propagates
+            assert not isinstance(error, d094.Refusal)
+    assert events == ['audit']
     assert 'transport' not in events and 'matrix' not in events
     body = inspect.getsource(helper.main)
     assert body.index("'executable-pin'") < body.index('transport_controls') < body.index('run_matrix')
