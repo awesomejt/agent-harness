@@ -13,7 +13,7 @@ This directory plans work on agent-harness. It is not the runtime queue/state us
 | 4 | [Core MVP](04-core-mvp.md) | Named constrained agents, automation and declared binary support |
 | 5 | [Sequences](05-sequences.md) | Ordered steps, verification and durable recovery |
 | 6 | [Ralph](06-ralph.md) | Fresh-context bounded iterations |
-| 7 | [Local/subscription portfolio](07-native-adapters.md) | Existing local/Claude plus explicit OpenCode ChatGPT/Go; paused targets outside mandatory closure (D068) |
+| 7 | [Local/subscription portfolio](07-native-adapters.md) | Existing local/Claude plus local → OpenCode Go → opt-in Zen chain; ChatGPT-plan and paused targets outside mandatory closure (D103) |
 | 8 | [Pi](08-pi.md) | Early single-run adapter, then workflow parity after Phase 6 |
 | 9 | [Optional resource awareness](09-resource-awareness.md) | Demand-selected quota/ranking/scheduling increments |
 
