@@ -117,3 +117,5 @@ The [D099 created-state inventory](evidence/p7-9-230-state-inventory.md) follows
 The [D100 Bun cache control](evidence/p7-9-230-bun-cache-control.md) reruns D099 with Bun's runtime transpiler cache disabled, keeping the state gate exact, so the D098 denied leg can run once after setup review. Any primitive result still needs a separately reviewed continuation; cases 4–6, catalog and authenticated gates stay unchanged.
 
 The [D101 case 3 retirement](evidence/p7-9-230-retire-case-3.md) removes the listing-denied installed row, which cannot pass its gates by design, and records the resulting coverage gap and boundary invariant. Cases 4–6 follow only through a separately reviewed continuation; catalog and authenticated gates stay unchanged.
+
+The [D102 matrix rerun](evidence/p7-9-230-cases-4-6.md) runs D094 cases 1, 2, 4, 5 and 6 once, through the unchanged D094 helper and environment, after setup review. A pass closes the disposable no-auth qualification without case 3; catalog and authenticated gates stay unchanged.

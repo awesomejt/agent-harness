@@ -174,3 +174,11 @@ D100's cache-controlled rerun is opt-in and setup-review gated:
 Its offline `chatgpt_230_cache_control_cases.py` suite never launches installed
 OpenCode and fails if its `run_case` diverges from D099's beyond the child
 environment. See the [source findings and result](evidence/p7-9-230-bun-cache-control.md).
+
+
+D102's reduced-matrix rerun is opt-in and setup-review gated:
+`python3 -B scripts/experiments/chatgpt_230_observer_matrix.py --source <clean-v2.3.0-checkout>`.
+Its offline `chatgpt_230_observer_matrix_cases.py` suite never launches installed
+OpenCode. It fails if the rows drift from the merged D094 literal minus case 3,
+or if the wrapper replaces D094's `run_case`, controls or environment. See the
+[selection and result](evidence/p7-9-230-cases-4-6.md).
