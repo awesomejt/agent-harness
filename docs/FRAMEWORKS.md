@@ -1,6 +1,6 @@
 # Tools and reuse candidates
 
-D068 selects OpenCode ChatGPT-plan and dedicated Go routes for separate feasibility and delivery under P7.9–P7.12. They are not supported by today's adapter merely because selected. Current configuration/auth and capability claims below remain the tested implementation baseline until consuming contracts and evidence change. Codex/Grok remain paused and Antigravity blocked outside mandatory portfolio closure; Pi stays independent.
+D103 selects the OpenCode Go native target and an opt-in Go→Zen transition (P7.10, P7.12, P7.14) and defers ChatGPT-plan (P7.9/P7.11). None is supported by today's adapter merely because selected. Current configuration/auth and capability claims below remain the tested implementation baseline until consuming contracts and evidence change. Codex/Grok remain paused and Antigravity blocked outside mandatory portfolio closure; Pi stays independent.
 
 Research snapshot: 2026-11-01. These are evaluation candidates, not installed dependencies or compatibility guarantees. Recheck the selected release's API, license, platform behavior, and provider integration at adoption. Do not mix repository-head examples with an older published crate without checking differences.
 
