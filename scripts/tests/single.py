@@ -163,6 +163,7 @@ for case in ['version','version-old','version-new','route','widened','agent-wide
 check('text',2,source='missing')
 for source in ['inline','file','stdin']:
     check('text',0,source=source)
+check('version-patch',0)
 for case in ['read','edit','execute','search','external']:
     check(case,0,trusted=True)
 # 2.3.0 ends the turn with stopReason=cancelled after any rejected permission.

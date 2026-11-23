@@ -50,7 +50,7 @@ if sys.argv[1:] != ['acp']:
 if '--version' in sys.argv:
     if case=='preflight-deadline': time.sleep(10)
     print({'version': 'wrong', 'version-old': 'opencode v2.2.5',
-           'version-new': 'opencode v2.3.1'}.get(case, 'opencode v2.3.0'))
+           'version-new': 'opencode v2.4.0', 'version-patch': 'opencode v2.3.0'}.get(case, 'opencode v2.3.2'))
     sys.exit()
 if 'models' in sys.argv:
     assert native

@@ -115,13 +115,13 @@ impl Runtime {
     }
     /// Every inspection runs `--standalone`: without it 2.x attaches to the
     /// user's shared background service and its configuration.
-    pub async fn preflight(&self, request: &Resolved) -> Result<(), Exit> {
+    pub async fn preflight(&self, request: &Resolved) -> Result<String, Exit> {
         let version = self
             .inspect(&request.project, &["--version", "--standalone"])
             .await?;
-        if version.trim_ascii() != format!("opencode v{}", crate::opencode::VERSION).as_bytes() {
-            return Err(Exit::Invalid);
-        }
+        let detected_version = crate::opencode::parse_supported_version(&version)
+            .ok_or(Exit::Invalid)?
+            .to_owned();
         let parse =
             |bytes: Vec<u8>| serde_json::from_slice::<Value>(&bytes).map_err(|_| Exit::Invalid);
         let sources = parse(
@@ -141,7 +141,8 @@ impl Runtime {
             self.inspect(&request.project, &["debug", "agents", "--standalone"])
                 .await?,
         )?;
-        crate::opencode::validate_agents(request, &agents).map_err(|_| Exit::Invalid)
+        crate::opencode::validate_agents(request, &agents).map_err(|_| Exit::Invalid)?;
+        Ok(detected_version)
     }
 
     /// Remove runtime-owned state before reporting the final outcome. A plain

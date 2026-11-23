@@ -64,9 +64,9 @@ with tempfile.TemporaryDirectory(prefix='ah-preview-') as directory:
     assert 'override (invocation)' in out and '9 seconds (invocation)' in out
     assert 'host privileges' in out
     out, _ = run(path='')
-    assert 'missing; install OpenCode 2.3.0' in out
+    assert 'missing; install OpenCode 2.3.x' in out
     out, _ = run(path='.')
-    assert 'missing; install OpenCode 2.3.0' in out
+    assert 'missing; install OpenCode 2.3.x' in out
     run(['--prompt-file', str(project / 'prompt.txt')])
     run(['--prompt-file', '-'], stdin=prompt)
     _, err = run(key=False, expected=2)
