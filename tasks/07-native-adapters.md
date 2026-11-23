@@ -2,7 +2,7 @@
 
 Status checkboxes live only in [PROJECT.md](../PROJECT.md). These cards specify dependencies and evidence; their order is the recommended work order, not a second status board. See [task conventions](README.md).
 
-D103 replaces D068's portfolio. The mandatory portfolio is existing OpenCode/LiteLLM, accepted Claude, and a **local → OpenCode Go → opt-in OpenCode Zen** fallback chain through OpenCode. ChatGPT-plan P7.9/P7.11 are deferred outside mandatory closure with their evidence and gates kept, as are P7.3–P7.5. One focused task/PR is active at a time. Recommended order: P7.10 → P7.12 → P7.14 → P7.13 → P7.6 → P7.7; IDs are stable, not numeric execution order.
+D103 replaces D068's portfolio. The mandatory portfolio is existing OpenCode/LiteLLM, accepted Claude, the OpenCode Go native target, and an **operator-configured ordered fallback chain** for `local-first` (recommended local → Go → Claude, with opt-in Zen last). ChatGPT-plan P7.9/P7.11 are deferred outside mandatory closure with their evidence and gates kept, as are P7.3–P7.5. One focused task/PR is active at a time. Recommended order: P7.10 → P7.12 → P7.14 → P7.13 → P7.6 → P7.7; IDs are stable, not numeric execution order.
 
 <a id="p7-1"></a>
 ## P7.1 — Select next native adapter
@@ -111,7 +111,7 @@ D061 replaces the former Gemini CLI target at the same stable task ID. First pro
   - deny/trusted restrictions and source/helper isolation;
   - sanitized preview/output and bounded cancellation/cleanup;
   - local-first fallback from an unreachable proxy to Go;
-  - a limit refusal that stops (P7.14 owns the transition);
+  - a limit refusal that stops (P7.14 owns chain transitions);
   - the dated Extra Usage-off attestation.
 
   Record tested versions and account-control limitations. Do not deliberately exhaust an allowance.
@@ -119,33 +119,33 @@ D061 replaces the former Gemini CLI target at the same stable task ID. First pro
 - **Contract:** [Configuration](../docs/CONFIGURATION.md), [execution](../docs/EXECUTION.md), [frameworks](../docs/FRAMEWORKS.md), [operations](../docs/OPERATIONS.md); update before implementation consumption.
 
 <a id="p7-14"></a>
-## P7.14 — Go allowance exhaustion to opt-in OpenCode Zen
+## P7.14 — Configurable ordered fallback chain
 
 - **Depends on:** [P7.12](07-native-adapters.md#p7-12).
-- **Deliverable and boundary:** Select the Go→Zen subset of F27 and record the D034 replacement for that transition only, before implementation. The Zen step requires explicit configuration naming its model (metered, or a free Zen model) and never activates by default. A transition needs all of:
-  - a classified Go allowance-limit failure;
+- **Deliverable and boundary:** Select F27's ordered chain for `local-first` and record the D034 replacement for configured chains, with the finalized schema, before implementation. The operator lists the steps in order, each naming one accepted native target (`opencode-go`, `claude` or `opencode`/Zen) and its exact model. Without a chain, the single `native` fallback is unchanged. The sample config uses local → Go → Claude; a Zen step (metered, or a free Zen model) appears only when listed. The first transition keeps D034's unreachable-proxy trigger. A later transition needs all of:
+  - a classified allowance or rate-limit failure from the current step's target, using a classifier proven for that target (Go `provider.go-limit`; Claude `rate_limit_event`/result);
   - affirmative harness-side evidence that no work ran, such as no permission grant issued and no project change, with cleanup confirmed;
   - one linked attempt with fresh runtime state and grants, the same prompt and role constraints and the shared deadline.
 
-  Cancellation, deadline, authentication, unsupported or uncertain-effect failures never transition. No cycle and no uncertain replay.
-- **Acceptance evidence:** Fixture coverage of eligible and ineligible failures with the fake runtime. Progress/result/record fields name both attempts, the cause and usage, or record it as unknown. Live evidence of a real `provider.go-limit` only from natural exhaustion during ordinary use; until then, record that limitation explicitly.
-- **Decision/readiness gate:** [Action plan step 5](../docs/SUBSCRIPTION_ACTION_PLAN.md) applies in full. Metered spend is the operator's configured choice, with no hard-cap claim. Extra Usage stays off.
-- **Contract:** [Execution](../docs/EXECUTION.md), [configuration](../docs/CONFIGURATION.md), [workflows](../docs/WORKFLOWS.md).
+  Cancellation, deadline, authentication, unsupported or uncertain-effect failures never transition. Steps advance forward only: no cycle and no uncertain replay. Validation rejects unaccepted targets and any step that follows a target without a proven classifier. Exhaustion after a permission grant or project change stops for explicit recovery, so the chain covers exhaustion only at or before a run's first request; document that in setup docs. Decide whether a recorded exhaustion skips a step for later steps/iterations of the same workflow. Cloud-only chains stay a candidate.
+- **Acceptance evidence:** Fixture coverage of eligible and ineligible failures for each classified target, of reordered and shortened chains, and of the no-chain default, with the fake runtime. Progress/result/record fields name every attempt, its step, the cause and usage, or record it as unknown. Preview shows the resolved chain without network access. Live evidence of a real limit only from natural exhaustion during ordinary use; until then, record that limitation explicitly.
+- **Decision/readiness gate:** [Action plan step 5](../docs/SUBSCRIPTION_ACTION_PLAN.md) applies in full. Metered spend is the operator's configured choice, with no hard-cap claim. Extra Usage stays off. No new CLI flag unless this task's decision selects one.
+- **Contract:** [Execution](../docs/EXECUTION.md), [configuration](../docs/CONFIGURATION.md), [workflows](../docs/WORKFLOWS.md), [operations](../docs/OPERATIONS.md).
 
 <a id="p7-13"></a>
 ## P7.13 — Selected portfolio integrated acceptance
 
 - **Depends on:** [P7.2](07-native-adapters.md#p7-2), [P7.12](07-native-adapters.md#p7-12), [P7.14](07-native-adapters.md#p7-14), accepted [P5.6](05-sequences.md#p5-6) and [P6.5](06-ralph.md#p6-5).
-- **Deliverable and boundary:** Exercise existing OpenCode/LiteLLM, Claude, the Go native target and the local → Go → opt-in Zen chain through single/sequence/Ralph workflows. Reuse existing policy; add no fallback or locality behavior beyond P7.12/P7.14.
-- **Acceptance evidence:** Fixture/live evidence for coding/constrained roles, explicit route/model choices, interruption/recovery, dirty-project preservation, bounded cancellation/cleanup and sanitized preview/output. Verify supported limit failures stop without metered substitution or uncertain replay; distinguish synthetic failures from observed provider behavior. Record versions, account controls, usage or unknown, friction and limitations.
-- **Decision/readiness gate:** D034 as amended by P7.14 only. The rest of F27 and all of F28 remain candidates outside this milestone. P7.6 prepares the audit and P7.7 still gates phase exit; failed mandatory routes require a new scope decision.
+- **Deliverable and boundary:** Exercise existing OpenCode/LiteLLM, Claude, the Go native target and the recommended configured chain (local → Go → Claude, plus an opt-in Zen step) through single/sequence/Ralph workflows. Reuse existing policy; add no fallback or locality behavior beyond P7.12/P7.14.
+- **Acceptance evidence:** Fixture/live evidence for coding/constrained roles, explicit route/model choices, interruption/recovery, dirty-project preservation, bounded cancellation/cleanup and sanitized preview/output. Verify classified limit failures advance only to the next configured step, that unlisted targets are never substituted, and that unclassified or post-work failures stop without uncertain replay; distinguish synthetic failures from observed provider behavior. Record versions, account controls, usage or unknown, friction and limitations.
+- **Decision/readiness gate:** D034 as amended by P7.14 only. F27's remaining parts (cloud-only chains, the fallback-model known-problem record, a reachable-proxy trigger) and all of F28 remain candidates outside this milestone. P7.6 prepares the audit and P7.7 still gates phase exit; failed mandatory routes require a new scope decision.
 - **Contract:** [Workflows](../docs/WORKFLOWS.md), [testing](../docs/TESTING.md), [implementation](../docs/IMPLEMENTATION.md).
 
 <a id="p7-6"></a>
 ## P7.6 — Native adapter portfolio acceptance audit
 
 - **Depends on:** [P7.13](07-native-adapters.md#p7-13) (includes P7.2/P7.12/P7.14 and accepted workflow gates).
-- **Deliverable and boundary:** Audit aggregate capability/version/install coverage across D103’s selected local/Claude/Go/Zen portfolio. Incremental per-adapter docs/tests remain mandatory inside each adapter task; this task is only the final portfolio audit/evidence preparation; P7.7 closes the phase.
+- **Deliverable and boundary:** Audit aggregate capability/version/install coverage across D103’s selected local/Claude/Go portfolio and configurable chain. Incremental per-adapter docs/tests remain mandatory inside each adapter task; this task is only the final portfolio audit/evidence preparation; P7.7 closes the phase.
 - **Acceptance evidence:** Every selected route has linked fixture/live evidence and setup/capability docs; paused/blocked/deferred targets (including ChatGPT-plan P7.9/P7.11) retain explicit dispositions and resume conditions. Include existing local and Claude regressions, account-control limitations and tested installation/version coverage.
 - **Decision/readiness gate:** Partial milestones are usable independently. D068 replaced the four-target closure requirement and D103 the ChatGPT/Go portfolio; no mandatory selected route may be waived without a new decision. P7.3–P7.5 stay unchecked outside closure. P7.7 still reviews their accumulated experiments and dispositions.
 - **Contract:** [docs/IMPLEMENTATION.md](../docs/IMPLEMENTATION.md); status/evidence summary in [PROJECT.md](../PROJECT.md).
