@@ -23,10 +23,10 @@ Rust is the accepted harness language. Deliver `ah` as prebuilt platform binarie
 | G5 | Portable named agents | Markdown + YAML definitions map by name; primary and specialized roles carry supported model/tool/permission constraints. | Phase 4, expanded in 7–8 |
 | G6 | Ordered execution | A folder of prompts runs in deterministic order with defined failure, context, and restart behavior. | Phase 5 |
 | G7 | Bounded iterative execution | Ralph uses fresh agent context per iteration, durable filesystem state, an explicit completion signal, and limits. | Phase 6 |
-| G8 | Multiple runtimes | OpenCode/LiteLLM and Claude, then explicit ChatGPT-plan and dedicated Go routes through OpenCode (D068); independent Pi portability. Codex/Grok deferred and Antigravity blocked outside mandatory portfolio closure. | Phases 7–8 |
+| G8 | Multiple runtimes | OpenCode/LiteLLM and Claude, then the OpenCode Go native target and a configurable ordered `local-first` fallback chain (recommended local → Go → Claude, opt-in Zen last) (D103); independent Pi portability. ChatGPT-plan and Codex/Grok deferred and Antigravity blocked outside mandatory portfolio closure. | Phases 7–8 |
 | G9 | Optional resource-aware operation | Where supported, expose quota/cooldown information and optional scheduling without overriding mode policy. | Phase 9; demand-driven |
 
-D068 selects a finite Phase 7 portfolio; selected routes require separate feasibility, implementation and live acceptance before support is advertised. P7.6 audits this portfolio and P7.7 reviews the entire phase, including historical paused experiments. D066/D067 terms, account and spend constraints remain binding. F27 extended fallback and F28 physical locality remain candidates; mode names and D034 behavior are unchanged.
+D103 (amending D068) selects a finite Phase 7 portfolio; selected routes require separate feasibility, implementation and live acceptance before support is advertised. P7.6 audits this portfolio and P7.7 reviews the entire phase, including historical paused experiments. D066/D067 terms, account and spend constraints remain binding. D103 selects F27's ordered chain for `local-first` (P7.14), replacing D034 only when a chain is configured; F27's remaining parts and F28 physical locality remain candidates. Mode names are unchanged.
 
 ## Feature coverage and supporting contracts
 

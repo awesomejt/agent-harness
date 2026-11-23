@@ -13,7 +13,7 @@ It enforces operational modes (`local-only`, `cloud-only`, `local-first`) so clo
 - Never route cloud subscription traffic through LiteLLM if doing so would violate the provider’s Terms of Service. Those calls must go to the official native CLIs.
 - The harness owns LiteLLM routing configuration. When driving OpenCode in a local-capable mode, sync the relevant provider settings into the **project-level** OpenCode config only.
 - Canonical agent definitions live as Markdown + YAML frontmatter. Mapping to provider-specific formats is name-based.
-- Phase 7 follows D068: existing OpenCode/LiteLLM and accepted Claude, plus separately gated ChatGPT-plan and dedicated Go routes through OpenCode. Paused Codex/Grok and blocked Antigravity retain their gates outside mandatory portfolio closure; Pi stays independent. F27/F28 remain candidates and D034 fallback is unchanged.
+- Phase 7 follows D103 (amending D068): existing OpenCode/LiteLLM, accepted Claude, the OpenCode Go native target and a configurable ordered `local-first` fallback chain (recommended local → Go → Claude, opt-in Zen last). Deferred ChatGPT-plan, paused Codex/Grok and blocked Antigravity retain their gates outside mandatory portfolio closure; Pi stays independent. F27's ordered chain is selected for `local-first` (P7.14); without a configured chain D034 is unchanged; F28 remains a candidate.
 - OpenCode is the first runtime. The first usable slice is one local-only project coding run through LiteLLM. The core MVP adds all routing modes and named agents; sequences, Ralph, other native CLIs, and Pi follow in focused phases (see docs/IMPLEMENTATION.md).
 
 ## Git workflow
