@@ -158,7 +158,7 @@ fn named_agent_preview_reports_mapping_and_unsupported_effort_refuses_without_wr
     assert!(
         String::from_utf8(output.stderr)
             .unwrap()
-            .contains("agent effort is unsupported by OpenCode 2.3.0; only default effort runs")
+            .contains("agent effort is unsupported by OpenCode 2.3.x; only default effort runs")
     );
     assert_eq!(listing(), before);
     std::fs::remove_dir_all(project).unwrap();

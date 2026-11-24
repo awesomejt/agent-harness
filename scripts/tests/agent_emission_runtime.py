@@ -46,9 +46,9 @@ def write(project, path, text):
 
 def main():
     runtime = shutil.which('opencode')
-    assert runtime, 'OpenCode 2.3.0 required'
+    assert runtime, 'OpenCode 2.3.x required'
     version = subprocess.run([runtime, '--version'], capture_output=True, text=True, timeout=10)
-    assert version.returncode == 0 and version.stdout.strip() == 'opencode v2.3.0'
+    assert version.returncode == 0 and version.stdout.strip().startswith('opencode v2.3.'), version.stdout
 
     golden = sorted(GOLDEN.glob('*.md'))
     assert [g.stem for g in golden] == ['coder', 'reviewer']

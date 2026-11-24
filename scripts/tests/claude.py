@@ -581,7 +581,7 @@ for case in ('success', 'agent-big', 'agent-effort'):
     if case == 'agent-big':
         assert 'execution refused: agent body exceeds 128 KiB' in p.stdout, p.stdout
     if case == 'agent-effort':
-        assert 'execution refused: agent effort is unsupported by OpenCode 2.3.0; only default effort runs' in p.stdout, p.stdout
+        assert 'execution refused: agent effort is unsupported by OpenCode 2.3.x; only default effort runs' in p.stdout, p.stdout
     if case != 'success':
         q = ah('single', 'task', '--project', str(project), *extra)
         assert q.returncode == 2, q.stderr

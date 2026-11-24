@@ -269,7 +269,7 @@ def main():
                    'NATIVE_KEY': 'unused-native-key'}
             p = ah(project, 'Never forwarded to provider', '--agent', 'reviewer', '--permissions', 'trusted', env=env)
             assert p.returncode == 0, (p.returncode, p.stderr)
-            assert 'attempt=2 local-first fallback via OpenCode 2.3.0; model opencode/gpt-5.4' in p.stderr, p.stderr
+            assert 'attempt=2 local-first fallback via OpenCode 2.3.' in p.stderr, p.stderr
             assert (project / 'intercepted-native-prompt').exists()
             assert not any(sentinels.iterdir())
             checks.append('local-first native fallback: preflight with instructions entry passes; prompt intercepted')

@@ -311,18 +311,21 @@ async fn attempt(
         }
         // Preflight consumes an isolated routing snapshot; no project code or
         // plugins execute. Only then persist the already validated plan.
-        if let Err(exit) = adapter.preflight(request).await {
-            progress.event(format!(
-                "preflight failed (requires OpenCode {} and exact isolated routing/permissions)",
-                crate::opencode::VERSION
-            ));
-            if exit == Exit::Invalid {
-                progress.reason(
-                    "preflight failed: OpenCode version, isolated routing, permissions or agent did not match",
-                );
+        let runtime_version = match adapter.preflight(request).await {
+            Ok(version) => version,
+            Err(exit) => {
+                progress.event(format!(
+                    "preflight failed (requires OpenCode {} and exact isolated routing/permissions)",
+                    crate::opencode::VERSION
+                ));
+                if exit == Exit::Invalid {
+                    progress.reason(
+                        "preflight failed: OpenCode version, isolated routing, permissions or agent did not match",
+                    );
+                }
+                return exit;
             }
-            return exit;
-        }
+        };
         if tokio::time::Instant::now() >= adapter.deadline {
             return Exit::Cancelled;
         }
@@ -337,8 +340,7 @@ async fn attempt(
             return Exit::Cancelled;
         }
         progress.event(format!(
-            "{label} via OpenCode {}; model {}{}; permissions {:?}{}",
-            crate::opencode::VERSION,
+            "{label} via OpenCode {runtime_version}; model {}{}; permissions {:?}{}",
             request.runtime_model(),
             request
                 .group

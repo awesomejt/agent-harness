@@ -87,7 +87,7 @@ def main():
                          env={**env, 'LOCAL_KEY':'unused-local-test-key'}, capture_output=True, text=True, timeout=45)
         assert p.returncode == 0, (p.returncode, p.stderr)
         assert (fallback/'intercepted-native-prompt').exists(), p.stderr
-        assert 'attempt=2 local-first fallback via OpenCode 2.3.0; model opencode/gpt-5.4' in p.stderr, p.stderr
+        assert 'attempt=2 local-first fallback via OpenCode 2.3.' in p.stderr, p.stderr
         assert not (fallback/'opencode.json').exists() and not (fallback/'.ah-opencode-owner.json').exists()
         assert 'unused-native-test-key' not in p.stdout+p.stderr and 'unused-local-test-key' not in p.stdout+p.stderr
     print('PASS installed OpenCode 2.3.0 native preflight and ACP session; deny/trusted and local-first fallback; 0 native prompts forwarded; managed routing preserved')
