@@ -85,7 +85,7 @@ The steps below deliver the configurable fallback chain (recommended local → G
 
 ### Agent steps
 
-1. **D103 scope patch.** Done when U1 merges.
+1. **D103 scope patch.** Done: U1 merged in PR #129.
 2. **Offline-suite hygiene patch.** Two 2.2.5 suites depend on an optional `/tmp` checkout that the system emptied. Make that dependency explicit so the full offline suite is reliably green. No operator action.
 3. **P7.10 Go feasibility on the ACP path.** Audit the pinned 2.3.0 `opencode-go` registration, endpoint, helper and limit-error surfacing; extend the fake-runtime fixtures; run setup review, then one live no-tool prompt. Needs U2–U4.
 4. **P7.12 Go native target.** Schema, implementation and docs, then live coding and constrained review. Afterwards, `local-first` falls back from an unreachable proxy to Go. Needs U3, U4 and U7.

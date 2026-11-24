@@ -1,6 +1,6 @@
 # Project tracker
 
-Last updated: 2026-11-18. Status is maintained here; phase contracts are in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
+Last updated: 2026-11-24. Status is maintained here; phase contracts are in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
 
 ## Current state
 
