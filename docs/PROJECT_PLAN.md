@@ -75,7 +75,7 @@ The steps below deliver the configurable fallback chain (recommended local → G
 
 | # | Action | Unblocks | How |
 |---|---|---|---|
-| U1 | Approve D103 | Everything below | Review and merge the D103 patch PR after its Grok review. |
+| U1 | Approve D103 | Everything below | Complete: D103 merged in PR #129 after review. |
 | U2 | Hold minor/major pins | Every gate | Do not upgrade OpenCode past `2.3.x` (`2.4+` stops the gate), Claude Code (`2.1.314`) or Pi (`1.5.0`) until Phase 7 closes. SemVer patch releases in `2.3.x` are accepted under D104. |
 | U3 | Prepare the Go account | Step 3 live check, step 4 | In OpenCode Console, confirm the workspace holding the Go subscription, its active Go plan, and **Extra Usage off** on the Go page. Create an API key in that workspace and export it in your shell profile under a name you choose (for example `OPENCODE_API_KEY`). The harness reads only the configured name and never stores it. |
 | U4 | Attest before each live run | Each live acceptance in steps 3–6 | When asked, reply with the current time, time zone and a confirmation that the U3 workspace, plan and Extra Usage-off state are still true. Recheck after any account or plan change. |

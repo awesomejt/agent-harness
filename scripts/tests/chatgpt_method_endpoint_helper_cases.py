@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Offline method/endpoint/helper expectation and redaction checks; no OpenCode or network."""
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -17,13 +18,18 @@ def rejects(action):
 
 
 def expectations_cases():
-    source = Path('/tmp/ah-opencode-source-review')
-    if source.is_dir():
+    source_path = os.environ.get('AH_OPENCODE_225_SOURCE')
+    if source_path is not None:
+        source = Path(source_path)
+        if not source_path or not source.is_dir():
+            raise RuntimeError('AH_OPENCODE_225_SOURCE must name a v2.2.5 source checkout directory')
         from chatgpt_installed_observer import verify_source
         packages, _ = verify_source(source)
         expected = helper.pinned_expectations(packages)
         assert expected['method_id'] == 'chatgpt-token-sharing'
         print('PASS: pinned checkout constants decoded', flush=True)
+    else:
+        print('SKIP: pinned checkout constants (set AH_OPENCODE_225_SOURCE)', flush=True)
     snippet = '''
     const resource = "https://api.openai.com/v1"
     const providerID = Provider.ID.openai

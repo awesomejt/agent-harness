@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Offline ChatGPT credits-off attestation and usage-source inventory checks; no OpenCode or network."""
+import os
 import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -51,13 +52,18 @@ def inventory_cases():
     description:
       "Return the OpenCode Go allowance and Console budgets of the OpenCode Console workspace the location is signed in to, or null when it isn't signed in.",
     '''
-    source = Path('/tmp/ah-opencode-source-review')
-    if source.is_dir():
+    source_path = os.environ.get('AH_OPENCODE_225_SOURCE')
+    if source_path is not None:
+        source = Path(source_path)
+        if not source_path or not source.is_dir():
+            raise RuntimeError('AH_OPENCODE_225_SOURCE must name a v2.2.5 source checkout directory')
         from chatgpt_installed_observer import verify_source
         packages, _ = verify_source(source)
         credits.verify_usage_pins(packages)
         credits.inventory_from_source(packages)
         print('PASS: pinned checkout usage inventory verified', flush=True)
+    else:
+        print('SKIP: pinned checkout usage inventory (set AH_OPENCODE_225_SOURCE)', flush=True)
     with tempfile.TemporaryDirectory() as directory:
         pkg = Path(directory) / 'packages'
         for rel, text in (
