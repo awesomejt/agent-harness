@@ -99,7 +99,8 @@ concern about the stale setup record and missing Beam Free source observation,
 and one portability nit. The follow-up reviewed the model change; this record
 corrects its requested model and endpoint evidence, and the portability nit is
 fixed. Neither finding requires another setup review under the workflow. The
-live result and its separate result review remain pending.
+third review covered the live result and found zero blockers, zero concerns and
+two documentation nits, corrected here; no further review is required.
 
 The separately ignored `runtime::go_candidate_fixture::live_acp` entry requires
 setup review and a fresh same-session Go account/Extra-Usage-off attestation
@@ -127,7 +128,7 @@ stop, not permission to retry. User-provided interactive Go use is not a pass fo
 this candidate. No forced exhaustion, authenticated request, or model turn was
 performed before setup review.
 
-## Bounded live observation — result review pending
+## Bounded live observation
 
 On 2026-11-24 at approximately 22:45 CST, the operator confirmed Extra Usage
 was still off for the existing Personal Go account and directed the use of Beam
@@ -137,7 +138,9 @@ then configured the key used here. The operator stated the existing account was
 active. These account observations are not an independent API verification of
 workspace/key association or billing state.
 
-One run used reviewed source revision `c2e840d70b40d6cf2b808f4a6b1df3eb0e2766a2`,
+One run used source revision `c2e840d70b40d6cf2b808f4a6b1df3eb0e2766a2`
+(its Rust sources match reviewed revision `d0fb2b3`; subsequent changes before
+the run affected documentation and the test runner),
 the prebuilt test executable SHA-256
 `d9cc3e4f4e63feef0b335f3dbe7d9377d8ed943c47c9d66716a9a2b391ce12f9`,
 and installed OpenCode 2.3.2 on macOS arm64. The reviewed preflight passed the
@@ -154,8 +157,8 @@ This observation establishes the selected effective OpenCode Go model and a
 successful no-tool ACP response. It is not a captured wire trace, paid allowance
 or entitlement proof, live usage-limit test, billing guarantee, or production
 Go adapter. P7.12 still owns its own schema, route implementation and live
-acceptance, including a fresh account check. PR result review remains pending;
-P7.10 acceptance is not effective until required review and merge.
+acceptance, including a fresh account check. P7.10 acceptance is effective on
+PR #132 merge after the completed result review.
 
 ## Reproduce source identity
 
