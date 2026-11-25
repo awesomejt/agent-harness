@@ -30,15 +30,15 @@ if (cwd / 'track-config').exists():
     with open(cwd / 'runtime-config.jsonl', 'a') as record:
         record.write(json.dumps(dict(args=sys.argv[1:], env=sorted(os.environ), config=config)) + '\n')
 provider = config['model']['providerID']
-native = provider == 'opencode'
+native = provider in ('opencode', 'opencode-go')
 assert config['policies'] == [dict(action='provider.use', resource='*', effect='deny'),
                               dict(action='provider.use', resource=provider, effect='allow')]
 if native:
-    assert config['providers'] == {'opencode': {'settings': {'apiKey': '{env:AH_RUNTIME_API_KEY}'}}}
+    assert config['providers'] == {provider: {'settings': {'apiKey': '{env:AH_RUNTIME_API_KEY}'}}}
     assert 'OPENCODE_API_KEY' not in os.environ
     assert os.environ['AH_RUNTIME_API_KEY'] == 'SECRET_SENTINEL'
-    assert config['model'] == config['agents']['title']['model'] == dict(providerID='opencode', model='fixture')
-    assert 'TEST_KEY' not in os.environ and 'LITELLM_API_KEY' not in os.environ
+    assert config['model'] == config['agents']['title']['model'] == dict(providerID=provider, model='fixture')
+    assert 'TEST_KEY' not in os.environ and 'P710_KEY' not in os.environ and 'LITELLM_API_KEY' not in os.environ
 else:
     assert 'OPENCODE_API_KEY' not in os.environ
     assert config['providers']['ah-litellm']['settings']['apiKey'] == '{env:AH_RUNTIME_API_KEY}'
@@ -55,7 +55,7 @@ if '--version' in sys.argv:
 if 'models' in sys.argv:
     assert native
     print('opencode/missing' if case == 'native-model-missing' else target)
-    print('ah-litellm/fixture' if case == 'catalog-foreign' else 'opencode/other')
+    print('ah-litellm/fixture' if case == 'catalog-foreign' else provider + '/other')
     sys.exit()
 if 'debug' in sys.argv:
     if 'config' in sys.argv:
@@ -64,6 +64,8 @@ if 'debug' in sys.argv:
             item['settings']['apiKey'] = '***'
         if case == 'route':
             info['agents']['title']['model'] = dict(providerID=provider, model='other')
+        if case == 'go-baseurl':
+            info['providers'][provider]['settings']['baseURL'] = 'https://example.invalid'
         if case == 'native-provider':
             info['providers']['ah-litellm'] = dict(package='aisdk:@ai-sdk/openai-compatible', settings=dict(baseURL='http://127.0.0.1:9/v1'))
         if case == 'native-enabled':
@@ -106,6 +108,8 @@ if 'debug' in sys.argv:
                   dict(id='explore', name='Explore', mode='subagent', hidden=False, permissions=explore, request=request),
                   dict(id='title', name='Title', mode='primary', hidden=True, permissions=builtin + list(config['permissions']) + tail, request=request,
                        model=dict(id=config['model']['model'], providerID=provider))]
+        if case == 'go-title-missing':
+            agents[2]['model'] = None
         if case == 'agent-model':
             agents[1]['model'] = dict(id='other', providerID=provider)
         # P4.3: configured agents append their own rules after the global ones.
@@ -217,11 +221,11 @@ for line in sys.stdin:
                    'The marker AH-RALPH-COMPLETE is mentioned, not claimed.\nOK' if 'MENTION' in text else 'OK'))
             reply(prompt_id, dict(stopReason='end_turn'))
             continue
-        if case in ['deny-progress', 'deny-completed', 'named-completed-edit', 'named-completed-read', 'named-completed-unknown']:
+        if case in ['deny-progress', 'deny-completed', 'go-tool-event', 'named-completed-edit', 'named-completed-read', 'named-completed-unknown']:
             # 2.3.0 reports in_progress while parsing arguments, then fails an unavailable tool.
             kind = 'edit' if case == 'named-completed-edit' else 'read'
             update(sessionUpdate='tool_call', toolCallId='t', **({} if case == 'named-completed-unknown' else dict(kind=kind)), status='pending', rawInput={})
-            for status in ['in_progress', 'failed' if case == 'deny-progress' else 'completed']:
+            for status in ['in_progress', 'failed' if case in ['deny-progress', 'go-tool-event'] else 'completed']:
                 fields = dict(sessionUpdate='tool_call_update', toolCallId='t', status=status, rawInput=dict(path='/tmp/example'))
                 if case != 'named-completed-unknown':
                     fields['kind'] = kind
@@ -240,6 +244,13 @@ for line in sys.stdin:
             break
         if case == 'rpc-error':
             send(dict(jsonrpc='2.0',id=prompt_id,error=dict(code=-32603,message='SECRET_SENTINEL')))
+            continue
+        if case == 'go-limit-rpc':
+            # ACP 2.3.0 translates a Go limit into a session service failure.
+            # This exercises the current conservative handling, not fallback.
+            send(dict(jsonrpc='2.0', id=prompt_id, error=dict(
+                code=-32603, message='SECRET_SENTINEL',
+                data=dict(service='session', errorName='provider.go-limit'))))
             continue
         if case == 'known-failure':
             reply(prompt_id,dict(stopReason='max_tokens'))

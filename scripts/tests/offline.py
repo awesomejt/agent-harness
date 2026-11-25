@@ -25,6 +25,7 @@ SUITES = [
     ['scripts/tests/single_runtime.py', '--group=coder'],
     ['scripts/tests/single_runtime.py', '--refuse'],
     ['scripts/tests/native.py'],
+    ['scripts/tests/go_acp_candidate.py'],
     ['scripts/tests/native_runtime.py'],
     ['scripts/tests/opencode_process_runtime.py'],
     ['scripts/tests/opencode_native_isolation_runtime.py'],

@@ -15,6 +15,8 @@ pub(crate) struct Runtime {
     pub cancelled: tokio_util::sync::CancellationToken,
     env: Vec<(OsString, OsString)>,
     pub executable: std::path::PathBuf,
+    #[cfg(test)]
+    go_candidate: bool,
 }
 
 impl Runtime {
@@ -80,7 +82,46 @@ impl Runtime {
             env,
             executable,
             deadline,
+            #[cfg(test)]
+            go_candidate: false,
         })
+    }
+
+    #[cfg(test)]
+    fn new_go_candidate(
+        request: &Resolved,
+        deadline: tokio::time::Instant,
+        cancelled: tokio_util::sync::CancellationToken,
+        progress: crate::progress::Progress,
+    ) -> Result<Self, Exit> {
+        let mut runtime = Self::new(request, deadline, cancelled, progress)?;
+        runtime.go_candidate = true;
+        runtime.config["model"]["providerID"] = serde_json::json!("opencode-go");
+        runtime.config["agents"]["title"]["model"] = runtime.config["model"].clone();
+        runtime.config["policies"][1]["resource"] = serde_json::json!("opencode-go");
+        runtime.config["providers"] = serde_json::json!({"opencode-go": {
+            "settings": {"apiKey": "{env:AH_RUNTIME_API_KEY}"}
+        }});
+        let entry = runtime
+            .env
+            .iter_mut()
+            .find(|(name, _)| name == "OPENCODE_CONFIG_CONTENT")
+            .ok_or(Exit::Invalid)?;
+        entry.1 = runtime.config.to_string().into();
+        Ok(runtime)
+    }
+
+    pub fn target(&self, request: &Resolved) -> String {
+        #[cfg(test)]
+        if self.go_candidate {
+            return format!("opencode-go/{}", request.model);
+        }
+        request.runtime_model()
+    }
+
+    #[cfg(test)]
+    pub fn is_go_candidate(&self) -> bool {
+        self.go_candidate
     }
     pub fn command(&self, project: &Path, args: &[&str]) -> Command {
         let mut command = Command::new(&self.executable);
@@ -135,12 +176,28 @@ impl Runtime {
                 .inspect(&request.project, &["models", "--standalone"])
                 .await?;
             let models = std::str::from_utf8(&bytes).map_err(|_| Exit::Invalid)?;
+            #[cfg(test)]
+            if self.go_candidate {
+                crate::opencode::validate_catalog_for(&self.target(request), "opencode-go", models)
+                    .map_err(|_| Exit::Invalid)?;
+            } else {
+                crate::opencode::validate_catalog(request, models).map_err(|_| Exit::Invalid)?;
+            }
+            #[cfg(not(test))]
             crate::opencode::validate_catalog(request, models).map_err(|_| Exit::Invalid)?;
         }
         let agents = parse(
             self.inspect(&request.project, &["debug", "agents", "--standalone"])
                 .await?,
         )?;
+        #[cfg(test)]
+        if self.go_candidate {
+            crate::opencode::validate_agents_for(request, &agents, "opencode-go", true)
+                .map_err(|_| Exit::Invalid)?;
+        } else {
+            crate::opencode::validate_agents(request, &agents).map_err(|_| Exit::Invalid)?;
+        }
+        #[cfg(not(test))]
         crate::opencode::validate_agents(request, &agents).map_err(|_| Exit::Invalid)?;
         Ok(detected_version)
     }
@@ -254,5 +311,128 @@ impl Drop for PrivateHome {
             // runs use Runtime::cleanup_private_home so failure affects outcome.
             let _ = std::fs::remove_dir_all(path);
         }
+    }
+}
+
+#[cfg(test)]
+mod go_candidate_fixture {
+    use super::*;
+    use crate::config::{Config, Invocation};
+
+    // This entry point is deliberately fake-only. It cannot be used for the
+    // reviewed live gate: both executable identity and credential are fixed.
+    #[test]
+    #[ignore = "invoked only by the disposable Go candidate fixture runner"]
+    fn synthetic_acp() {
+        let project = std::path::PathBuf::from(std::env::var_os("AH_P710_PROJECT").unwrap());
+        assert_eq!(std::env::var("P710_KEY").as_deref(), Ok("SECRET_SENTINEL"));
+        let executable = crate::preview::discover_runtime("opencode").unwrap();
+        let fake = Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/tests/fake_opencode.py");
+        assert_eq!(
+            executable.canonicalize().unwrap(),
+            fake.canonicalize().unwrap()
+        );
+        let input = br#"{"version":1,"mode":"cloud-only","native":{"target":"opencode","model":"fixture","api_key_env":"P710_KEY"}}"#;
+        let request = Invocation::parse(
+            vec![
+                "single".into(),
+                "fixture prompt".into(),
+                "--project".into(),
+                project.into_os_string(),
+            ],
+            Path::new("/"),
+        )
+        .unwrap()
+        .resolve(
+            Config::read(&input[..]).unwrap(),
+            |name| std::env::var_os(name),
+            &b""[..],
+        )
+        .unwrap();
+        let executor = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        executor.block_on(async {
+            let deadline = tokio::time::Instant::now() + Duration::from_secs(20);
+            let mut runtime = Runtime::new_go_candidate(
+                &request,
+                deadline,
+                tokio_util::sync::CancellationToken::new(),
+                crate::progress::Progress::new(false),
+            )
+            .unwrap();
+            let outcome = match runtime.preflight(&request).await {
+                Ok(_) => crate::acp::run(&runtime, &request).await,
+                Err(exit) => exit,
+            };
+            assert!(runtime.cleanup_private_home().await);
+            println!("P710_RESULT={}", outcome as u8);
+        });
+    }
+
+    // Not run by the fixture suite. Execute only after setup review and the
+    // operator's fresh account attestation; never force allowance exhaustion.
+    #[test]
+    #[ignore = "operator-gated Go live acceptance; see P7.10 setup evidence"]
+    fn live_acp() {
+        assert_eq!(
+            std::env::var("AH_P710_LIVE").as_deref(),
+            Ok("operator-attested")
+        );
+        let key = std::env::var_os("P710_KEY")
+            .filter(|s| !s.is_empty())
+            .expect("P710_KEY is required");
+        assert_ne!(key, "SECRET_SENTINEL");
+        let executable = crate::preview::discover_runtime("opencode").unwrap();
+        let installed = Path::new("/opt/homebrew/bin/opencode");
+        assert_eq!(
+            executable.canonicalize().unwrap(),
+            installed.canonicalize().unwrap()
+        );
+        let mut project = PrivateHome::new().unwrap();
+        let input = br#"{"version":1,"mode":"cloud-only","native":{"target":"opencode","model":"kimi-k3","api_key_env":"P710_KEY"}}"#;
+        let request = Invocation::parse(
+            vec![
+                "single".into(),
+                "Reply with OK.".into(),
+                "--project".into(),
+                project.path().into(),
+            ],
+            Path::new("/"),
+        )
+        .unwrap()
+        .resolve(
+            Config::read(&input[..]).unwrap(),
+            |name| std::env::var_os(name),
+            &b""[..],
+        )
+        .unwrap();
+        let executor = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        executor.block_on(async {
+            let deadline = tokio::time::Instant::now() + Duration::from_secs(90);
+            let signals = Signals::watch();
+            let mut runtime = Runtime::new_go_candidate(&request, deadline, signals.token(), crate::progress::Progress::new(false)).unwrap();
+            let outcome = match runtime.preflight(&request).await {
+                Ok(version) => {
+                    eprintln!("Go candidate preflight passed: OpenCode {version}, opencode-go/kimi-k3, deny");
+                    crate::acp::run(&runtime, &request).await
+                }
+                Err(exit) => exit,
+            };
+            let outcome = if outcome == Exit::Success && runtime.progress.final_line().is_none() {
+                eprintln!("Go candidate returned an empty response; acceptance not met");
+                Exit::Failed
+            } else {
+                outcome
+            };
+            assert!(runtime.cleanup_private_home().await);
+            let path = project.take().unwrap();
+            std::fs::remove_dir_all(path).expect("remove disposable project");
+            println!("P710_LIVE_RESULT={}", outcome as u8);
+        });
     }
 }

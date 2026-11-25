@@ -90,7 +90,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
         return Exit::Cancelled;
     }
     let project = &request.project;
-    let target = request.runtime_model();
+    let target = runtime.target(request);
     let prompt = &request.prompt;
     // Kinds the effective rules may grant; a named role also fails on a
     // completed call of any other kind, independently of backend rules.
@@ -538,6 +538,16 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
         } else {
             Exit::Failed
         };
+    }
+    #[cfg(test)]
+    if runtime.is_go_candidate() {
+        let state = observed.lock().unwrap();
+        if state.permissions != 0 || state.tools != 0 {
+            runtime
+                .progress
+                .event("Go candidate observed tool activity; no-tool acceptance not met");
+            return Exit::Failed;
+        }
     }
     runtime
         .progress
