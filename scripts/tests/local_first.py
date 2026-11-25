@@ -64,7 +64,7 @@ def blackholed(address='10.255.255.1'):
     return False
 
 
-def check(case, expected, routes, endpoint, *, extra=(), env_drop=(), timeout='15', signal_after=None):
+def check(case, expected, routes, endpoint, *, extra=(), env_drop=(), timeout='15', signal_after=None, target='opencode'):
     with tempfile.TemporaryDirectory(prefix='ah-local-first-') as d:
         base = Path(d).resolve()
         (base/'opencode').symlink_to(FAKE)
@@ -73,7 +73,7 @@ def check(case, expected, routes, endpoint, *, extra=(), env_drop=(), timeout='1
         (base/'user.txt').write_bytes(b'preserve dirty user content')
         cfg = dict(version=1, mode='local-first', model='group:coder',
                    litellm=dict(api_base=endpoint, api_key_env='TEST_KEY', groups=dict(coder='fixture')),
-                   native=dict(target='opencode', model='fixture', api_key_env='NATIVE_KEY'))
+                   native=dict(target=target, model='fixture', api_key_env='NATIVE_KEY'))
         (base/'ah.json').write_text(json.dumps(cfg))
         env = {**os.environ, 'PATH': str(base)+':'+os.environ['PATH'],
                'TEST_KEY': 'SECRET_SENTINEL', 'NATIVE_KEY': 'SECRET_SENTINEL',
@@ -131,6 +131,14 @@ check('rpc-error', 4, ['native'], unreachable)
 check('session-model', 1, ['native'], unreachable)
 check('version', 2, [], unreachable)  # native preflight failure ends the run; no further attempt
 check('cancel-deadline', 3, ['native'], unreachable, timeout='1')
+
+# Go uses the same pre-submission boundary, without falling through on a limit.
+err = check('success', 0, ['native'], unreachable, target='opencode-go')
+assert 'model opencode-go/fixture' in err, err
+check('read', 0, ['native'], unreachable, extra=['--permissions', 'trusted'], target='opencode-go')
+check('go-limit-rpc', 4, ['native'], unreachable, target='opencode-go')
+check('go-title-missing', 2, [], unreachable, target='opencode-go')
+check('success', 0, ['local'], reachable, target='opencode-go')
 
 # Static validation and preview precede any network contact.
 before = listener.connections

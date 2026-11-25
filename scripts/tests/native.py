@@ -30,7 +30,12 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), Trap) as trap:
     # 2.3.0 ends the turn with stopReason=cancelled after a rejected permission.
     cases += [('success', 0), ('version-patch', 0), ('read', 0), ('deny', 3), ('cancel-deadline', 3), ('session-model', 1), ('rpc-error', 4), ('go-limit-rpc', 4), ('preview', 0), ('missing-key', 2)]
     count = 0
-    for case, expected in cases:
+    # Exercise the production Go route through the same isolation matrix.
+    cases += [("go-baseurl", 2), ("go-title-missing", 2)]
+    for target in ['opencode', 'opencode-go']:
+      for case, expected in cases:
+        if target == 'opencode' and case in ['go-baseurl', 'go-title-missing']:
+            continue
         for no_sync in [False, True]:
             with tempfile.TemporaryDirectory(prefix='ah-native-') as d:
                 base = Path(d).resolve()
@@ -47,7 +52,7 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), Trap) as trap:
                 for name, content in sentinels.items():
                     (base/name).write_bytes(content)
                 cfg = dict(version=1, mode='cloud-only',
-                           native=dict(target='opencode', model='fixture', api_key_env='NATIVE_KEY'),
+                           native=dict(target=target, model='fixture', api_key_env='NATIVE_KEY'),
                            litellm=dict(api_base=endpoint, api_key_env='MISSING_LOCAL_KEY'))
                 (base/'ah.json').write_text(json.dumps(cfg))
                 env = {**os.environ, 'PATH': str(base)+':'+os.environ['PATH'],
@@ -78,6 +83,7 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), Trap) as trap:
                     assert not Path((base/'runtime-home').read_text()).exists(), case
                 if case == 'preview':
                     assert 'route: native OpenCode' in p.stdout
+                    assert ('opencode-go/fixture' in p.stdout) == (target == 'opencode-go')
                     assert 'managed project config untouched' in p.stdout
                     assert 'planned changes: none' in p.stdout
                     assert 'proxy handoff: not applicable (native route)' in p.stdout

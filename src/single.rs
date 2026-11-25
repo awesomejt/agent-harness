@@ -108,7 +108,9 @@ pub(crate) fn supported(request: &crate::config::Resolved) -> Result<(), crate::
     // Effort maps on Claude Code (D050); OpenCode still runs only default.
     if let Some(agent) = &request.agent {
         match request.runtime {
-            crate::config::RuntimeKind::OpenCode => crate::opencode::supports(agent)?,
+            crate::config::RuntimeKind::OpenCode | crate::config::RuntimeKind::OpenCodeGo => {
+                crate::opencode::supports(agent)?
+            }
             crate::config::RuntimeKind::Pi => crate::pi::supports(agent)?,
             _ => {}
         }
@@ -386,12 +388,12 @@ fn describe(request: &crate::config::Resolved, label: &str) -> serde_json::Value
     serde_json::json!({
         "route": label,
         "runtime": match request.runtime {
-            crate::config::RuntimeKind::OpenCode => "opencode",
+            crate::config::RuntimeKind::OpenCode | crate::config::RuntimeKind::OpenCodeGo => "opencode",
             crate::config::RuntimeKind::Claude => "claude",
             crate::config::RuntimeKind::Pi => "pi",
         },
         "runtime_version": match request.runtime {
-            crate::config::RuntimeKind::OpenCode => crate::opencode::VERSION,
+            crate::config::RuntimeKind::OpenCode | crate::config::RuntimeKind::OpenCodeGo => crate::opencode::VERSION,
             crate::config::RuntimeKind::Claude => crate::claude::VERSION,
             crate::config::RuntimeKind::Pi => crate::pi::VERSION,
         },

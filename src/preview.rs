@@ -131,6 +131,8 @@ pub(crate) fn render(r: &Resolved, plan: Option<&Plan>, config: &Path) -> String
         "LiteLLM only"
     } else if claude {
         "native Claude Code on the operator's existing official CLI login"
+    } else if r.runtime == crate::config::RuntimeKind::OpenCodeGo {
+        "native OpenCode built-in opencode-go API-key provider"
     } else {
         "native OpenCode built-in opencode API-key provider"
     };

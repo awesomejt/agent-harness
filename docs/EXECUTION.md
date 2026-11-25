@@ -71,6 +71,13 @@ Once prompt submission was attempted, no automatic replay or fallback is permitt
 
 The decision function and fixtures in `src/recovery.rs` and `tests/recovery.rs` exercise these guards. P3.3/D034 connects them to execution: in local-first, the only evidence source is a bounded TCP reachability check of the LiteLLM endpoint, made before any local runtime, private state, preflight or project write exists. An unreachable endpoint is `Transport` with affirmative `NotAttempted` submission, so `decide` permits the one configured native attempt; a reachable endpoint runs the local attempt, whose ACP failures remain unclassified and stop. local-only (including D033 group references) and isolated native cloud-only (P3.2/D032) never automatically retry or fall back. See [local-first configuration](CONFIGURATION.md#local-first-route-p33--d034). Native OpenCode setup checks the pinned runtime and embedded model catalog; authentication/service availability are not established by those checks. See [native configuration](CONFIGURATION.md#native-opencode-route-p32--d032).
 
+P7.12 adds `native.target: "opencode-go"` to the existing single fallback and
+cloud-only path (D105). The OpenCode ACP runtime uses only the built-in Go
+provider, a private key environment reference and no endpoint override. Source,
+catalog, agent/title and session-model preflights enforce the selected route;
+Go failures stop under existing outcome rules. The implementation has offline
+fixture coverage; its live coding and constrained-review acceptance is pending.
+
 P7.2 ([D052](../DECISIONS.md#2026-11-06--d052-claude-as-the-configured-pre-submission-native-fallback)) also permits `native.target: "claude"` as that one fallback. The coordinator, eligibility and shared deadline are unchanged. Claude runs its complete D048–D050 preflight before the prompt, using the official CLI login, the same project instructions and canonical role, and fresh request-bound grants. A failed Claude setup, terminal error, cancellation or uncertain result ends the run without another attempt. Capability checks cover both runtimes before the probe: OpenCode still refuses non-default role effort, and Claude refuses bodies above 128 KiB. Workflow records name the fallback `claude/MODEL`; machine attempt 2 reports `runtime: "claude"`, the bare model and `route: "local-first fallback"`.
 
 ## Process and project integrity

@@ -114,6 +114,7 @@ struct Native {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RuntimeKind {
     OpenCode,
+    OpenCodeGo,
     Claude,
     Pi,
 }
@@ -326,9 +327,12 @@ impl Config {
         }
         if let Some(native) = &self.native {
             match (native.target.as_str(), &native.api_key_env) {
-                ("opencode", Some(key)) => validate_key_name(key)?,
+                ("opencode" | "opencode-go", Some(key)) => validate_key_name(key)?,
                 ("opencode", None) => {
                     return Err(Invalid("native target opencode requires api_key_env"));
+                }
+                ("opencode-go", None) => {
+                    return Err(Invalid("native target opencode-go requires api_key_env"));
                 }
                 ("claude", None) => {}
                 ("claude", Some(_)) => {
@@ -338,7 +342,7 @@ impl Config {
                 }
                 _ => {
                     return Err(Invalid(
-                        "native target must be opencode (built-in API-key provider) or claude (official CLI login)",
+                        "native target must be opencode, opencode-go, or claude",
                     ));
                 }
             }
@@ -927,6 +931,7 @@ impl Invocation {
         let runtime = if mode == "cloud-only" {
             match config.native.as_ref() {
                 Some(native) if native.target == "claude" => RuntimeKind::Claude,
+                Some(native) if native.target == "opencode-go" => RuntimeKind::OpenCodeGo,
                 _ => RuntimeKind::OpenCode,
             }
         } else if config.litellm.as_ref().and_then(|l| l.runtime.as_deref()) == Some("pi") {
@@ -991,6 +996,8 @@ impl Invocation {
                     source,
                     if native.target == "claude" {
                         RuntimeKind::Claude
+                    } else if native.target == "opencode-go" {
+                        RuntimeKind::OpenCodeGo
                     } else {
                         RuntimeKind::OpenCode
                     },
@@ -1147,6 +1154,7 @@ impl Resolved {
         match self.runtime {
             RuntimeKind::Claude => self.model.clone(),
             RuntimeKind::Pi => format!("pi/{}", self.model),
+            RuntimeKind::OpenCodeGo => format!("opencode-go/{}", self.model),
             RuntimeKind::OpenCode => format!(
                 "{}/{}",
                 if self.mode == Mode::LocalOnly {
@@ -1165,7 +1173,7 @@ impl Resolved {
         match self.runtime {
             RuntimeKind::Claude => format!("claude/{}", self.model),
             RuntimeKind::Pi => format!("pi/{}", self.model),
-            RuntimeKind::OpenCode => self.runtime_model(),
+            RuntimeKind::OpenCode | RuntimeKind::OpenCodeGo => self.runtime_model(),
         }
     }
 }
