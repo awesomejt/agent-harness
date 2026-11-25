@@ -24,7 +24,9 @@ not itself establish either.
   their chat-completions base URLs are respectively
   `https://opencode.ai/inference/openai/v1` and
   `https://opencode.ai/inference/go/openai/v1`. This catalog observation does not
-  establish the effective endpoint of a configured runtime.
+  establish the effective endpoint of a configured runtime. The same pinned
+  snapshot includes `opencode-go/beam-free`, whose chat-completions base URL is
+  `https://opencode.ai/inference/go/openai/v1`.
 - `packages/core/src/plugin/models-dev.ts` registers provider and integration IDs
   from the catalog, with key and environment methods. `model-resolver.ts` merges
   settings and credentials; a connection credential can affect precedence. D092's
@@ -90,10 +92,14 @@ checks pass.
 
 Setup review on [PR #132](https://github.com/awesomejt/agent-harness/pull/132)
 of `f25d236` reported zero blockers and concerns, and one nit: the live-entry
-refusal tests did not assert which guard refused. The fixture now checks each
-specific refusal diagnostic; the live helper bytes are unchanged. The focused
-runner passes again. The repository workflow does not require re-review for this
-nit. The live result and its separate result review remain pending.
+refusal tests did not assert which guard refused. `2428104` corrected the
+fixture. At the operator's request, `d0fb2b3` then changed the live helper model
+from `kimi-k3` to `beam-free`. A follow-up review found zero blockers, one
+concern about the stale setup record and missing Beam Free source observation,
+and one portability nit. The follow-up reviewed the model change; this record
+corrects its requested model and endpoint evidence, and the portability nit is
+fixed. Neither finding requires another setup review under the workflow. The
+live result and its separate result review remain pending.
 
 The separately ignored `runtime::go_candidate_fixture::live_acp` entry is
 **not authorized to run until setup review completes and the operator provides

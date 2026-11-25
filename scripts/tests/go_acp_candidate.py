@@ -47,10 +47,14 @@ for case, (expected, prompted) in CASES.items():
 
 # The live entry point must refuse without the explicit gate, a real key, or
 # the installed executable. Dummy values prevent these checks contacting Go.
-for ack, key, refusal in [
+refusals = [
         ('absent', 'NOT_A_REAL_KEY', 'left: Ok("absent")'),
-        ('operator-attested', 'SECRET_SENTINEL', 'assertion `left != right` failed'),
-        ('operator-attested', 'NOT_A_REAL_KEY', f'left: "{FAKE.resolve()}"')]:
+        ('operator-attested', 'SECRET_SENTINEL', 'assertion `left != right` failed')]
+if Path('/opt/homebrew/bin/opencode').exists():
+    refusals.append(('operator-attested', 'NOT_A_REAL_KEY', f'left: "{FAKE.resolve()}"'))
+else:
+    print('SKIP executable identity refusal: Homebrew OpenCode is absent')
+for ack, key, refusal in refusals:
     with tempfile.TemporaryDirectory(prefix='ah-p710-refusal-') as temporary:
         project = Path(temporary).resolve()
         (project / 'opencode').symlink_to(FAKE)
@@ -63,4 +67,4 @@ for ack, key, refusal in [
             cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
         assert result.returncode == 101 and 'P710_LIVE_RESULT=' not in result.stdout
         assert refusal in result.stderr, (ack, refusal, result.stderr)
-print(f'PASS {len(CASES)} Go ACP candidate fixtures and 3 live-entry refusals; fake runtime only')
+print(f'PASS {len(CASES)} Go ACP candidate fixtures and {len(refusals)} live-entry refusals; fake runtime only')
