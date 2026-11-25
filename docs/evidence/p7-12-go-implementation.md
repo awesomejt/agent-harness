@@ -23,3 +23,10 @@ or installed behavior. P7.10's free-model live result is not P7.12 acceptance.
 P7.12 remains open: separately reviewed live coding and constrained-review
 acceptance, with a fresh same-session account and Extra Usage-off attestation,
 are still required. Do not deliberately exhaust the allowance.
+
+Validation on macOS: `cargo test --locked`, locked Clippy, the targeted native,
+local-first and machine suites, doc links and `git diff --check` passed. The
+full offline runner passed 52/52 suites, including installed OpenCode process
+and isolation regressions. Grok reviewed the implementation with zero blockers
+or concerns; its two nits were addressed with the runbook heading correction and
+machine attribution fixtures. This does not replace the pending live acceptance.
