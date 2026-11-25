@@ -59,8 +59,8 @@ Native preview uses the same input resolver, reports native selection and no man
 The finalized P7.12 contract selects `native.target: "opencode-go"`, with a
 required unprefixed `native.model` and `native.api_key_env`. This is a planned
 interface; the current CLI does not yet accept it. The target uses the official
-OpenCode ACP runtime and its dedicated Go provider, with a settings-only private
-key overlay and no endpoint override. Cloud-only selects that route directly;
+OpenCode ACP runtime and its dedicated Go provider, with the key passed only as `AH_RUNTIME_API_KEY`, a settings-only provider
+overlay, and no endpoint override. Cloud-only selects that route directly;
 local-first uses it only as the configured single fallback under D034. Model
 precedence, preview, isolation, permission checks, cleanup and failure handling
 follow [D105](../DECISIONS.md#2026-11-24--d105-opencode-go-native-target-contract).
