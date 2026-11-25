@@ -196,7 +196,7 @@ and constrained-review acceptance remains pending. A local-first configuration
 uses Go only when the LiteLLM endpoint is unreachable before submission; later
 failures stop. See [configuration](CONFIGURATION.md#opencode-go-native-target-p712--d105).
 
-## Native Claude cloud-only (P7.2)
+### Native Claude cloud-only (P7.2)
 
 Supported from current source on macOS 27.0.1 arm64; the published alpha.2 binary predates this adapter. Build with `cargo build --release --locked` and use `target/release/ah`. The [capability matrix](FRAMEWORKS.md#p72-claude-capability-matrix) lists tested behavior and limits, with [final acceptance evidence](evidence/p7-2-claude-acceptance.md).
 

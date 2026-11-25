@@ -15,6 +15,8 @@ model mismatch, output redaction, project preservation, cancellation and Go
 limit errors. Local-first fixtures exercise Go on an unreachable proxy, trusted
 permissions, limit stop, helper refusal and a reachable local route. Config
 fixtures verify Go key requirements, model override and fallback selection.
+Machine records retain `runtime: "opencode"` and identify the Go provider in
+the `opencode-go/MODEL` model field, both directly and on fallback.
 These are synthetic checks and do not establish account access, paid allowance,
 or installed behavior. P7.10's free-model live result is not P7.12 acceptance.
 

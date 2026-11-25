@@ -170,6 +170,15 @@ fallback = next(r for r in records if r['type'] == 'fallback')
 assert fallback['from_attempt'] == 1 and fallback['to_attempt'] == 2, fallback
 assert all(r.get('attempt') == 2 for r in records if r['type'].startswith('attempt.') and r['seq'] > fallback['seq'])
 
+# The Go provider is represented by the model prefix; runtime remains OpenCode.
+_, result = run('success', 0, cfg=dict(version=1, mode='cloud-only',
+    native=dict(target='opencode-go', model='fixture', api_key_env='NATIVE_KEY')))
+assert result['attempts'][0]['runtime'] == 'opencode' and result['attempts'][0]['model'] == 'opencode-go/fixture', result
+_, result = run('success', 0, cfg=dict(version=1, mode='local-first', model='fixture',
+    litellm=dict(api_base=closed, api_key_env='TEST_KEY'),
+    native=dict(target='opencode-go', model='fixture', api_key_env='NATIVE_KEY')))
+assert result['attempts'][1]['runtime'] == 'opencode' and result['attempts'][1]['model'] == 'opencode-go/fixture', result
+
 # Human mode stays byte-for-byte unchanged on stdout.
 with tempfile.TemporaryDirectory(prefix='ah-machine-test-') as d:
     base = Path(d).resolve()
