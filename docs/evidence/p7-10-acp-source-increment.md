@@ -101,9 +101,9 @@ corrects its requested model and endpoint evidence, and the portability nit is
 fixed. Neither finding requires another setup review under the workflow. The
 live result and its separate result review remain pending.
 
-The separately ignored `runtime::go_candidate_fixture::live_acp` entry is
-**not authorized to run until setup review completes and the operator provides
-a fresh same-session Go workspace/active-plan/Extra-Usage-off attestation**.
+The separately ignored `runtime::go_candidate_fixture::live_acp` entry requires
+setup review and a fresh same-session Go account/Extra-Usage-off attestation
+before each live run.
 It requires `AH_P710_LIVE=operator-attested` and `P710_KEY` in its environment,
 refuses the fixture sentinel, and requires the executable to resolve to the
 Homebrew OpenCode path. It uses a newly created private disposable project,
@@ -125,7 +125,37 @@ environment. Record the reviewed revision and executable digest without recordin
 the key. Do not persist the gate environment variable. A failed or uncertain run is a
 stop, not permission to retry. User-provided interactive Go use is not a pass for
 this candidate. No forced exhaustion, authenticated request, or model turn was
-performed by this increment.
+performed before setup review.
+
+## Bounded live observation — result review pending
+
+On 2026-11-24 at approximately 22:45 CST, the operator confirmed Extra Usage
+was still off for the existing Personal Go account and directed the use of Beam
+Free. Earlier in the session the operator supplied screenshots of the active Go
+subscription, the disabled Extra Usage setting and a Personal API-key entry,
+then configured the key used here. The operator stated the existing account was
+active. These account observations are not an independent API verification of
+workspace/key association or billing state.
+
+One run used reviewed source revision `c2e840d70b40d6cf2b808f4a6b1df3eb0e2766a2`,
+the prebuilt test executable SHA-256
+`d9cc3e4f4e63feef0b335f3dbe7d9377d8ed943c47c9d66716a9a2b391ce12f9`,
+and installed OpenCode 2.3.2 on macOS arm64. The reviewed preflight passed the
+isolated source, Go-only catalog, effective-agent/title and version checks; ACP
+session selection matched `opencode-go/beam-free`. The fixed prompt produced
+`OK`, terminal `end_turn` and result 0 in approximately 2.3 seconds, with zero
+permission requests, grants or tool events, zero recorded stderr bytes and
+confirmed process and private-runtime cleanup. The disposable project removal
+also succeeded. No retry or deliberate limit exhaustion occurred. The key was
+supplied to the test via its environment, remapped to the private runtime child,
+and was not recorded in the evidence.
+
+This observation establishes the selected effective OpenCode Go model and a
+successful no-tool ACP response. It is not a captured wire trace, paid allowance
+or entitlement proof, live usage-limit test, billing guarantee, or production
+Go adapter. P7.12 still owns its own schema, route implementation and live
+acceptance, including a fresh account check. PR result review remains pending;
+P7.10 acceptance is not effective until required review and merge.
 
 ## Reproduce source identity
 
