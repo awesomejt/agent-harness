@@ -28,7 +28,7 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), Trap) as trap:
     cases = [(case, 2) for case in ['native-model-missing', 'catalog-foreign', 'route', 'native-provider', 'native-enabled', 'native-agent',
                                     'widened', 'agent-widened', 'subagent-widened', 'agent-model', 'project-source', 'version', 'version-old', 'version-new']]
     # 2.3.0 ends the turn with stopReason=cancelled after a rejected permission.
-    cases += [('success', 0), ('version-patch', 0), ('read', 0), ('deny', 3), ('cancel-deadline', 3), ('session-model', 1), ('rpc-error', 4), ('preview', 0), ('missing-key', 2)]
+    cases += [('success', 0), ('version-patch', 0), ('read', 0), ('deny', 3), ('cancel-deadline', 3), ('session-model', 1), ('rpc-error', 4), ('go-limit-rpc', 4), ('preview', 0), ('missing-key', 2)]
     count = 0
     for case, expected in cases:
         for no_sync in [False, True]:
@@ -68,7 +68,7 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), Trap) as trap:
                 for name, content in sentinels.items():
                     assert (base/name).read_bytes() == content, (case, name)
                 assert not list(base.glob('.ah-write-*')), case
-                if case in ['success', 'version-patch', 'read', 'deny', 'cancel-deadline', 'rpc-error']:
+                if case in ['success', 'version-patch', 'read', 'deny', 'cancel-deadline', 'rpc-error', 'go-limit-rpc']:
                     assert (base/'prompted').exists(), case
                 else:
                     assert not (base/'prompted').exists(), case
@@ -89,6 +89,8 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), Trap) as trap:
                     assert result['result']['outcome']['optionId'] == 'reject', result
                 if case == 'cancel-deadline':
                     assert (base/'cancelled').exists(), case
+                if case == 'go-limit-rpc':
+                    assert (base/'launch-routes').read_text().splitlines() == ['native']
                 count += 1
     trap.shutdown()
     thread.join(timeout=2)

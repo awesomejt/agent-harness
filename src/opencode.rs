@@ -249,14 +249,30 @@ pub(crate) fn validate_sources(sent: &Value, sources: &Value, home: &Path) -> Re
 /// carry no request overrides. The default agent (`build`, or the selected
 /// agent with its exact model and system text) must be a visible primary.
 pub(crate) fn validate_agents(request: &Resolved, agents: &Value) -> Result<(), Invalid> {
+    validate_agents_for(request, agents, provider(request), false)
+}
+
+pub(crate) fn validate_agents_for(
+    request: &Resolved,
+    agents: &Value,
+    selected_provider: &str,
+    require_title: bool,
+) -> Result<(), Invalid> {
     const DIFFERS: Invalid =
         Invalid("effective agents differ from the selected route or permissions");
     let profile = effective(request);
     let profile = profile.as_array().expect("profile is an array");
-    let wanted = json!({"id": request.model, "providerID": provider(request)});
+    let wanted = json!({"id": request.model, "providerID": selected_provider});
     let agents = agents.as_array().ok_or(DIFFERS)?;
     let mut default = false;
+    let mut title_count = 0;
     for agent in agents {
+        if agent["id"] == "title" {
+            title_count += 1;
+            if require_title && agent["model"] != wanted {
+                return Err(DIFFERS);
+            }
+        }
         let rules = agent["permissions"].as_array().ok_or(DIFFERS)?;
         let start = rules
             .windows(profile.len())
@@ -282,15 +298,27 @@ pub(crate) fn validate_agents(request: &Resolved, agents: &Value) -> Result<(), 
             }
         };
     }
-    if default { Ok(()) } else { Err(DIFFERS) }
+    if default && (!require_title || title_count == 1) {
+        Ok(())
+    } else {
+        Err(DIFFERS)
+    }
 }
 
 /// Built-in catalog only: the provider policy must hide every other provider.
 /// This checks support, not credential validity or balance.
 pub(crate) fn validate_catalog(request: &Resolved, models: &str) -> Result<(), Invalid> {
-    let target = request.runtime_model();
+    validate_catalog_for(&request.runtime_model(), "opencode", models)
+}
+
+pub(crate) fn validate_catalog_for(
+    target: &str,
+    provider: &str,
+    models: &str,
+) -> Result<(), Invalid> {
+    let prefix = format!("{provider}/");
     if models.lines().any(|line| line == target)
-        && models.lines().all(|line| line.starts_with("opencode/"))
+        && models.lines().all(|line| line.starts_with(&prefix))
     {
         Ok(())
     } else {
@@ -406,6 +434,42 @@ mod tests {
         std::fs::remove_dir_all(home).unwrap();
     }
 
+    #[test]
+    fn go_candidate_sources_reject_route_and_helper_changes() {
+        let home = std::env::temp_dir().join(format!("ah-go-source-test-{}", std::process::id()));
+        std::fs::create_dir_all(home.join("CONFIG/opencode")).unwrap();
+        let mut sent = config(&request(Mode::CloudOnly, Permissions::Deny));
+        sent["model"]["providerID"] = json!("opencode-go");
+        sent["agents"]["title"]["model"] = sent["model"].clone();
+        sent["policies"][1]["resource"] = json!("opencode-go");
+        sent["providers"] =
+            json!({"opencode-go": {"settings": {"apiKey": "{env:AH_RUNTIME_API_KEY}"}}});
+        let mut masked = sent.clone();
+        masked["providers"]["opencode-go"]["settings"]["apiKey"] = json!("***");
+        let good = json!([
+            {"type": "directory", "path": home.join("CONFIG/opencode")},
+            {"type": "document", "info": masked}
+        ]);
+        validate_sources(&sent, &good, &home).unwrap();
+        for (pointer, replacement) in [
+            ("/1/info/model/providerID", json!("opencode")),
+            ("/1/info/agents/title/model/providerID", json!("opencode")),
+            (
+                "/1/info/providers/opencode-go/settings/baseURL",
+                json!("https://example.invalid"),
+            ),
+        ] {
+            let mut bad = good.clone();
+            if pointer.ends_with("/baseURL") {
+                bad[1]["info"]["providers"]["opencode-go"]["settings"]["baseURL"] = replacement;
+            } else {
+                *bad.pointer_mut(pointer).unwrap() = replacement;
+            }
+            assert!(validate_sources(&sent, &bad, &home).is_err());
+        }
+        std::fs::remove_dir_all(home).unwrap();
+    }
+
     fn tempfile_home() -> std::path::PathBuf {
         let home = std::env::temp_dir().join(format!("ah-opencode-test-{}", std::process::id()));
         std::fs::create_dir_all(home.join("CONFIG/opencode")).unwrap();
@@ -448,6 +512,68 @@ mod tests {
             ] {
                 assert!(validate_agents(&r, &bad).is_err(), "{bad}");
             }
+        }
+    }
+
+    #[test]
+    fn go_candidate_agent_validation_rejects_cross_route_and_overrides() {
+        for permissions in [Permissions::Deny, Permissions::Trusted] {
+            let r = request(Mode::CloudOnly, permissions);
+            let wanted = json!({"id": "gpt-5.4", "providerID": "opencode-go"});
+            let good = json!([
+                agent("build", rules(&r, &[]), Value::Null),
+                agent("title", rules(&r, &[]), wanted)
+            ]);
+            validate_agents_for(&r, &good, "opencode-go", true).unwrap();
+            let mut wrong_provider = good.clone();
+            wrong_provider[1]["model"]["providerID"] = json!("opencode");
+            let mut wrong_model = good.clone();
+            wrong_model[1]["model"]["id"] = json!("different");
+            let mut widened = good.clone();
+            widened[1]["permissions"]
+                .as_array_mut()
+                .unwrap()
+                .push(rule("shell", "allow"));
+            let mut override_request = good.clone();
+            override_request[1]["request"]["settings"]["baseURL"] =
+                json!("https://example.invalid");
+            let mut missing_model = good.clone();
+            missing_model[1]["model"] = Value::Null;
+            let no_title = json!([good[0].clone()]);
+            let duplicate_title = json!([good[0].clone(), good[1].clone(), good[1].clone()]);
+            for bad in [
+                wrong_provider,
+                wrong_model,
+                widened,
+                override_request,
+                missing_model,
+                no_title,
+                duplicate_title,
+            ] {
+                assert!(validate_agents_for(&r, &bad, "opencode-go", true).is_err());
+            }
+            assert!(validate_agents(&r, &good).is_err());
+        }
+    }
+
+    #[test]
+    fn go_candidate_catalog_requires_exact_model_and_excludes_other_providers() {
+        let target = "opencode-go/kimi-k3";
+        assert!(
+            validate_catalog_for(
+                target,
+                "opencode-go",
+                "opencode-go/kimi-k3\nopencode-go/other\n"
+            )
+            .is_ok()
+        );
+        for bad in [
+            "opencode-go/other\n",
+            "opencode-go/kimi-k3\nopencode/kimi-k3\n",
+            "opencode-go/kimi-k3\nopencode-go-foreign/model\n",
+            "opencode-go/kimi-k3-extra\n",
+        ] {
+            assert!(validate_catalog_for(target, "opencode-go", bad).is_err());
         }
     }
 
