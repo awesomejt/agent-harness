@@ -88,6 +88,13 @@ offline runner completed 52/52 suites; after the later no-tool guard was added,
 the focused runner was rerun. `cargo test --locked`, locked Clippy and doc-link
 checks pass.
 
+Setup review on [PR #132](https://github.com/awesomejt/agent-harness/pull/132)
+of `f25d236` reported zero blockers and concerns, and one nit: the live-entry
+refusal tests did not assert which guard refused. The fixture now checks each
+specific refusal diagnostic; the live helper bytes are unchanged. The focused
+runner passes again. The repository workflow does not require re-review for this
+nit. The live result and its separate result review remain pending.
+
 The separately ignored `runtime::go_candidate_fixture::live_acp` entry is
 **not authorized to run until setup review completes and the operator provides
 a fresh same-session Go workspace/active-plan/Extra-Usage-off attestation**.

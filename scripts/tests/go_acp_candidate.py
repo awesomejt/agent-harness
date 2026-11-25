@@ -47,8 +47,10 @@ for case, (expected, prompted) in CASES.items():
 
 # The live entry point must refuse without the explicit gate, a real key, or
 # the installed executable. Dummy values prevent these checks contacting Go.
-for ack, key in [('absent', 'NOT_A_REAL_KEY'), ('operator-attested', 'SECRET_SENTINEL'),
-                 ('operator-attested', 'NOT_A_REAL_KEY')]:
+for ack, key, refusal in [
+        ('absent', 'NOT_A_REAL_KEY', 'left: Ok("absent")'),
+        ('operator-attested', 'SECRET_SENTINEL', 'assertion `left != right` failed'),
+        ('operator-attested', 'NOT_A_REAL_KEY', f'left: "{FAKE.resolve()}"')]:
     with tempfile.TemporaryDirectory(prefix='ah-p710-refusal-') as temporary:
         project = Path(temporary).resolve()
         (project / 'opencode').symlink_to(FAKE)
@@ -59,6 +61,6 @@ for ack, key in [('absent', 'NOT_A_REAL_KEY'), ('operator-attested', 'SECRET_SEN
             ['cargo', 'test', '--locked', '--lib', 'runtime::go_candidate_fixture::live_acp',
              '--', '--ignored', '--exact', '--nocapture'],
             cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
-        assert result.returncode != 0 and 'P710_LIVE_RESULT=' not in result.stdout
-        assert not (project / 'launched').exists()
+        assert result.returncode == 101 and 'P710_LIVE_RESULT=' not in result.stdout
+        assert refusal in result.stderr, (ack, refusal, result.stderr)
 print(f'PASS {len(CASES)} Go ACP candidate fixtures and 3 live-entry refusals; fake runtime only')
