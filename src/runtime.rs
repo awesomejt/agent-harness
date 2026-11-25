@@ -391,7 +391,7 @@ mod go_candidate_fixture {
             installed.canonicalize().unwrap()
         );
         let mut project = PrivateHome::new().unwrap();
-        let input = br#"{"version":1,"mode":"cloud-only","native":{"target":"opencode","model":"kimi-k3","api_key_env":"P710_KEY"}}"#;
+        let input = br#"{"version":1,"mode":"cloud-only","native":{"target":"opencode","model":"beam-free","api_key_env":"P710_KEY"}}"#;
         let request = Invocation::parse(
             vec![
                 "single".into(),
@@ -418,7 +418,7 @@ mod go_candidate_fixture {
             let mut runtime = Runtime::new_go_candidate(&request, deadline, signals.token(), crate::progress::Progress::new(false)).unwrap();
             let outcome = match runtime.preflight(&request).await {
                 Ok(version) => {
-                    eprintln!("Go candidate preflight passed: OpenCode {version}, opencode-go/kimi-k3, deny");
+                    eprintln!("Go candidate preflight passed: OpenCode {version}, opencode-go/beam-free, deny");
                     crate::acp::run(&runtime, &request).await
                 }
                 Err(exit) => exit,

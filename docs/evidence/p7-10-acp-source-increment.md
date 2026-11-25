@@ -101,10 +101,13 @@ a fresh same-session Go workspace/active-plan/Extra-Usage-off attestation**.
 It requires `AH_P710_LIVE=operator-attested` and `P710_KEY` in its environment,
 refuses the fixture sentinel, and requires the executable to resolve to the
 Homebrew OpenCode path. It uses a newly created private disposable project,
-the fixed `opencode-go/kimi-k3` model, deny permissions, one fixed no-tool prompt
+the operator-selected `opencode-go/beam-free` model, deny permissions, one fixed no-tool prompt
 (`Reply with OK.`), a 90-second deadline, normal process cleanup and no retry.
 It requires a nonempty response for success and refuses observed tool activity;
 interrupts use the normal cancellation watcher.
+Beam Free was selected by the operator. A successful request to this free model
+does not demonstrate paid Go allowance consumption, subscription entitlement,
+or live Go-limit behavior; those remain limitations of that observation.
 The production preflight verifies the accepted 2.3.x version, sources, catalog,
 agents and session model; no provider request is made before that preflight and
 session selection succeed. The operator's key must be supplied privately through
