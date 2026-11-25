@@ -26,6 +26,8 @@ pub(crate) fn parse_supported_version(output: &[u8]) -> Option<&str> {
 fn provider(request: &Resolved) -> &'static str {
     if request.mode == Mode::LocalOnly {
         LOCAL
+    } else if request.runtime == crate::config::RuntimeKind::OpenCodeGo {
+        "opencode-go"
     } else {
         NATIVE
     }
@@ -183,7 +185,7 @@ pub(crate) fn config(request: &Resolved) -> Value {
     } else {
         // Settings-only overlay keeps built-in models/endpoints while avoiding
         // an env-discovered Console connection and its remote resources (D092).
-        json!({NATIVE: {"settings": {"apiKey": "{env:AH_RUNTIME_API_KEY}"}}})
+        json!({provider: {"settings": {"apiKey": "{env:AH_RUNTIME_API_KEY}"}}})
     };
     let mut agents = json!({"title": {"model": model(request)}});
     if let Some(agent) = &request.agent {
@@ -249,7 +251,12 @@ pub(crate) fn validate_sources(sent: &Value, sources: &Value, home: &Path) -> Re
 /// carry no request overrides. The default agent (`build`, or the selected
 /// agent with its exact model and system text) must be a visible primary.
 pub(crate) fn validate_agents(request: &Resolved, agents: &Value) -> Result<(), Invalid> {
-    validate_agents_for(request, agents, provider(request), false)
+    validate_agents_for(
+        request,
+        agents,
+        provider(request),
+        request.runtime == crate::config::RuntimeKind::OpenCodeGo,
+    )
 }
 
 pub(crate) fn validate_agents_for(
@@ -308,7 +315,7 @@ pub(crate) fn validate_agents_for(
 /// Built-in catalog only: the provider policy must hide every other provider.
 /// This checks support, not credential validity or balance.
 pub(crate) fn validate_catalog(request: &Resolved, models: &str) -> Result<(), Invalid> {
-    validate_catalog_for(&request.runtime_model(), "opencode", models)
+    validate_catalog_for(&request.runtime_model(), provider(request), models)
 }
 
 pub(crate) fn validate_catalog_for(

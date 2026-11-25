@@ -54,18 +54,22 @@ Cloud-only bypasses the project transaction planner entirely, including with `--
 
 Native preview uses the same input resolver, reports native selection and no managed changes, and performs no child launch, catalog read or network check. `--no-sync` has no additional effect on this route: effective runtime checks are always mandatory. No harness retry or fallback is added; unknown post-submission outcomes remain uncertain.
 
-### Planned OpenCode Go native target (P7.12 / D105)
+### OpenCode Go native target (P7.12 / D105)
 
-The finalized P7.12 contract selects `native.target: "opencode-go"`, with a
-required unprefixed `native.model` and `native.api_key_env`. This is a planned
-interface; the current CLI does not yet accept it. The target uses the official
+Current source accepts `native.target: "opencode-go"`, with a required
+unprefixed `native.model` and `native.api_key_env`. This implementation has
+offline fixture evidence; live P7.12 acceptance remains pending. The target uses the official
 OpenCode ACP runtime and its dedicated Go provider, with the key passed only as `AH_RUNTIME_API_KEY`, a settings-only provider
 overlay, and no endpoint override. Cloud-only selects that route directly;
 local-first uses it only as the configured single fallback under D034. Model
 precedence, preview, isolation, permission checks, cleanup and failure handling
 follow [D105](../DECISIONS.md#2026-11-24--d105-opencode-go-native-target-contract).
-P7.14 separately owns ordered chains. Go account controls and live acceptance
-remain required before P7.12 closes.
+The catalog, session and title helper must match the exact Go model. `--model`
+overrides the selected cloud-only model, or the local primary in local-first;
+the fallback uses the agent native model if set, otherwise `native.model`.
+The Go target never substitutes Zen. P7.14 separately owns ordered chains; a
+Go limit or other failure stops without another attempt under existing outcome
+rules. P7.12 live acceptance remains pending.
 
 ### Native Claude runtime (P7.2 / D048)
 

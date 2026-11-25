@@ -1,6 +1,6 @@
 # Operations and distribution contract
 
-Status: P4.5 core-MVP runbook for `0.1.0-alpha.2` (D041): the declared platform matrix, installation, separate prerequisites, sample configuration and agents, setup check, upgrade from `0.1.0-alpha.1`, rollback and the maintainer release procedure. All three routing modes, named agents and machine output ship in that artifact. Phase 5 adds trusted verification gates (D043), ordered sequences and durable resume (D044); Phase 6 adds bounded Ralph loops (D045). The sequence and Ralph runbooks below apply to current source, not to the published alpha.2 artifact. The Claude runtime section (P7.2, D048) also applies to current source only; other native adapters remain prospective. See [P4.5 evidence](evidence/p4-5-mvp-artifacts.md); the first artifact's [P2.5 evidence](evidence/p2-5-installable-binary.md) remains the historical record for alpha.1.
+Status: P4.5 core-MVP runbook for `0.1.0-alpha.2` (D041): the declared platform matrix, installation, separate prerequisites, sample configuration and agents, setup check, upgrade from `0.1.0-alpha.1`, rollback and the maintainer release procedure. All three routing modes, named agents and machine output ship in that artifact. Phase 5 adds trusted verification gates (D043), ordered sequences and durable resume (D044); Phase 6 adds bounded Ralph loops (D045). The sequence and Ralph runbooks below apply to current source, not to the published alpha.2 artifact. The Claude runtime (P7.2, D048) and Go target implementation (P7.12, D105) also apply to current source only; Go live acceptance is pending. See [P4.5 evidence](evidence/p4-5-mvp-artifacts.md); the first artifact's [P2.5 evidence](evidence/p2-5-installable-binary.md) remains the historical record for alpha.1.
 
 The [deployment diagram](ARCHITECTURE.md) separates the release pipeline, local executable, installed runtime and external services. Rust library dependencies are linked/packaged for the target as required; binary users do not install Cargo packages manually.
 
@@ -186,7 +186,17 @@ and ignores emitted agent files; remove `.opencode/agents/` entries listed in
 `.ah-opencode-agents.json`, before deliberately reconciling or removing them;
 uninstall performs no automatic project cleanup.
 
-### Native Claude cloud-only (P7.2)
+### OpenCode Go native target (P7.12)
+
+For the Go native target in current source, configure `native.target` as
+`opencode-go`, set `native.model` to an unprefixed model in the embedded Go
+catalog, and export the API key from the workspace holding the active Go plan
+under `native.api_key_env`. Confirm Extra Usage is off before use. Go live coding
+and constrained-review acceptance remains pending. A local-first configuration
+uses Go only when the LiteLLM endpoint is unreachable before submission; later
+failures stop. See [configuration](CONFIGURATION.md#opencode-go-native-target-p712--d105).
+
+## Native Claude cloud-only (P7.2)
 
 Supported from current source on macOS 27.0.1 arm64; the published alpha.2 binary predates this adapter. Build with `cargo build --release --locked` and use `target/release/ah`. The [capability matrix](FRAMEWORKS.md#p72-claude-capability-matrix) lists tested behavior and limits, with [final acceptance evidence](evidence/p7-2-claude-acceptance.md).
 

@@ -1296,7 +1296,7 @@ fn claude_target_rejects_keys_and_groups() {
         ),
         (
             CLAUDE.replace("claude", "codex"),
-            "native target must be opencode (built-in API-key provider) or claude (official CLI login)",
+            "native target must be opencode, opencode-go, or claude",
         ),
     ] {
         assert_eq!(
@@ -1408,4 +1408,37 @@ fn pi_runtime_rejects_non_local_only_modes() {
     ] {
         assert!(Config::read(text.as_bytes()).is_err());
     }
+}
+
+#[test]
+fn go_native_resolves_explicit_route_and_local_first_fallback() {
+    let native = r#"{"version":1,"mode":"cloud-only","native":{"target":"opencode-go","model":"beam-free","api_key_env":"GO_KEY"}}"#;
+    let config = Config::read(native.as_bytes()).unwrap();
+    let request = invocation(&["single", "x", "--model", "other"])
+        .resolve(
+            config,
+            |name| (name == "GO_KEY").then(|| "key".into()),
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!(request.runtime_model(), "opencode-go/other");
+    assert_eq!(request.record_model(), "opencode-go/other");
+    assert_eq!(request.api_key_env.as_deref(), Some("GO_KEY"));
+    let missing = native.replace(",\"api_key_env\":\"GO_KEY\"", "");
+    assert!(Config::read(missing.as_bytes()).is_err());
+    let group = native.replace("beam-free", "group:coder");
+    assert!(Config::read(group.as_bytes()).is_err());
+    let local = r#"{"version":1,"mode":"local-first","model":"primary","litellm":{"api_base":"http://localhost:4000/v1","api_key_env":"LOCAL_KEY"},"native":{"target":"opencode-go","model":"beam-free","api_key_env":"GO_KEY"}}"#;
+    let request = invocation(&["single", "x", "--model", "override"])
+        .resolve(
+            Config::read(local.as_bytes()).unwrap(),
+            |_| Some("key".into()),
+            NeverRead,
+        )
+        .unwrap();
+    assert_eq!(request.runtime_model(), "ah-litellm/override");
+    assert_eq!(
+        request.fallback.unwrap().runtime_model(),
+        "opencode-go/beam-free"
+    );
 }
