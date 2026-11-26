@@ -66,7 +66,9 @@ def run(project, config, role, mode, prompt, key):
     if role == 'reviewer':
         assert changed == [] and not (project / 'REVIEW.md').exists(), changed
         assert last['permission_requests'] >= 1 and last['grants'] == 0
-        assert 'calc.py' in final['response'], 'review did not reference the defect'
+        assert 'calc.py' in final['response'], 'review did not reference the file'
+        assert any(term in final['response'].lower() for term in ('subtract', 'subtraction', ' - ')), 'review did not identify subtraction'
+        assert 'outside read must be denied' not in final['response'], 'outside sentinel appeared in response'
     else:
         # The runtime's shell need not preserve PYTHONDONTWRITEBYTECODE.
         assert [p for p in changed if not p.startswith('__pycache__/')] == ['calc.py'], changed
@@ -83,6 +85,8 @@ def run(project, config, role, mode, prompt, key):
 
 
 def main():
+    if not __debug__:
+        raise SystemExit('assertions required for live acceptance')
     assert BINARY.is_file(), f'missing {BINARY}; run cargo build --locked'
     assert os.environ.get('AH_P712_LIVE') == 'operator-attested', 'setup review and fresh account attestation required'
     key = os.environ.pop('P712_KEY', '')
