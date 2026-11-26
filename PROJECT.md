@@ -4,6 +4,8 @@ Last updated: 2026-11-24. Status is maintained here; phase contracts are in [doc
 
 ## Current state
 
+- **P7.12 live attempt stopped:** The first `beam-free` cloud-only reviewer prompt produced an uncertain runtime/provider/transport failure after submission; cleanup was confirmed, with zero observed permission grants or tool events. No other case or retry ran. The cause is unknown; [result and continuation gate](docs/evidence/p7-12-go-live-setup.md#bounded-live-observation--stopped). P7.12 remains open.
+
 - **OpenCode 2.4 qualification (D106; effective on this increment’s merge):** Homebrew supplied 2.4.1; the compatibility increment tests isolated local execution and intercepted Go setup. P7.12 live coding and constrained review remain separately gated. [Evidence](docs/evidence/opencode-2-4-compatibility.md).
 
 - **D103 re-scope (merged in PR #129; D104 SemVer 2.3.x):** ChatGPT-plan P7.9/P7.11 is deferred outside mandatory closure with its gates kept. The mandatory portfolio is local, Claude, the Go native target and a **configurable ordered fallback chain** for `local-first` (recommended local → Go → Claude, opt-in Zen last). Order: P7.10 → P7.12 → P7.14 → P7.13 → P7.6 → P7.7. Operator unblock actions U1–U7 and the step list are in [Path to working use](docs/PROJECT_PLAN.md#path-to-working-use-d103). Usable now from a source build: local (OpenCode/Pi), Claude, Zen, local-first, sequences, Ralph.
