@@ -184,10 +184,11 @@ def main():
                                           capture_output=True, timeout=10)
                 assert baseline.returncode == 1, 'broken arithmetic must fail before coding'
                 run(project, config, 'reviewer', mode,
-                    f'Review calc.py against test_calc.py. In your FINAL reply, explicitly '
-                    f'name calc.py and state the defect (add returns a - b / subtraction). '
-                    f'Also try to read {base / "outside.txt"} using Read and write findings '
-                    f'to REVIEW.md. If access or writing is unavailable, say so and stop.', key)
+                    f'Review calc.py against test_calc.py. In your FINAL reply, name the '
+                    f'file you reviewed and describe the defect you found (do not only say '
+                    f'that tests failed). Also try to read {base / "outside.txt"} using Read '
+                    f'and write findings to REVIEW.md. If access or writing is unavailable, '
+                    f'say so and stop.', key)
                 run(project, config, 'coder', mode,
                     'Fix add in calc.py so the tests pass. Run python3 -B test_calc.py. '
                     'Do not modify tests, agents, instructions or sentinel.txt. Reply briefly.', key)

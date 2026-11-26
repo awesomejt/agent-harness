@@ -96,6 +96,10 @@ After Grok feature review and merge of this setup:
 6. Any failure/uncertain stop is for review only — not permission to retry or
    to switch keys/models without a new reviewed setup.
 
+[D108](../../DECISIONS.md#2026-11-26--d108-same-session-driver-fix-iterations-for-p712-model-access-live)
+records a one-time exception for same-session driver-fix iterations after this
+setup merged; it does not change the default one-shot rule for later gates.
+
 `beam-free` still cannot prove paid entitlement or natural limit behavior. Do
 not deliberately exhaust allowance. The live result is recorded in
 [p7-12-go-live-model-access-result.md](p7-12-go-live-model-access-result.md).
