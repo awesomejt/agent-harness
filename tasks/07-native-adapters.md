@@ -114,7 +114,7 @@ D061 replaces the former Gemini CLI target at the same stable task ID. First pro
   - a limit refusal that stops (P7.14 owns chain transitions);
   - the dated Extra Usage-off attestation.
 
-  Record tested versions and account-control limitations. Do not deliberately exhaust an allowance.
+  Record tested versions and account-control limitations. Do not deliberately exhaust an allowance. The 2026-11-25 live attempt stopped uncertain after submission. [D107](../DECISIONS.md#2026-11-25--d107-classify-post-submission-acp-errors) specifies bounded post-submission error labels before any further live run; those labels do not replace the acceptance evidence above.
 - **Decision/readiness gate:** D067 spend/use rules apply. No LiteLLM placement. Workflow acceptance awaits P7.13.
 - **Contract:** [Configuration](../docs/CONFIGURATION.md), [execution](../docs/EXECUTION.md), [frameworks](../docs/FRAMEWORKS.md), [operations](../docs/OPERATIONS.md); update before implementation consumption.
 
