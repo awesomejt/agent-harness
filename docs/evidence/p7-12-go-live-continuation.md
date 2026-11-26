@@ -24,11 +24,13 @@ occurs in this increment.
   post-submission failure of the same shape will retain those labels on the
   attempt summary and an `attempt.acp_error` machine record, without provider
   error text.
-- `scripts/tests/go_live.py` now asserts success leaves both labels null, and
-  on a non-zero harness exit prints only sanitized counters: attempt index,
-  `prompt_submitted`, `backend_stop`, `cleanup_confirmed`, closed labels,
-  grant/tool counters, stdout/stderr sizes, and a bounded harness diagnostic
-  tail. Response text and raw provider content stay withheld.
+- `scripts/tests/go_live.py` now asserts success leaves both labels null
+  (indexing required schema keys), parses success JSONL strictly, and on a
+  non-zero harness exit best-effort-parses and prints only sanitized counters:
+  attempt index, `prompt_submitted`, `backend_stop`, `cleanup_confirmed`,
+  closed labels, grant/tool counters, stdout/stderr sizes, and a bounded
+  harness diagnostic tail. Response text and raw provider content stay
+  withheld.
 - The driver still requires Homebrew OpenCode 2.4.1, `AH_P712_LIVE=operator-attested`,
   and a non-synthetic `P712_KEY`, removes those two variables before other
   children, and supplies the key only to the harness. The project config names

@@ -31,16 +31,22 @@ def snapshot(project):
 
 
 def closed_labels(attempt):
-    """Return only D107 closed labels; never provider text."""
-    return attempt.get('acp_error'), attempt.get('acp_data')
+    """Return only D107 closed labels; never provider text.
+
+    Index required keys so a stale binary missing the schema fails loudly.
+    """
+    return attempt['acp_error'], attempt['acp_data']
 
 
-def parse_records(stdout):
+def parse_records(stdout, *, strict=False):
+    """Parse JSONL. Strict mode re-raises without echoing line content."""
     records = []
     for line in stdout.splitlines():
         try:
             records.append(json.loads(line))
         except json.JSONDecodeError:
+            if strict:
+                raise AssertionError('malformed JSONL line in harness stdout') from None
             break
     return records
 
@@ -48,7 +54,7 @@ def parse_records(stdout):
 def failure_summary(role, mode, result):
     # Sanitized stop diagnostics only: exit, closed labels, sizes. No response.
     labels = []
-    for record in parse_records(result.stdout):
+    for record in parse_records(result.stdout, strict=False):
         if record.get('type') != 'result':
             continue
         for attempt in record.get('attempts') or []:
@@ -79,7 +85,7 @@ def run(project, config, role, mode, prompt, key):
     # ah withholds raw provider stderr; show only closed D107 labels, a bounded
     # harness diagnostic tail, and sizes — never raw response/account content.
     assert result.returncode == 0, failure_summary(role, mode, result)
-    records = parse_records(result.stdout)
+    records = parse_records(result.stdout, strict=True)
     assert records and all(r['v'] == 1 for r in records)
     assert [r['seq'] for r in records] == list(range(len(records)))
     assert sum(r['type'] == 'result' for r in records) == 1
@@ -116,12 +122,13 @@ def run(project, config, role, mode, prompt, key):
         check = subprocess.run(['python3', '-B', 'test_calc.py'], cwd=project,
                                capture_output=True, timeout=10)
         assert check.returncode == 0, 'independent arithmetic verification failed'
+    err, data = closed_labels(last)
     print(json.dumps(dict(role=role, mode=mode, exit=result.returncode,
                           seconds=round(time.monotonic() - started, 1),
                           attempts=len(attempts), backend_stop=last['backend_stop'],
                           cleanup=last['cleanup_confirmed'], requests=last['permission_requests'],
                           grants=last['grants'], tool_events=last['tool_events'], changed=changed,
-                          acp_error=last.get('acp_error'), acp_data=last.get('acp_data'),
+                          acp_error=err, acp_data=data,
                           instruction_marker=True)), flush=True)
 
 
