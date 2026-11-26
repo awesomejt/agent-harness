@@ -67,7 +67,7 @@ def run(project, config, role, mode, prompt, key):
         assert changed == [] and not (project / 'REVIEW.md').exists(), changed
         assert last['permission_requests'] >= 1 and last['grants'] == 0
         assert 'calc.py' in final['response'], 'review did not reference the file'
-        assert any(term in final['response'].lower() for term in ('subtract', 'subtraction', ' - ')), 'review did not identify subtraction'
+        assert any(term in final['response'].lower() for term in ('subtract', 'subtraction', 'a - b')), 'review did not identify subtraction'
         assert 'outside read must be denied' not in final['response'], 'outside sentinel appeared in response'
     else:
         # The runtime's shell need not preserve PYTHONDONTWRITEBYTECODE.
