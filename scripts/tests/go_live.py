@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Opt-in P7.12 acceptance; uses the operator-attested Go API key.
 
-Run after cargo build --locked. Real inference is never part of offline.py.
-Only sanitized counters are printed; all work is in a disposable git project.
+Run after cargo build --locked from the reviewed continuation revision.
+Real inference is never part of offline.py. Only sanitized counters and
+closed D107 labels are printed; all work is in a disposable git project.
 """
 import hashlib
 import json
@@ -29,6 +30,44 @@ def snapshot(project):
             for p in project.rglob('*') if p.is_file() and '.git' not in p.relative_to(project).parts}
 
 
+def closed_labels(attempt):
+    """Return only D107 closed labels; never provider text."""
+    return attempt.get('acp_error'), attempt.get('acp_data')
+
+
+def parse_records(stdout):
+    records = []
+    for line in stdout.splitlines():
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            break
+    return records
+
+
+def failure_summary(role, mode, result):
+    # Sanitized stop diagnostics only: exit, closed labels, sizes. No response.
+    labels = []
+    for record in parse_records(result.stdout):
+        if record.get('type') != 'result':
+            continue
+        for attempt in record.get('attempts') or []:
+            labels.append(dict(
+                attempt=attempt.get('attempt'),
+                prompt_submitted=attempt.get('prompt_submitted'),
+                backend_stop=attempt.get('backend_stop'),
+                cleanup_confirmed=attempt.get('cleanup_confirmed'),
+                acp_error=attempt.get('acp_error'),
+                acp_data=attempt.get('acp_data'),
+                grants=attempt.get('grants'),
+                tool_events=attempt.get('tool_events'),
+            ))
+    return (role, mode, result.returncode,
+            f'stdout bytes: {len(result.stdout.encode())}',
+            f'stderr bytes: {len(result.stderr.encode())}',
+            labels, result.stderr[-1200:])
+
+
 def run(project, config, role, mode, prompt, key):
     before = snapshot(project)
     started = time.monotonic()
@@ -37,11 +76,10 @@ def run(project, config, role, mode, prompt, key):
          '--mode', mode, '--agent', role, '--permissions', 'trusted', '--timeout-secs', '120',
          '--output', 'jsonl'], capture_output=True, text=True, timeout=135,
         env={**os.environ, 'P712_KEY': key, 'AH_P712_UNUSED_KEY': 'synthetic-unused-key', 'PYTHONDONTWRITEBYTECODE': '1'})
-    # ah withholds raw provider stderr; show only a bounded tail of its own
-    # diagnostics and the stdout size, never raw response/account content.
-    assert result.returncode == 0, (role, mode, result.returncode,
-                                   f'stdout bytes: {len(result.stdout.encode())}', result.stderr[-1200:])
-    records = [json.loads(line) for line in result.stdout.splitlines()]
+    # ah withholds raw provider stderr; show only closed D107 labels, a bounded
+    # harness diagnostic tail, and sizes — never raw response/account content.
+    assert result.returncode == 0, failure_summary(role, mode, result)
+    records = parse_records(result.stdout)
     assert records and all(r['v'] == 1 for r in records)
     assert [r['seq'] for r in records] == list(range(len(records)))
     assert sum(r['type'] == 'result' for r in records) == 1
@@ -54,6 +92,7 @@ def run(project, config, role, mode, prompt, key):
     if mode == 'local-first':
         assert attempts[0]['runtime'] == 'opencode'
         assert not attempts[0]['launched'] and not attempts[0]['prompt_submitted']
+        assert closed_labels(attempts[0]) == (None, None)
     last = attempts[-1]
     assert last['runtime'] == 'opencode' and last['runtime_version'] == '2.4.1'
     assert last['model'] == 'opencode-go/beam-free' and last['agent']['name'] == role
@@ -61,6 +100,7 @@ def run(project, config, role, mode, prompt, key):
     assert last['prompt_submitted'] and last['backend_stop'] == 'end_turn'
     assert last['cleanup_confirmed'] and last['tool_events'] > 0
     assert not last['protocol_violation']
+    assert closed_labels(last) == (None, None), 'success must leave acp labels null'
     after = snapshot(project)
     changed = sorted(k for k in before.keys() | after.keys() if before.get(k) != after.get(k))
     if role == 'reviewer':
@@ -81,6 +121,7 @@ def run(project, config, role, mode, prompt, key):
                           attempts=len(attempts), backend_stop=last['backend_stop'],
                           cleanup=last['cleanup_confirmed'], requests=last['permission_requests'],
                           grants=last['grants'], tool_events=last['tool_events'], changed=changed,
+                          acp_error=last.get('acp_error'), acp_data=last.get('acp_data'),
                           instruction_marker=True)), flush=True)
 
 
