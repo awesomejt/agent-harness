@@ -242,6 +242,8 @@ impl Progress {
                     "tool_events",
                     "protocol_violation",
                     "runtime_state_removed",
+                    "acp_error",
+                    "acp_data",
                 ] {
                     entry.insert(key.into(), Value::Null);
                 }

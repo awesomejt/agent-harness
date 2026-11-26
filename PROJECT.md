@@ -1,10 +1,10 @@
 # Project tracker
 
-Last updated: 2026-11-25. Status is maintained here; phase contracts are in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
+Last updated: 2026-11-26. Status is maintained here; phase contracts are in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
 
 ## Current state
 
-- **P7.12 diagnostic design (D107):** The first `beam-free` cloud-only reviewer prompt produced an uncertain runtime/provider/transport failure after submission; cleanup was confirmed, with zero observed permission grants or tool events. No other case or retry ran. The cause is unknown ([result](docs/evidence/p7-12-go-live-setup.md#bounded-live-observation--stopped); [assessment](docs/evidence/p7-12-go-failure-assessment.md)). [D107](DECISIONS.md#2026-11-25--d107-classify-post-submission-acp-errors) specifies closed post-submission `acp_error` / `acp_data` labels and drops provider message and data ([design](docs/evidence/p7-12-acp-error-classification.md)). Implementation is next and sends no live prompt. P7.12 remains open.
+- **P7.12 ACP error classifier (D107):** Closed post-submission `acp_error` / `acp_data` labels are implemented offline ([design](docs/evidence/p7-12-acp-error-classification.md)). The 2026-11-25 stopped `beam-free` attempt remains unclassified ([result](docs/evidence/p7-12-go-live-setup.md#bounded-live-observation--stopped); [assessment](docs/evidence/p7-12-go-failure-assessment.md)). No live prompt in this increment. P7.12 remains open; live coding and constrained review stay separately gated.
 
 - **OpenCode 2.4 qualification (D106; effective on this increment’s merge):** Homebrew supplied 2.4.1; the compatibility increment tests isolated local execution and intercepted Go setup. P7.12 live coding and constrained review remain separately gated. [Evidence](docs/evidence/opencode-2-4-compatibility.md).
 
@@ -137,7 +137,7 @@ D068 replaced four-native-target closure; D103 replaces its ChatGPT/Go routes wi
 - [ ] P7.9 (deferred outside mandatory closure, D103) Assess pinned OpenCode ChatGPT-plan feasibility; bounded selection/assessment (D069) and [contained diagnostics](docs/evidence/p7-9-contained-diagnostics.md) (D070) leave source/resource/persistent-state and effective auth/tool proof open ([card](tasks/07-native-adapters.md#p7-9)).
 - [x] P7.10 Assess OpenCode Go feasibility on the production ACP API-key path (D103); [source, fixtures and bounded live evidence](docs/evidence/p7-10-acp-source-increment.md). Acceptance became effective on PR #132 merge after result review; the operator-selected free model does not prove paid allowance consumption or entitlement. P7.12 retains its own live acceptance ([card](tasks/07-native-adapters.md#p7-10)).
 - [ ] P7.11 (deferred outside mandatory closure, D103) Design/deliver explicit ChatGPT-plan route after feasibility, with fixture/live coding and constrained-review acceptance ([card](tasks/07-native-adapters.md#p7-11)).
-- [ ] P7.12 **Current task.** Deliver Go as a native target for cloud-only and as the local-first fallback (unchanged D034), with fixture/live coding and constrained-review acceptance ([card](tasks/07-native-adapters.md#p7-12)). The stopped live attempt is unexplained; [D107](DECISIONS.md#2026-11-25--d107-classify-post-submission-acp-errors) is the next increment and does not pass live acceptance.
+- [ ] P7.12 **Current task.** Deliver Go as a native target for cloud-only and as the local-first fallback (unchanged D034), with fixture/live coding and constrained-review acceptance ([card](tasks/07-native-adapters.md#p7-12)). D107's offline classifier is landed; the stopped live attempt stays unexplained and live acceptance remains open.
 - [ ] P7.14 Configurable ordered `local-first` fallback chain (recommended local → Go → Claude, opt-in Zen): schema and D034 replacement, per-target limit classifiers, fixtures, natural-exhaustion live evidence or a recorded limitation ([card](tasks/07-native-adapters.md#p7-14)).
 - [ ] P7.13 Verify selected local/Claude/Go portfolio and configured chain through single/sequence/Ralph and limit/interruption/recovery boundaries ([card](tasks/07-native-adapters.md#p7-13)).
 - [ ] P7.6 Audit selected portfolio capability/version/install coverage after P7.13; retain paused/blocked-target dispositions; incremental docs belong to each adapter task ([card](tasks/07-native-adapters.md#p7-6)).

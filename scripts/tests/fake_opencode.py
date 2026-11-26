@@ -243,7 +243,10 @@ for line in sys.stdin:
             os.write(1, b'\xff\n')
             break
         if case == 'rpc-error':
-            send(dict(jsonrpc='2.0',id=prompt_id,error=dict(code=-32603,message='SECRET_SENTINEL')))
+            # Canary in message and data; classifier must keep only closed labels.
+            send(dict(jsonrpc='2.0',id=prompt_id,error=dict(
+                code=-32603, message='SECRET_SENTINEL',
+                data=dict(detail='SECRET_SENTINEL'))))
             continue
         if case == 'go-limit-rpc':
             # ACP 2.3.0 translates a Go limit into a session service failure.

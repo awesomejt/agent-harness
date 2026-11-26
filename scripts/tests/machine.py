@@ -21,7 +21,7 @@ OUTCOMES = {0: 'succeeded', 1: 'failed', 2: 'rejected', 3: 'cancelled', 4: 'unce
 ATTEMPT_KEYS = {'attempt', 'route', 'runtime', 'runtime_version', 'model', 'group', 'permissions', 'agent',
                 'launched', 'session', 'prompt_submitted', 'backend_stop', 'cleanup_confirmed',
                 'permission_requests', 'grants', 'tool_events', 'protocol_violation',
-                'runtime_state_removed', 'usage'}
+                'runtime_state_removed', 'acp_error', 'acp_data', 'usage'}
 USAGE_KEYS = {'source', 'context_used_tokens', 'context_capacity_tokens', 'turn_tokens', 'session_cost'}
 
 
@@ -115,6 +115,7 @@ assert result['response'] == 'OK' and result['reason'] is None and result['fallb
 assert attempt['route'] == 'local-only' and attempt['model'] == 'ah-litellm/fixture' and attempt['runtime'] == 'opencode', attempt
 assert attempt['backend_stop'] == 'end_turn' and attempt['cleanup_confirmed'] is True and attempt['runtime_state_removed'] is True
 assert attempt['permissions'] == 'deny' and attempt['agent'] is None and attempt['grants'] == 0, attempt
+assert attempt['acp_error'] is None and attempt['acp_data'] is None, attempt
 assert all(v is None for v in attempt['usage'].values()), 'unreported usage is null, never zero'
 
 # Reported usage with units and provenance; an invalid cost stays unknown.
@@ -136,11 +137,23 @@ _, result = run('backend-cancelled', 3)
 assert result['attempts'][0]['backend_stop'] == 'cancelled', result
 _, result = run('deny-completed', 4)
 assert result['attempts'][0]['protocol_violation'] is True and result['response'] is None, result
+assert result['attempts'][0]['acp_error'] is None and result['attempts'][0]['acp_data'] is None, result
 # R03-REC1 declined (D039): a post-submission failure without terminal evidence
 # stays uncertain even with zero grants; the counters are reported instead.
-_, result = run('rpc-error', 4)
+records, result = run('rpc-error', 4)
 a = result['attempts'][0]
 assert a['prompt_submitted'] and a['backend_stop'] is None and a['grants'] == 0 and a['tool_events'] == 0, a
+assert a['acp_error'] == 'internal_error' and a['acp_data'] == 'unclassified', a
+assert any(r['type'] == 'attempt.acp_error' and r.get('acp_error') == 'internal_error'
+           and r.get('acp_data') == 'unclassified' for r in records), records
+_, result = run('go-limit-rpc', 4)
+a = result['attempts'][0]
+assert a['acp_error'] == 'internal_error' and a['acp_data'] == 'go_limit', a
+# Transport EOF after submission: the ACP SDK surfaces an InternalError; exit 4.
+_, result = run('eof', 4)
+a = result['attempts'][0]
+assert a['prompt_submitted'] and a['backend_stop'] is None and a['cleanup_confirmed'] is True, a
+assert a['acp_error'] == 'internal_error' and a['acp_data'] == 'unclassified', a
 _, result = run('interrupt', 4, trusted=True, interrupt=True)
 assert result['attempts'][0]['prompt_submitted'] is True, result
 
@@ -151,6 +164,7 @@ records, result = run('text', 2, extra=['--output', 'jsonl'])
 assert result['reason'] == 'duplicate option' and result['attempts'] == [], result
 _, result = run('version', 2)
 assert result['attempts'][0]['launched'] is False and result['attempts'][0]['prompt_submitted'] is False, result
+assert result['attempts'][0]['acp_error'] is None and result['attempts'][0]['acp_data'] is None, result
 assert result['reason'].startswith('preflight failed'), result
 
 # A blocked consumer cannot stall cleanup; undelivered success becomes exit 1.

@@ -95,8 +95,13 @@ with http.server.ThreadingHTTPServer(('127.0.0.1', 0), Trap) as trap:
                     assert result['result']['outcome']['optionId'] == 'reject', result
                 if case == 'cancel-deadline':
                     assert (base/'cancelled').exists(), case
+                if case == 'rpc-error':
+                    assert 'acp_error=internal_error' in p.stderr and 'acp_data=unclassified' in p.stderr, p.stderr
                 if case == 'go-limit-rpc':
                     assert (base/'launch-routes').read_text().splitlines() == ['native']
+                    assert 'acp_error=internal_error' in p.stderr and 'acp_data=go_limit' in p.stderr, p.stderr
+                if case == 'session-model':
+                    assert 'acp_error=' not in p.stderr and 'acp_data=' not in p.stderr, p.stderr
                 count += 1
     trap.shutdown()
     thread.join(timeout=2)
