@@ -76,11 +76,12 @@ cloud-only path (D105). The OpenCode ACP runtime uses only the built-in Go
 provider, a private key environment reference and no endpoint override. Source,
 catalog, agent/title and session-model preflights enforce the selected route;
 Go failures stop under existing outcome rules. After prompt submission, a peer
-ACP error, harness response-budget timeout, or finished connection without a
-stored label records closed `acp_error` / `acp_data` labels (D107) on the
-attempt summary and an `attempt.acp_error` machine record; message and
-non-allowlisted data are dropped, and the labels do not change exit 4, D031,
-or D034. The implementation has offline fixture coverage; its live coding and
+JSON-RPC ACP error, SDK transport EOF/termination (`unknown`), harness
+response-budget timeout, or finished connection without a stored label records
+closed `acp_error` / `acp_data` labels (D107) on the attempt summary and an
+`attempt.acp_error` machine record; message and non-allowlisted data are
+dropped, and the labels do not change exit 4, D031, or D034. The
+implementation has offline fixture coverage; its live coding and
 constrained-review acceptance is pending.
 
 P7.2 ([D052](../DECISIONS.md#2026-11-06--d052-claude-as-the-configured-pre-submission-native-fallback)) also permits `native.target: "claude"` as that one fallback. The coordinator, eligibility and shared deadline are unchanged. Claude runs its complete D048–D050 preflight before the prompt, using the official CLI login, the same project instructions and canonical role, and fresh request-bound grants. A failed Claude setup, terminal error, cancellation or uncertain result ends the run without another attempt. Capability checks cover both runtimes before the probe: OpenCode still refuses non-default role effort, and Claude refuses bodies above 128 KiB. Workflow records name the fallback `claude/MODEL`; machine attempt 2 reports `runtime: "claude"`, the bare model and `route: "local-first fallback"`.
@@ -156,7 +157,7 @@ stdout then carries only UTF-8 JSON Lines, one object per `\n`-terminated line, 
 | `attempt.usage` | The usage object below. |
 | `attempt.activity` | Cumulative `assistant_chunks`, `tool_events`, `permission_requests`, `grants`. Sampled like human activity; also sent with the five-second heartbeat. |
 | `attempt.backend_stop` | `backend_stop`: `end_turn`, `cancelled` or `other` (other known terminal reasons). |
-| `attempt.acp_error` | Closed post-submission labels only (D107): `acp_error` and `acp_data`. Emitted after a peer ACP error, harness response-budget timeout, or finished connection with no stored label once the prompt was submitted. Never carries provider error text, raw codes, or untrusted `data`. |
+| `attempt.acp_error` | Closed post-submission labels only (D107): `acp_error` and `acp_data`. Emitted after a peer JSON-RPC ACP error, SDK transport EOF/termination (`unknown`), harness response-budget timeout, or finished connection with no stored label once the prompt was submitted. Never carries provider error text, raw codes, or untrusted `data`. |
 | `attempt.cleanup` | `cleanup_confirmed`, `permission_requests`, `grants`, `tool_events`, `protocol_violation`. |
 | `fallback` | `from_attempt` 1, `to_attempt` 2, `reason` `litellm_unreachable_before_submission`. |
 | `verification.started` | `check`, `timeout_secs`. Only with `--verify`, after a successful backend outcome (D043). |

@@ -66,7 +66,7 @@ def check(case, expected, trusted=False, source='inline', grouped=False):
         if pipe_write is not None:
             os.close(pipe_write)
             p.stderr=os.fdopen(pipe_read,'r')
-        if case in ['interrupt','before-prompt','cancel-ack','cancel-success','cancel-ack-only','cancel-permission','cancel-term']:
+        if case in ['interrupt','before-prompt','cancel-ack','cancel-success','cancel-ack-only','cancel-rpc-error','cancel-permission','cancel-term']:
             marker = base / ('prompted' if case != 'before-prompt' else 'pids.json')
             until = time.monotonic()+10
             while not marker.exists() and p.poll() is None and time.monotonic()<until:
@@ -137,7 +137,7 @@ def check(case, expected, trusted=False, source='inline', grouped=False):
         if (base/'prompted').exists() and case != 'blocked-stderr':
             assert 'attempt=1' in err and 'usage=' in err and 'outcome=' in err, (case,err)
             assert ('ah-litellm/fixture (group coder)' in err) == grouped, (case,err)
-        if case in ['cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission','cancel-term']:
+        if case in ['cancel-ack','cancel-success','cancel-ack-only','cancel-rpc-error','cancel-deadline','cancel-permission','cancel-term']:
             assert (base/'cancelled').exists(),case
         if case == 'session-controls':
             assert not any(c in err for c in ['\u009b','\u202e','\x1b']),repr(err)
@@ -179,7 +179,9 @@ check('read',0,trusted=True,grouped=True)
 for case in ['triplicate','duplicate','empty-id','wrong-session','eof','oversized','deadline','interrupt','unexpected-write']:
     err = check(case,4,trusted=True)
     if case == 'eof':
-        assert 'acp_error=internal_error' in err and 'acp_data=unclassified' in err, err
+        assert 'acp_error=unknown' in err and 'acp_data=absent' in err, err
+err = check('cancel-rpc-error', 4)
+assert 'acp_error=internal_error' in err and 'acp_data=go_limit' in err, err
 check('before-prompt',3)
 check('backend-cancelled',3)
 check('session-model',1)

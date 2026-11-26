@@ -149,11 +149,11 @@ assert any(r['type'] == 'attempt.acp_error' and r.get('acp_error') == 'internal_
 _, result = run('go-limit-rpc', 4)
 a = result['attempts'][0]
 assert a['acp_error'] == 'internal_error' and a['acp_data'] == 'go_limit', a
-# Transport EOF after submission: the ACP SDK surfaces an InternalError; exit 4.
+# Transport EOF after submission is not a peer Error object (D107 fixture 8).
 _, result = run('eof', 4)
 a = result['attempts'][0]
 assert a['prompt_submitted'] and a['backend_stop'] is None and a['cleanup_confirmed'] is True, a
-assert a['acp_error'] == 'internal_error' and a['acp_data'] == 'unclassified', a
+assert a['acp_error'] == 'unknown' and a['acp_data'] == 'absent', a
 _, result = run('interrupt', 4, trusted=True, interrupt=True)
 assert result['attempts'][0]['prompt_submitted'] is True, result
 

@@ -180,6 +180,21 @@ fn record_acp_labels(
     }
 }
 
+/// SDK-local transport EOF / termination is not a peer JSON-RPC error object
+/// (D107 fixture 8); those map to `unknown` / `absent`.
+fn record_prompt_failure(
+    slot: &Mutex<Option<(AcpError, AcpData)>>,
+    err: &agent_client_protocol::Error,
+) {
+    if agent_client_protocol::is_incoming_transport_closed(err)
+        || agent_client_protocol::is_connection_terminated(err)
+    {
+        record_acp_labels(slot, (AcpError::Unknown, AcpData::Absent), false);
+    } else {
+        record_acp_labels(slot, classify_acp_error(err), true);
+    }
+}
+
 pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
     if runtime.cancelled.is_cancelled() || tokio::time::Instant::now() >= runtime.deadline {
         return Exit::Cancelled;
@@ -537,7 +552,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                 result = &mut response => match result {
                     Ok(ok) => ok,
                     Err(err) => {
-                        record_acp_labels(&prompt_labels, classify_acp_error(&err), true);
+                        record_prompt_failure(&prompt_labels, &err);
                         return Err(err);
                     }
                 },
@@ -549,7 +564,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                     {
                         Ok(Ok(ok)) => ok,
                         Ok(Err(err)) => {
-                            record_acp_labels(&prompt_labels, classify_acp_error(&err), true);
+                            record_prompt_failure(&prompt_labels, &err);
                             return Err(err);
                         }
                         Err(_) => {
@@ -570,7 +585,7 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                     {
                         Ok(Ok(ok)) => ok,
                         Ok(Err(err)) => {
-                            record_acp_labels(&prompt_labels, classify_acp_error(&err), true);
+                            record_prompt_failure(&prompt_labels, &err);
                             return Err(err);
                         }
                         Err(_) => {
@@ -732,7 +747,7 @@ fn bound(permission: &Value, descriptor: Option<&Value>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        AcpData, AcpError, bound, classify_acp_error, record_acp_labels,
+        AcpData, AcpError, bound, classify_acp_error, record_acp_labels, record_prompt_failure,
     };
     use agent_client_protocol::{Error, ErrorCode};
     use serde_json::{Value, json};
@@ -856,12 +871,28 @@ mod tests {
     }
 
     #[test]
-    fn unknown_fallback_only_when_no_label_stored() {
-        let mut slot = None;
-        let (error, data) = *slot.get_or_insert((AcpError::Unknown, AcpData::Absent));
-        assert_eq!((error, data), (AcpError::Unknown, AcpData::Absent));
-        assert_eq!(error.as_str(), "unknown");
-        assert_eq!(data.as_str(), "absent");
+    fn transport_closed_records_unknown_not_peer_internal_error() {
+        let closed = Error::internal_error().data(json!({
+            "reason": "incoming_transport_closed",
+            "method": "session/prompt",
+        }));
+        assert!(agent_client_protocol::is_incoming_transport_closed(&closed));
+        let slot = Mutex::new(None);
+        record_prompt_failure(&slot, &closed);
+        assert_eq!(
+            *slot.lock().unwrap(),
+            Some((AcpError::Unknown, AcpData::Absent))
+        );
+        let peer = Error::internal_error().data(json!({
+            "service": "session",
+            "errorName": "provider.go-limit",
+        }));
+        let peer_slot = Mutex::new(None);
+        record_prompt_failure(&peer_slot, &peer);
+        assert_eq!(
+            *peer_slot.lock().unwrap(),
+            Some((AcpError::InternalError, AcpData::GoLimit))
+        );
     }
 
     #[test]
