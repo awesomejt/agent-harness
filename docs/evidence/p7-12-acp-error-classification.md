@@ -36,7 +36,10 @@ The implementation classifies with a pure function of
 `String`. Formatting uses `match` to `'static` words. `Error`'s `Display` and
 `Debug` are not written to progress, notes, machine records, or stderr.
 
-`acp_error` is exactly one of:
+`acp_error` is exactly one of these 11 labels, in two groups.
+
+From `ErrorCode` (returned only by the pure function of
+`&agent_client_protocol::Error`):
 
 | `ErrorCode` | Label |
 |---|---|
@@ -50,8 +53,16 @@ The implementation classifies with a pure function of
 | `ResourceNotFound` (−32002) | `resource_not_found` |
 | `Other(_)`, including `i32::MIN` and `i32::MAX` | `other` |
 
-The numeric code behind `other` is not emitted. Adding a code requires a
-reviewed amendment.
+Call-site only (never returned by the pure function):
+
+| Source | Label |
+|---|---|
+| Harness cancel/deadline elapsed after submission | `response_timeout` |
+| Finished connection with no stored peer or call-site label | `unknown` |
+
+The numeric code behind `other` is not emitted. The pure function never
+returns `response_timeout` or `unknown`. Adding a code or call-site label
+requires a reviewed amendment.
 
 `acp_data` is exactly one of `absent`, `unclassified`, or `go_limit`.
 
@@ -83,8 +94,11 @@ them from `internal_error` plus `absent`, because a peer can send that shape:
   protocol violation records `acp_error=unknown` and `acp_data=absent`.
 
 Labels live in an `Arc` owned outside the foreground task, written before the
-task returns, and read after `is_ok()`. A label is emitted only when `active`
-is true. Pre-submission failures leave both fields null and keep today's
+task returns, and read after `is_ok()`. Write rule: the first write wins,
+except a peer error classified by the pure function replaces a prior
+`response_timeout` (fixture 7). The `unknown` fallback runs only when no
+label is stored. A label is emitted only when `active` is true.
+Pre-submission failures leave both fields null and keep today's
 setup-stopped, failed, and cancelled exits.
 
 A protocol violation stays the existing sticky flag. It is not cleared or
@@ -134,8 +148,8 @@ from every event, note, and stdout/stderr byte.
    Labels: `internal_error`, `go_limit`.
 4. Near misses stay `unclassified`: trailing space, different case, a longer
    name, the canary as `errorName`, `service` other than `session`,
-   `errorName` as an object, array, or number, `data` as a string, array, or
-   null versus omitted.
+   `errorName` as an object, array, or number, and `data` as a string or
+   array. Separately, `data` null and `data` omitted both give `absent`.
 5. `resource_not_found` with `data.uri` set to the canary, and
    `auth_required` with a canary `data` object.
 6. A multi-megabyte `message` containing newlines, ANSI, and bidi overrides.
