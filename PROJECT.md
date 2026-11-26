@@ -4,6 +4,8 @@ Last updated: 2026-11-26. Status is maintained here; phase contracts are in [doc
 
 ## Current state
 
+- **P7.14 transition assessment:** [Source assessment](docs/evidence/p7-14-transition-assessment.md) identifies the typed-result, classifier, affirmative no-work, cleanup and durable workflow gaps to resolve before the chain decision and implementation. No chain or new fallback is enabled; P7.14 remains open.
+
 - **P7.12 Go live acceptance (Model Access):** After [setup PR #142](https://github.com/awesomejt/agent-harness/pull/142) and fresh Extra Usage-off / $0.00 attestation, one four-cell `go_live.py` run on OpenCode 2.4.1 with Personal **OpenCode Model Access** key and `beam-free` **passed** cloud-only and local-first reviewer/coder ([result](docs/evidence/p7-12-go-live-model-access-result.md)). Digests and key-hash gates matched. Prior MacBookPro [`auth_required`](docs/evidence/p7-12-go-live-result.md) remains historical. P7.12 live coding/constrained-review gate is satisfied; workflow portfolio (P7.13) and chain (P7.14) remain separate.
 
 - **OpenCode 2.4 qualification (D106; effective on this increment’s merge):** Homebrew supplied 2.4.1; the compatibility increment tests isolated local execution and intercepted Go setup. P7.12 live coding and constrained review remain separately gated. [Evidence](docs/evidence/opencode-2-4-compatibility.md).
