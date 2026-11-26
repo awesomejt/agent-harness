@@ -155,11 +155,9 @@ fn named_agent_preview_reports_mapping_and_unsupported_effort_refuses_without_wr
     let output = run("thinker", &[]);
     assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
-    assert!(
-        String::from_utf8(output.stderr)
-            .unwrap()
-            .contains("agent effort is unsupported by OpenCode 2.3.x; only default effort runs")
-    );
+    assert!(String::from_utf8(output.stderr).unwrap().contains(
+        "agent effort is unsupported by OpenCode 2.3.x or 2.4.x; only default effort runs"
+    ));
     assert_eq!(listing(), before);
     std::fs::remove_dir_all(project).unwrap();
 }
