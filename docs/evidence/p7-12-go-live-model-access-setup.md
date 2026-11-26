@@ -97,8 +97,9 @@ After Grok feature review and merge of this setup:
    to switch keys/models without a new reviewed setup.
 
 `beam-free` still cannot prove paid entitlement or natural limit behavior. Do
-not deliberately exhaust allowance. P7.12 stays open until a separate result
-PR passes review; P7.14 stays blocked.
+not deliberately exhaust allowance. The live result is recorded in
+[p7-12-go-live-model-access-result.md](p7-12-go-live-model-access-result.md).
+P7.14 stays separately gated.
 
 ## Verification
 
