@@ -61,10 +61,12 @@ impl Runtime {
         }
         // 2.3.0 no longer recognizes OPENCODE_DISABLE_DEFAULT_PLUGINS; the
         // `plugins: []` document and the sources check stand in for it.
+        // 2.4 restores CLAUDE.md discovery, including nested directories.
         for name in [
             "OPENCODE_DISABLE_MODELS_FETCH",
             "OPENCODE_DISABLE_AUTOUPDATE",
             "OPENCODE_DISABLE_PROJECT_CONFIG",
+            "OPENCODE_DISABLE_CLAUDE_CODE",
         ] {
             env.push((name.into(), "true".into()));
         }

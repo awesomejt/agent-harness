@@ -99,7 +99,7 @@ def main():
                 assert 'unused-' not in p.stdout + p.stderr
                 assert f'; agent {agent} (' in p.stderr, p.stderr
                 if mode == 'local-first':
-                    assert 'attempt=2 local-first fallback via OpenCode 2.3.' in p.stderr, p.stderr
+                    assert 'attempt=2 local-first fallback via OpenCode 2.' in p.stderr, p.stderr
                     assert not (project / '.opencode').exists()
                 else:
                     assert (project / '.opencode/agents' / (agent + '.md')).exists()

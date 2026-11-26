@@ -16,7 +16,7 @@ def main():
     runtime = shutil.which('opencode')
     assert runtime, 'OpenCode 2.3.x required'
     version = subprocess.run([runtime, '--version'], capture_output=True, text=True, timeout=10)
-    assert version.returncode == 0 and version.stdout.strip().startswith('opencode v2.3.'), version.stdout
+    assert version.returncode == 0 and version.stdout.strip().startswith(('opencode v2.3.', 'opencode v2.4.')), version.stdout
     rules = [dict(action='*', resource='*', effect='deny'),
              dict(action='external_directory', resource='*', effect='deny')]
     with tempfile.TemporaryDirectory(prefix='ah-agent-destination-') as d:

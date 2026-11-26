@@ -165,7 +165,7 @@ def shim(runtime):
 
 def main():
     runtime = shutil.which('opencode')
-    assert runtime and subprocess.run([runtime, '--version'], capture_output=True, text=True, timeout=10).stdout.strip().startswith('opencode v2.3.')
+    assert runtime and subprocess.run([runtime, '--version'], capture_output=True, text=True, timeout=10).stdout.strip().startswith(('opencode v2.3.', 'opencode v2.4.'))
     binary = ROOT / 'target/debug/ah'
     assert binary.is_file() and os.access(binary, os.X_OK)
     with tempfile.TemporaryDirectory(prefix='ah-native-isolation-') as directory:

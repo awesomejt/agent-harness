@@ -62,7 +62,7 @@ Every phase includes an explicit whole-phase review after acceptance evidence is
 ## Path to working use (D103)
 
 **Usable now, from a source build** (`cargo build --release --locked`; the published alpha.2 still requires OpenCode 2.2.5):
-- `local-only` through LiteLLM, with OpenCode 2.3.x (tested through 2.3.2) or Pi 1.5.0;
+- `local-only` through LiteLLM, with OpenCode 2.3.x or 2.4.x (2.4.1 qualified offline; live Go acceptance pending) or Pi 1.5.0;
 - `cloud-only` through Claude Code 2.1.314 or the OpenCode Zen API-key route;
 - `local-first` with a Claude or Zen fallback when the proxy is unreachable;
 - named agents, `--verify`, sequences and Ralph.
@@ -76,7 +76,7 @@ The steps below deliver the configurable fallback chain (recommended local → G
 | # | Action | Unblocks | How |
 |---|---|---|---|
 | U1 | Approve D103 | Everything below | Complete: D103 merged in PR #129 after review. |
-| U2 | Hold minor/major pins | Every gate | Do not upgrade OpenCode past `2.3.x` (`2.4+` stops the gate), Claude Code (`2.1.314`) or Pi (`1.5.0`) until Phase 7 closes. SemVer patch releases in `2.3.x` are accepted under D104. |
+| U2 | Hold minor/major pins | Every gate | Use OpenCode 2.3.x or 2.4.x (D106); 2.5+ stops the gate. Hold Claude Code at `2.1.314` and Pi at `1.5.0` until Phase 7 closes. |
 | U3 | Prepare the Go account | Step 3 live check, step 4 | In OpenCode Console, confirm the workspace holding the Go subscription, its active Go plan, and **Extra Usage off** on the Go page. Create an API key in that workspace and export it in your shell profile under a name you choose (for example `OPENCODE_API_KEY`). The harness reads only the configured name and never stores it. |
 | U4 | Attest before each live run | Each live acceptance in steps 3–6 | When asked, reply with the current time, time zone and a confirmation that the U3 workspace, plan and Extra Usage-off state are still true. Recheck after any account or plan change. |
 | U5 | Choose the fallback chain | Step 5 | Confirm the step order (recommended: Go, then Claude) and each step's model. Say whether to append a Zen step and which model (metered, or a free Zen model); confirm any metered spend is your choice and fund the Console balance if so. |

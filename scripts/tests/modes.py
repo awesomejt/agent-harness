@@ -23,7 +23,7 @@ MODES = ['local-only', 'cloud-only', 'local-first']
 DECOYS = ['claude', 'codex', 'grok', 'gemini', 'pi']
 RUNTIME_ENV = {'HOME', 'PATH', 'OPENCODE_CONFIG_CONTENT',
                *(f'XDG_{k}_HOME' for k in ['CONFIG', 'DATA', 'CACHE', 'STATE']),
-               *(f'OPENCODE_DISABLE_{k}' for k in ['MODELS_FETCH', 'AUTOUPDATE', 'PROJECT_CONFIG'])}
+               *(f'OPENCODE_DISABLE_{k}' for k in ['MODELS_FETCH', 'AUTOUPDATE', 'PROJECT_CONFIG', 'CLAUDE_CODE'])}
 
 # Exit status is route-independent: the fake behaves identically on both routes.
 SCENARIOS = {

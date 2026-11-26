@@ -1,4 +1,4 @@
-//! Supported OpenCode 2.3.x runtime surface (D104; extends D092): native-schema config for both
+//! Supported OpenCode 2.3.x and 2.4.x runtime surface (D106; extends D104/D092): native-schema config for both
 //! routes, project agent emission, named-role mapping (D038), and pure
 //! validators for its configuration sources, agents and catalog.
 use crate::agents::{self, Agent, Capacity, Effort, Tool};
@@ -6,17 +6,19 @@ use crate::config::{Invalid, Mode, Permissions, Resolved};
 use serde_json::{Value, json};
 use std::path::Path;
 
-pub(crate) const VERSION: &str = "2.3.x";
+pub(crate) const VERSION: &str = "2.3.x or 2.4.x";
 const LOCAL: &str = "ah-litellm";
 const NATIVE: &str = "opencode";
 
 /// Parse `opencode --version` output and accept any stable SemVer patch
-/// release in the `2.3.x` minor line (`>= 2.3.0`, `< 2.4.0`), returning the
-/// matched `2.3.<patch>` version string without the `opencode v` prefix.
+/// release in the `2.3.x` or `2.4.x` minor lines, returning the
+/// matched version string without the `opencode v` prefix.
 pub(crate) fn parse_supported_version(output: &[u8]) -> Option<&str> {
     let trimmed = std::str::from_utf8(output.trim_ascii()).ok()?;
     let version = trimmed.strip_prefix("opencode v")?;
-    let patch = version.strip_prefix("2.3.")?;
+    let patch = version
+        .strip_prefix("2.3.")
+        .or_else(|| version.strip_prefix("2.4."))?;
     if patch.is_empty() || !patch.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
@@ -127,7 +129,7 @@ pub(crate) fn supports(agent: &Agent) -> Result<(), Invalid> {
         Ok(())
     } else {
         Err(Invalid(
-            "agent effort is unsupported by OpenCode 2.3.x; only default effort runs",
+            "agent effort is unsupported by OpenCode 2.3.x or 2.4.x; only default effort runs",
         ))
     }
 }
@@ -730,18 +732,21 @@ mod tests {
     }
 
     #[test]
-    fn semver_patch_version_accepts_2_3_x_and_rejects_other_lines() {
+    fn semver_patch_version_accepts_qualified_lines_and_rejects_others() {
         assert_eq!(parse_supported_version(b"opencode v2.3.0\n"), Some("2.3.0"));
         assert_eq!(parse_supported_version(b"opencode v2.3.2\n"), Some("2.3.2"));
+        assert_eq!(parse_supported_version(b"opencode v2.4.0\n"), Some("2.4.0"));
+        assert_eq!(parse_supported_version(b"opencode v2.4.1\n"), Some("2.4.1"));
         assert_eq!(
             parse_supported_version(b"  opencode v2.3.10  "),
             Some("2.3.10")
         );
         for bad in [
             b"opencode v2.2.5\n".as_slice(),
-            b"opencode v2.4.0\n",
+            b"opencode v2.5.0\n",
             b"opencode v3.0.0\n",
             b"opencode v2.3.2-rc1\n",
+            b"opencode v2.4.1-rc1\n",
             b"opencode v2.3.2+local\n",
             b"opencode v2.3.\n",
             b"opencode 2.3.2\n",

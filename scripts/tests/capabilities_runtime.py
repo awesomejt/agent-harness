@@ -190,27 +190,32 @@ def main():
                 commands = direct(runtime, base, str(named), named, port)
                 markers = set().union(*(r['markers'] for r in server.records))
                 assert markers == ({'M_AGENTS_ROOT'} if named else set()), (named, markers)
-            assert commands == ['init', 'review', 'goal', 'compact'], commands
-            checks.append('direct: AGENTS.md loads only when named; built-in commands init/review/goal/compact')
+            version = subprocess.run([runtime, '--version'], capture_output=True, text=True, timeout=10).stdout.strip()
+            expected_commands = (['init', 'review', 'goal', 'automation', 'compact'] if version.startswith('opencode v2.4.')
+                                 else ['init', 'review', 'goal', 'compact'])
+            assert commands == expected_commands, (version, commands)
+            checks.append('direct: AGENTS.md loads only when named; built-in command inventory checked')
 
             project, sentinels = plant(base, port)
             abs_sub = str(project / 'sub/file.txt')
-            # Trusted unnamed: denied/unavailable tool paths, then a granted nested read.
+            # Exact tool inventory excludes automation; also probe the 2.4.1 source namespace automation.create.
+            # Then exercise denied/unavailable tool paths and a granted nested read.
             p, primary, helpers = run(project, 'Probe capabilities', [
                 ('skill', dict(id='oc')), ('task', dict(description='d', prompt='p', subagent_type='general')),
-                ('webfetch', dict(url='http://127.0.0.1:9/')), ('read', dict(path=abs_sub))],
+                ('webfetch', dict(url='http://127.0.0.1:9/')), ('automation.create', dict()), ('read', dict(path=abs_sub))],
                 '--permissions', 'trusted')
             assert p.returncode == 0, (p.returncode, p.stderr)
             assert 'permission requests: 1; grants: 1;' in p.stderr, p.stderr
-            assert len(primary) == 5 and all(r['tools'] == TRUSTED for r in primary), primary
+            assert len(primary) == 6 and all(r['tools'] == TRUSTED for r in primary), primary
             assert all('M_AGENTS_ROOT' in r['markers'] for r in primary)
             assert all(not r['markers'] & {'M_AGENTS_PARENT', 'M_CLAUDE', 'M_INSTR_FILE', 'M_SKILL', 'M_CMD'}
                        for r in primary), primary
             assert 'Unable to load skill oc' in primary[1]['result'], primary[1]
             assert 'No tool named \\"task\\"' in primary[2]['result'], primary[2]
             assert 'No tool named \\"webfetch\\"' in primary[3]['result'], primary[3]
-            assert 'M_NESTED' not in set().union(*(r['markers'] for r in primary[:4]))
-            assert 'M_NESTED' in primary[4]['markers'], primary[4]
+            assert 'No tool named' in primary[4]['result'] and 'automation' in primary[4]['result'], primary[4]
+            assert 'M_NESTED' not in set().union(*(r['markers'] for r in primary[:5]))
+            assert 'M_NESTED' in primary[5]['markers'], primary[5]
             assert helpers and all(not r['markers'] for r in helpers), helpers
             checks.append('trusted: root AGENTS.md only; skill load fails; task/webfetch absent; nested AGENTS.md after granted read')
 
@@ -233,7 +238,7 @@ def main():
             checks.append('reviewer: role system + AGENTS.md; tools [glob, grep, read, skill]')
 
             # Slash-command prompts refuse before any runtime or model request.
-            for prompt in ['/review', ' /init', '/compact now', '/goal x', '/probecmd']:
+            for prompt in ['/review', ' /init', '/compact now', '/goal x', '/automation', '/probecmd']:
                 p, primary, helpers = run(project, prompt, [], '--permissions', 'trusted')
                 assert p.returncode == 2 and not primary and not helpers, (prompt, p.returncode, p.stderr)
                 assert 'runtime slash command' in p.stderr, p.stderr
@@ -269,7 +274,7 @@ def main():
                    'NATIVE_KEY': 'unused-native-key'}
             p = ah(project, 'Never forwarded to provider', '--agent', 'reviewer', '--permissions', 'trusted', env=env)
             assert p.returncode == 0, (p.returncode, p.stderr)
-            assert 'attempt=2 local-first fallback via OpenCode 2.3.' in p.stderr, p.stderr
+            assert 'attempt=2 local-first fallback via OpenCode 2.' in p.stderr, p.stderr
             assert (project / 'intercepted-native-prompt').exists()
             assert not any(sentinels.iterdir())
             checks.append('local-first native fallback: preflight with instructions entry passes; prompt intercepted')
@@ -278,7 +283,7 @@ def main():
         server.server_close()
     for check in checks:
         print('PASS', check)
-    print(f'PASS installed OpenCode 2.3.0 inherited capabilities: {len(checks)} checks; local model stub only')
+    print(f'PASS installed OpenCode inherited capabilities: {len(checks)} checks; local model stub only')
 
 
 if __name__ == '__main__':

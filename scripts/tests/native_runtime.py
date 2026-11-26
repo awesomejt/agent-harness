@@ -43,8 +43,13 @@ def shim(runtime):
 
 
 def main():
+    go = '--go' in sys.argv
+    target = 'opencode-go' if go else 'opencode'
+    model = 'beam-free' if go else 'gpt-5.4'
     runtime = shutil.which('opencode')
-    assert runtime, 'OpenCode 2.3.0 required'
+    assert runtime, 'OpenCode 2.3.x or 2.4.x required'
+    version = subprocess.run([runtime, '--version'], capture_output=True, text=True, timeout=10)
+    assert version.returncode == 0 and version.stdout.strip().startswith(('opencode v2.3.', 'opencode v2.4.')), version.stdout
     runtime = str(Path(runtime).resolve())
     with tempfile.TemporaryDirectory(prefix='ah-native-runtime-') as d:
         base = Path(d).resolve()
@@ -56,7 +61,7 @@ def main():
         project = base/'project'
         project.mkdir()
         (project/'ah.json').write_text(json.dumps(dict(version=1, mode='cloud-only',
-            native=dict(target='opencode', model='gpt-5.4', api_key_env='NATIVE_KEY'))))
+            native=dict(target=target, model=model, api_key_env='NATIVE_KEY'))))
         sentinel = b'{"provider":{"ah-litellm":{"options":{"baseURL":"http://127.0.0.1:9/v1"}}},"model":"ah-litellm/fixture","small_model":"ah-litellm/fixture","enabled_providers":["ah-litellm"]}'
         (project/'opencode.json').write_bytes(sentinel)
         for trusted in [False, True]:
@@ -72,7 +77,7 @@ def main():
             assert not (project/'.ah-opencode-owner.json').exists()
             assert not (project/'.ah-opencode.lock').exists()
             assert 'unused-native-test-key' not in p.stdout+p.stderr
-            assert 'model opencode/gpt-5.4' in p.stderr
+            assert f'model {target}/{model}' in p.stderr
         # P3.3/D034: unreachable LiteLLM before launch falls back to the same
         # native setup; the local plan is never applied to a fresh project.
         fallback = base/'fallback-project'
@@ -82,15 +87,16 @@ def main():
             endpoint = f'http://127.0.0.1:{closed.getsockname()[1]}/v1'
         (fallback/'ah.json').write_text(json.dumps(dict(version=1, mode='local-first', model='fixture',
             litellm=dict(api_base=endpoint, api_key_env='LOCAL_KEY'),
-            native=dict(target='opencode', model='gpt-5.4', api_key_env='NATIVE_KEY'))))
+            native=dict(target=target, model=model, api_key_env='NATIVE_KEY'))))
         p=subprocess.run([str(ROOT/'target/debug/ah'), 'single', 'Never forwarded to provider', '--project', str(fallback), '--timeout-secs', '30'],
                          env={**env, 'LOCAL_KEY':'unused-local-test-key'}, capture_output=True, text=True, timeout=45)
         assert p.returncode == 0, (p.returncode, p.stderr)
         assert (fallback/'intercepted-native-prompt').exists(), p.stderr
-        assert 'attempt=2 local-first fallback via OpenCode 2.3.' in p.stderr, p.stderr
+        assert 'attempt=2 local-first fallback via OpenCode 2.' in p.stderr, p.stderr
+        assert f'model {target}/{model}' in p.stderr, p.stderr
         assert not (fallback/'opencode.json').exists() and not (fallback/'.ah-opencode-owner.json').exists()
         assert 'unused-native-test-key' not in p.stdout+p.stderr and 'unused-local-test-key' not in p.stdout+p.stderr
-    print('PASS installed OpenCode 2.3.0 native preflight and ACP session; deny/trusted and local-first fallback; 0 native prompts forwarded; managed routing preserved')
+    print(f'PASS installed OpenCode native {target} preflight and ACP session; deny/trusted and local-first fallback; 0 native prompts forwarded; managed routing preserved')
 
 
 if __name__ == '__main__':
