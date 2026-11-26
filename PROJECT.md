@@ -4,7 +4,7 @@ Last updated: 2026-11-25. Status is maintained here; phase contracts are in [doc
 
 ## Current state
 
-- **P7.12 live attempt stopped:** The first `beam-free` cloud-only reviewer prompt produced an uncertain runtime/provider/transport failure after submission; cleanup was confirmed, with zero observed permission grants or tool events. No other case or retry ran. The cause is unknown; [result and continuation gate](docs/evidence/p7-12-go-live-setup.md#bounded-live-observation--stopped). P7.12 remains open.
+- **P7.12 live attempt stopped:** The first `beam-free` cloud-only reviewer prompt produced an uncertain runtime/provider/transport failure after submission; cleanup was confirmed, with zero observed permission grants or tool events. No other case or retry ran. The cause is unknown; [result and continuation gate](docs/evidence/p7-12-go-live-setup.md#bounded-live-observation--stopped). P7.12 remains open; the [offline failure assessment](docs/evidence/p7-12-go-failure-assessment.md) identifies the missing error detail without selecting a retry.
 
 - **OpenCode 2.4 qualification (D106; effective on this increment’s merge):** Homebrew supplied 2.4.1; the compatibility increment tests isolated local execution and intercepted Go setup. P7.12 live coding and constrained review remain separately gated. [Evidence](docs/evidence/opencode-2-4-compatibility.md).
 
