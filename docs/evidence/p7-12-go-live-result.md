@@ -73,11 +73,11 @@ D107 closed labels are present: the peer ACP error classified as
 diagnostic label only; it does not change exit 4, D031, or D034, and it is not
 authorization to retry or to substitute another key or model.
 
-Operator follow-up (outside this PR): confirm which Console API key belongs to
-the attested Personal Go workspace. Any further live attempt needs its own
-reviewed setup/continuation (re-fingerprint, fresh U3/U4 attestation); this
-record does not authorize a retry. Do not deliberately exhaust allowance.
-P7.12 remains open; P7.14 stays blocked.
+Operator follow-up completed outside this PR: Console showed MacBookPro is
+Read only and OpenCode Model Access has model scopes. A **new** reviewed setup
+for the Model Access key is [p7-12-go-live-model-access-setup.md](p7-12-go-live-model-access-setup.md).
+This `auth_required` record still does not authorize a retry by itself. Do not
+deliberately exhaust allowance. P7.12 remains open; P7.14 stays blocked.
 
 ## Verification
 
