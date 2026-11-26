@@ -85,6 +85,116 @@ impl Observed {
     }
 }
 
+/// Closed post-submission ACP error label (D107). Call-site values are never
+/// returned by [`classify_acp_error`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AcpError {
+    ParseError,
+    InvalidRequest,
+    MethodNotFound,
+    InvalidParams,
+    InternalError,
+    RequestCancelled,
+    AuthRequired,
+    ResourceNotFound,
+    Other,
+    ResponseTimeout,
+    Unknown,
+}
+
+impl AcpError {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::ParseError => "parse_error",
+            Self::InvalidRequest => "invalid_request",
+            Self::MethodNotFound => "method_not_found",
+            Self::InvalidParams => "invalid_params",
+            Self::InternalError => "internal_error",
+            Self::RequestCancelled => "request_cancelled",
+            Self::AuthRequired => "auth_required",
+            Self::ResourceNotFound => "resource_not_found",
+            Self::Other => "other",
+            Self::ResponseTimeout => "response_timeout",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+/// Closed post-submission ACP data label (D107).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AcpData {
+    Absent,
+    Unclassified,
+    GoLimit,
+}
+
+impl AcpData {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Absent => "absent",
+            Self::Unclassified => "unclassified",
+            Self::GoLimit => "go_limit",
+        }
+    }
+}
+
+/// Pure classifier of a peer ACP `Error`. Drops `message` and all non-allowlisted
+/// `data`; never returns `response_timeout` or `unknown`.
+fn classify_acp_error(error: &agent_client_protocol::Error) -> (AcpError, AcpData) {
+    let acp_error = match error.code {
+        ErrorCode::ParseError => AcpError::ParseError,
+        ErrorCode::InvalidRequest => AcpError::InvalidRequest,
+        ErrorCode::MethodNotFound => AcpError::MethodNotFound,
+        ErrorCode::InvalidParams => AcpError::InvalidParams,
+        ErrorCode::InternalError => AcpError::InternalError,
+        ErrorCode::RequestCancelled => AcpError::RequestCancelled,
+        ErrorCode::AuthRequired => AcpError::AuthRequired,
+        ErrorCode::ResourceNotFound => AcpError::ResourceNotFound,
+        // Non-exhaustive: any future code is retained as the closed `other` label.
+        ErrorCode::Other(_) | _ => AcpError::Other,
+    };
+    let acp_data = match (&acp_error, error.data.as_ref()) {
+        (_, None) | (_, Some(Value::Null)) => AcpData::Absent,
+        (AcpError::InternalError, Some(Value::Object(obj)))
+            if obj.get("service").and_then(Value::as_str) == Some("session")
+                && obj.get("errorName").and_then(Value::as_str) == Some("provider.go-limit") =>
+        {
+            AcpData::GoLimit
+        }
+        _ => AcpData::Unclassified,
+    };
+    (acp_error, acp_data)
+}
+
+/// First write wins, except a peer classification replaces `response_timeout`.
+fn record_acp_labels(
+    slot: &Mutex<Option<(AcpError, AcpData)>>,
+    next: (AcpError, AcpData),
+    peer: bool,
+) {
+    let mut guard = slot.lock().unwrap();
+    match *guard {
+        None => *guard = Some(next),
+        Some((AcpError::ResponseTimeout, _)) if peer => *guard = Some(next),
+        Some(_) => {}
+    }
+}
+
+/// SDK-local transport EOF / termination is not a peer JSON-RPC error object
+/// (D107 fixture 8); those map to `unknown` / `absent`.
+fn record_prompt_failure(
+    slot: &Mutex<Option<(AcpError, AcpData)>>,
+    err: &agent_client_protocol::Error,
+) {
+    if agent_client_protocol::is_incoming_transport_closed(err)
+        || agent_client_protocol::is_connection_terminated(err)
+    {
+        record_acp_labels(slot, (AcpError::Unknown, AcpData::Absent), false);
+    } else {
+        record_acp_labels(slot, classify_acp_error(err), true);
+    }
+}
+
 pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
     if runtime.cancelled.is_cancelled() || tokio::time::Instant::now() >= runtime.deadline {
         return Exit::Cancelled;
@@ -137,6 +247,8 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
     let sent = active.clone();
     let terminal = Arc::new(AtomicU8::new(0));
     let finished = terminal.clone();
+    let labels = Arc::new(Mutex::new(None::<(AcpError, AcpData)>));
+    let prompt_labels = labels.clone();
     let connection = Client
         .builder()
         .on_receive_notification(
@@ -433,19 +545,58 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
                 ))
                 .block_task();
             tokio::pin!(response);
+            // Capture peer ACP errors before `is_ok()` drops them (D107). Elapsed
+            // cancel/deadline budgets record response_timeout at the arm and do
+            // not classify the synthetic InternalError.
             let result = tokio::select! {
-                result = &mut response => result?,
+                result = &mut response => match result {
+                    Ok(ok) => ok,
+                    Err(err) => {
+                        record_prompt_failure(&prompt_labels, &err);
+                        return Err(err);
+                    }
+                },
                 _ = runtime.cancelled.cancelled() => {
                     foreground_progress.event("signal; sending session/cancel (5s response budget)");
                     cx.send_notification(CancelNotification::new(session.session_id.clone()))?;
-                    tokio::time::timeout(std::time::Duration::from_secs(5), &mut response).await
-                        .map_err(|_| agent_client_protocol::Error::internal_error())??
+                    match tokio::time::timeout(std::time::Duration::from_secs(5), &mut response)
+                        .await
+                    {
+                        Ok(Ok(ok)) => ok,
+                        Ok(Err(err)) => {
+                            record_prompt_failure(&prompt_labels, &err);
+                            return Err(err);
+                        }
+                        Err(_) => {
+                            record_acp_labels(
+                                &prompt_labels,
+                                (AcpError::ResponseTimeout, AcpData::Absent),
+                                false,
+                            );
+                            return Err(agent_client_protocol::Error::internal_error());
+                        }
+                    }
                 },
                 _ = tokio::time::sleep_until(runtime.deadline) => {
                     foreground_progress.event("deadline; sending session/cancel (5s response budget)");
                     cx.send_notification(CancelNotification::new(session.session_id.clone()))?;
-                    tokio::time::timeout(std::time::Duration::from_secs(5), &mut response).await
-                        .map_err(|_| agent_client_protocol::Error::internal_error())??
+                    match tokio::time::timeout(std::time::Duration::from_secs(5), &mut response)
+                        .await
+                    {
+                        Ok(Ok(ok)) => ok,
+                        Ok(Err(err)) => {
+                            record_prompt_failure(&prompt_labels, &err);
+                            return Err(err);
+                        }
+                        Err(_) => {
+                            record_acp_labels(
+                                &prompt_labels,
+                                (AcpError::ResponseTimeout, AcpData::Absent),
+                                false,
+                            );
+                            return Err(agent_client_protocol::Error::internal_error());
+                        }
+                    }
                 },
             };
             let stop = serde_json::to_value(&result)?;
@@ -490,11 +641,25 @@ pub(crate) async fn run(runtime: &Runtime, request: &Resolved) -> Exit {
         }
     };
     if !result && !violation.failed.load(Ordering::SeqCst) {
-        runtime.progress.event(if active.load(Ordering::SeqCst) {
-            "runtime/provider/transport failure or cancellation response timeout; effects unknown"
+        if active.load(Ordering::SeqCst) {
+            let mut slot = labels.lock().unwrap();
+            let (acp_error, acp_data) =
+                *slot.get_or_insert((AcpError::Unknown, AcpData::Absent));
+            drop(slot);
+            runtime.progress.event(format!(
+                "runtime/provider/transport failure or cancellation response timeout; effects unknown; acp_error={}; acp_data={}",
+                acp_error.as_str(),
+                acp_data.as_str()
+            ));
+            let fields = json!({
+                "acp_error": acp_error.as_str(),
+                "acp_data": acp_data.as_str(),
+            });
+            runtime.progress.note(fields.clone());
+            runtime.progress.emit("attempt.acp_error", fields);
         } else {
-            "setup stopped before prompt submission"
-        });
+            runtime.progress.event("setup stopped before prompt submission");
+        }
     }
     runtime.progress.event("process cleanup started");
     let cleanup = owned.cleanup().await;
@@ -581,8 +746,177 @@ fn bound(permission: &Value, descriptor: Option<&Value>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::bound;
-    use serde_json::json;
+    use super::{
+        AcpData, AcpError, bound, classify_acp_error, record_acp_labels, record_prompt_failure,
+    };
+    use agent_client_protocol::{Error, ErrorCode};
+    use serde_json::{Value, json};
+    use std::sync::Mutex;
+
+    const SECRET: &str = "SECRET_SENTINEL";
+
+    fn assert_labels(error: &Error, expected: (AcpError, AcpData)) {
+        let got = classify_acp_error(error);
+        assert_eq!(got, expected);
+        let rendered = format!("acp_error={}; acp_data={}", got.0.as_str(), got.1.as_str());
+        assert!(!rendered.contains(SECRET), "{rendered}");
+        assert!(!format!("{got:?}").contains(SECRET));
+        assert_ne!(got.0, AcpError::ResponseTimeout);
+        assert_ne!(got.0, AcpError::Unknown);
+    }
+
+    #[test]
+    fn classify_known_codes_drop_canary_message_and_data() {
+        let canary = json!({SECRET: true, "nested": SECRET});
+        for (code, label) in [
+            (ErrorCode::ParseError, AcpError::ParseError),
+            (ErrorCode::InvalidRequest, AcpError::InvalidRequest),
+            (ErrorCode::MethodNotFound, AcpError::MethodNotFound),
+            (ErrorCode::InvalidParams, AcpError::InvalidParams),
+            (ErrorCode::InternalError, AcpError::InternalError),
+            (ErrorCode::RequestCancelled, AcpError::RequestCancelled),
+            (ErrorCode::AuthRequired, AcpError::AuthRequired),
+            (ErrorCode::ResourceNotFound, AcpError::ResourceNotFound),
+        ] {
+            // Present non-null data is unclassified except the go_limit allowlist.
+            assert_labels(
+                &Error::from(code).data(canary.clone()),
+                (label, AcpData::Unclassified),
+            );
+        }
+    }
+
+    #[test]
+    fn classify_other_codes_without_emitting_integer() {
+        for code in [-32099, 0, 1, i32::MIN, i32::MAX] {
+            let error = Error::new(code, SECRET);
+            let (label, data) = classify_acp_error(&error);
+            assert_eq!((label, data), (AcpError::Other, AcpData::Absent));
+            assert_eq!(label.as_str(), "other");
+            let out = format!("{}{}", label.as_str(), data.as_str());
+            assert!(!out.contains(&code.to_string()), "{code} leaked into {out}");
+            assert!(!out.contains(SECRET));
+        }
+    }
+
+    #[test]
+    fn classify_go_limit_allowlist() {
+        let error = Error::internal_error().data(json!({
+            "service": "session",
+            "errorName": "provider.go-limit",
+            SECRET: true,
+        }));
+        assert_labels(&error, (AcpError::InternalError, AcpData::GoLimit));
+    }
+
+    #[test]
+    fn classify_go_limit_near_misses_and_absent_data() {
+        let exact = json!({"service": "session", "errorName": "provider.go-limit"});
+        for data in [
+            json!({"service": "session", "errorName": "provider.go-limit "}),
+            json!({"service": "session", "errorName": "Provider.go-limit"}),
+            json!({"service": "session", "errorName": "provider.go-limit.extra"}),
+            json!({"service": "session", "errorName": SECRET}),
+            json!({"service": "other", "errorName": "provider.go-limit"}),
+            json!({"service": "session", "errorName": {"nested": true}}),
+            json!({"service": "session", "errorName": ["provider.go-limit"]}),
+            json!({"service": "session", "errorName": 1}),
+            json!(SECRET),
+            json!([exact]),
+        ] {
+            assert_labels(
+                &Error::internal_error().data(data),
+                (AcpError::InternalError, AcpData::Unclassified),
+            );
+        }
+        assert_labels(
+            &Error::internal_error(),
+            (AcpError::InternalError, AcpData::Absent),
+        );
+        let mut null_data = Error::internal_error();
+        null_data.data = Some(Value::Null);
+        assert_labels(&null_data, (AcpError::InternalError, AcpData::Absent));
+    }
+
+    #[test]
+    fn classify_non_internal_data_is_unclassified_without_go_limit() {
+        assert_labels(
+            &Error::resource_not_found(Some(SECRET.into())),
+            (AcpError::ResourceNotFound, AcpData::Unclassified),
+        );
+        assert_labels(
+            &Error::auth_required().data(json!({SECRET: true})),
+            (AcpError::AuthRequired, AcpData::Unclassified),
+        );
+        // into_internal_error stuffs the message into data as a string.
+        assert_labels(
+            &Error::into_internal_error(std::io::Error::other(SECRET)),
+            (AcpError::InternalError, AcpData::Unclassified),
+        );
+    }
+
+    #[test]
+    fn classify_large_hostile_message_does_not_enter_labels() {
+        let mut message = String::new();
+        message.push_str(SECRET);
+        message.push('\n');
+        message.push_str("\u{1b}[31m");
+        message.push_str("\u{202e}");
+        message.extend(std::iter::repeat_n('x', 3_000_000));
+        let error = Error::new(-32603, message);
+        let got = classify_acp_error(&error);
+        assert_eq!(got, (AcpError::InternalError, AcpData::Absent));
+        assert_eq!(std::mem::size_of_val(&got), std::mem::size_of::<(AcpError, AcpData)>());
+        assert!(!got.0.as_str().contains(SECRET));
+    }
+
+    #[test]
+    fn transport_closed_records_unknown_not_peer_internal_error() {
+        let closed = Error::internal_error().data(json!({
+            "reason": "incoming_transport_closed",
+            "method": "session/prompt",
+        }));
+        assert!(agent_client_protocol::is_incoming_transport_closed(&closed));
+        let slot = Mutex::new(None);
+        record_prompt_failure(&slot, &closed);
+        assert_eq!(
+            *slot.lock().unwrap(),
+            Some((AcpError::Unknown, AcpData::Absent))
+        );
+        let peer = Error::internal_error().data(json!({
+            "service": "session",
+            "errorName": "provider.go-limit",
+        }));
+        let peer_slot = Mutex::new(None);
+        record_prompt_failure(&peer_slot, &peer);
+        assert_eq!(
+            *peer_slot.lock().unwrap(),
+            Some((AcpError::InternalError, AcpData::GoLimit))
+        );
+    }
+
+    #[test]
+    fn label_store_first_write_wins_except_peer_replaces_timeout() {
+        let slot = Mutex::new(None);
+        record_acp_labels(&slot, (AcpError::ResponseTimeout, AcpData::Absent), false);
+        record_acp_labels(&slot, (AcpError::InternalError, AcpData::GoLimit), true);
+        assert_eq!(
+            *slot.lock().unwrap(),
+            Some((AcpError::InternalError, AcpData::GoLimit))
+        );
+        record_acp_labels(&slot, (AcpError::Unknown, AcpData::Absent), false);
+        assert_eq!(
+            *slot.lock().unwrap(),
+            Some((AcpError::InternalError, AcpData::GoLimit))
+        );
+        let fresh = Mutex::new(None);
+        record_acp_labels(&fresh, (AcpError::AuthRequired, AcpData::Absent), true);
+        record_acp_labels(&fresh, (AcpError::ResponseTimeout, AcpData::Absent), false);
+        assert_eq!(
+            *fresh.lock().unwrap(),
+            Some((AcpError::AuthRequired, AcpData::Absent))
+        );
+    }
 
     #[test]
     fn grants_bind_exact_arguments_of_a_supported_kind() {

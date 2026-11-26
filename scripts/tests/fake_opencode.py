@@ -182,7 +182,7 @@ for line in sys.stdin:
         if case == 'remove-check':
             # P5.5: a pinned program that vanishes before the gate is an error.
             os.remove(json.loads((cwd / 'ah.json').read_text())['checks']['test']['argv'][0])
-        if case in ['deadline', 'interrupt','cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission','cancel-term']:
+        if case in ['deadline', 'interrupt','cancel-ack','cancel-success','cancel-ack-only','cancel-rpc-error','cancel-deadline','cancel-permission','cancel-term']:
             continue
         if case == 'sequence':
             # P5.2: each step's prompt names its behavior; record what arrived.
@@ -243,7 +243,10 @@ for line in sys.stdin:
             os.write(1, b'\xff\n')
             break
         if case == 'rpc-error':
-            send(dict(jsonrpc='2.0',id=prompt_id,error=dict(code=-32603,message='SECRET_SENTINEL')))
+            # Canary in message and data; classifier must keep only closed labels.
+            send(dict(jsonrpc='2.0',id=prompt_id,error=dict(
+                code=-32603, message='SECRET_SENTINEL',
+                data=dict(detail='SECRET_SENTINEL'))))
             continue
         if case == 'go-limit-rpc':
             # ACP 2.3.0 translates a Go limit into a session service failure.
@@ -311,6 +314,11 @@ for line in sys.stdin:
         elif case == 'cancel-ack-only':
             # A notification/ACK is not a trustworthy terminal response.
             update(sessionUpdate='agent_message_chunk',content=dict(type='text',text='cancel acknowledged'))
+        elif case == 'cancel-rpc-error':
+            # Peer error during the cancel response budget (D107 fixture 7).
+            send(dict(jsonrpc='2.0', id=prompt_id, error=dict(
+                code=-32603, message='SECRET_SENTINEL',
+                data=dict(service='session', errorName='provider.go-limit'))))
     elif m.get('id') in (100, 101, 102):
         with open(cwd / 'permission-results.jsonl', 'a') as results:
             results.write(json.dumps(m) + '\n')

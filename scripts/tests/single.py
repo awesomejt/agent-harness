@@ -66,7 +66,7 @@ def check(case, expected, trusted=False, source='inline', grouped=False):
         if pipe_write is not None:
             os.close(pipe_write)
             p.stderr=os.fdopen(pipe_read,'r')
-        if case in ['interrupt','before-prompt','cancel-ack','cancel-success','cancel-ack-only','cancel-permission','cancel-term']:
+        if case in ['interrupt','before-prompt','cancel-ack','cancel-success','cancel-ack-only','cancel-rpc-error','cancel-permission','cancel-term']:
             marker = base / ('prompted' if case != 'before-prompt' else 'pids.json')
             until = time.monotonic()+10
             while not marker.exists() and p.poll() is None and time.monotonic()<until:
@@ -137,7 +137,7 @@ def check(case, expected, trusted=False, source='inline', grouped=False):
         if (base/'prompted').exists() and case != 'blocked-stderr':
             assert 'attempt=1' in err and 'usage=' in err and 'outcome=' in err, (case,err)
             assert ('ah-litellm/fixture (group coder)' in err) == grouped, (case,err)
-        if case in ['cancel-ack','cancel-success','cancel-ack-only','cancel-deadline','cancel-permission','cancel-term']:
+        if case in ['cancel-ack','cancel-success','cancel-ack-only','cancel-rpc-error','cancel-deadline','cancel-permission','cancel-term']:
             assert (base/'cancelled').exists(),case
         if case == 'session-controls':
             assert not any(c in err for c in ['\u009b','\u202e','\x1b']),repr(err)
@@ -155,6 +155,7 @@ def check(case, expected, trusted=False, source='inline', grouped=False):
         if expected == 4:
             assert 'uncertain' in err
         print('PASS',case,source,'trusted' if trusted else 'deny',flush=True)
+        return err
 
 
 for case in ['version','version-old','version-new','route','widened','agent-widened','agent-reversed','empty','project-source','subagent-widened','agent-model',
@@ -171,11 +172,16 @@ for case in ['other','worktree','no-once','kind-mismatch','unbound','argument-mi
     check(case,3,trusted=True)
 check('deny',3)
 check('deny-progress',0)
-check('deny-completed',4)
+err = check('deny-completed',4)
+assert 'acp_error=' not in err, err
 check('success',0,grouped=True)
 check('read',0,trusted=True,grouped=True)
 for case in ['triplicate','duplicate','empty-id','wrong-session','eof','oversized','deadline','interrupt','unexpected-write']:
-    check(case,4,trusted=True)
+    err = check(case,4,trusted=True)
+    if case == 'eof':
+        assert 'acp_error=unknown' in err and 'acp_data=absent' in err, err
+err = check('cancel-rpc-error', 4)
+assert 'acp_error=internal_error' in err and 'acp_data=go_limit' in err, err
 check('before-prompt',3)
 check('backend-cancelled',3)
 check('session-model',1)
@@ -188,7 +194,11 @@ for case in ['stderr-noise','progress','blocked-stderr']:
 check('blocked-stdout',1)
 check('known-failure',1)
 for case in ['invalid-utf8','truncated-json','rpc-error','cancel-ack-only']:
-    check(case,4)
+    err = check(case,4)
+    if case == 'rpc-error':
+        assert 'acp_error=internal_error' in err and 'acp_data=unclassified' in err, err
+    if case == 'cancel-ack-only':
+        assert 'acp_error=response_timeout' in err and 'acp_data=absent' in err, err
 check('cancel-ack',3)
 check('cancel-term',3)
 check('cancel-deadline',3)

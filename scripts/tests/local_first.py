@@ -117,7 +117,8 @@ unreachable = closed_endpoint()
 # Reachable LiteLLM: local attempt only; every later outcome is final.
 check('success', 0, ['local'], reachable)
 check('session-model', 1, ['local'], reachable)
-check('rpc-error', 4, ['local'], reachable)
+err = check('rpc-error', 4, ['local'], reachable)
+assert 'acp_error=internal_error' in err and 'acp_data=unclassified' in err, err
 check('version', 2, [], reachable)
 check('success', 2, [], reachable, extra=['--no-sync'])  # static plan rejects before the check
 assert listener.connections >= 4 and listener.received == b'', (listener.connections, listener.received)
@@ -136,7 +137,9 @@ check('cancel-deadline', 3, ['native'], unreachable, timeout='1')
 err = check('success', 0, ['native'], unreachable, target='opencode-go')
 assert 'model opencode-go/fixture' in err, err
 check('read', 0, ['native'], unreachable, extra=['--permissions', 'trusted'], target='opencode-go')
-check('go-limit-rpc', 4, ['native'], unreachable, target='opencode-go')
+err = check('go-limit-rpc', 4, ['native'], unreachable, target='opencode-go')
+assert 'acp_error=internal_error' in err and 'acp_data=go_limit' in err, err
+assert 'attempt=3' not in err, err
 check('go-title-missing', 2, [], unreachable, target='opencode-go')
 check('success', 0, ['local'], reachable, target='opencode-go')
 
