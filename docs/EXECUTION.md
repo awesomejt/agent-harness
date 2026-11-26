@@ -81,8 +81,9 @@ response-budget timeout, or finished connection without a stored label records
 closed `acp_error` / `acp_data` labels (D107) on the attempt summary and an
 `attempt.acp_error` machine record; message and non-allowlisted data are
 dropped, and the labels do not change exit 4, D031, or D034. The
-implementation has offline fixture coverage; its live coding and
-constrained-review acceptance is pending.
+implementation has offline fixture coverage; live coding and constrained-review
+acceptance passed with the Personal OpenCode Model Access key on OpenCode 2.4.1
+([evidence](evidence/p7-12-go-live-model-access-result.md)).
 
 P7.2 ([D052](../DECISIONS.md#2026-11-06--d052-claude-as-the-configured-pre-submission-native-fallback)) also permits `native.target: "claude"` as that one fallback. The coordinator, eligibility and shared deadline are unchanged. Claude runs its complete D048–D050 preflight before the prompt, using the official CLI login, the same project instructions and canonical role, and fresh request-bound grants. A failed Claude setup, terminal error, cancellation or uncertain result ends the run without another attempt. Capability checks cover both runtimes before the probe: OpenCode still refuses non-default role effort, and Claude refuses bodies above 128 KiB. Workflow records name the fallback `claude/MODEL`; machine attempt 2 reports `runtime: "claude"`, the bare model and `route: "local-first fallback"`.
 
