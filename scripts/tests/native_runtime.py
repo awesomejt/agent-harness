@@ -47,7 +47,9 @@ def main():
     target = 'opencode-go' if go else 'opencode'
     model = 'beam-free' if go else 'gpt-5.4'
     runtime = shutil.which('opencode')
-    assert runtime, 'OpenCode 2.3.0 required'
+    assert runtime, 'OpenCode 2.3.x or 2.4.x required'
+    version = subprocess.run([runtime, '--version'], capture_output=True, text=True, timeout=10)
+    assert version.returncode == 0 and version.stdout.strip().startswith(('opencode v2.3.', 'opencode v2.4.')), version.stdout
     runtime = str(Path(runtime).resolve())
     with tempfile.TemporaryDirectory(prefix='ah-native-runtime-') as d:
         base = Path(d).resolve()

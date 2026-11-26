@@ -190,12 +190,16 @@ def main():
                 commands = direct(runtime, base, str(named), named, port)
                 markers = set().union(*(r['markers'] for r in server.records))
                 assert markers == ({'M_AGENTS_ROOT'} if named else set()), (named, markers)
-            assert commands in (['init', 'review', 'goal', 'compact'], ['init', 'review', 'goal', 'automation', 'compact']), commands
+            version = subprocess.run([runtime, '--version'], capture_output=True, text=True, timeout=10).stdout.strip()
+            expected_commands = (['init', 'review', 'goal', 'automation', 'compact'] if version.startswith('opencode v2.4.')
+                                 else ['init', 'review', 'goal', 'compact'])
+            assert commands == expected_commands, (version, commands)
             checks.append('direct: AGENTS.md loads only when named; built-in command inventory checked')
 
             project, sentinels = plant(base, port)
             abs_sub = str(project / 'sub/file.txt')
-            # Trusted unnamed: denied/unavailable tool paths, then a granted nested read.
+            # Exact tool inventory excludes automation; also probe the 2.4.1 source namespace automation.create.
+            # Then exercise denied/unavailable tool paths and a granted nested read.
             p, primary, helpers = run(project, 'Probe capabilities', [
                 ('skill', dict(id='oc')), ('task', dict(description='d', prompt='p', subagent_type='general')),
                 ('webfetch', dict(url='http://127.0.0.1:9/')), ('automation.create', dict()), ('read', dict(path=abs_sub))],

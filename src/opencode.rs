@@ -1,4 +1,4 @@
-//! Supported OpenCode 2.3.x and 2.4.x runtime surface: native-schema config for both
+//! Supported OpenCode 2.3.x and 2.4.x runtime surface (D106; extends D104/D092): native-schema config for both
 //! routes, project agent emission, named-role mapping (D038), and pure
 //! validators for its configuration sources, agents and catalog.
 use crate::agents::{self, Agent, Capacity, Effort, Tool};
