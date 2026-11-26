@@ -92,7 +92,8 @@ uncertain after submission, record the closed `acp_error` / `acp_data` labels
 from the sanitized driver output; do not collect raw error text, account state,
 or another request merely to explain it. Do not deliberately exhaust allowance.
 This setup alone does not complete P7.12. A separate result review and PR merge
-are required after the live run.
+are required after the live run. The first attested continuation result is
+recorded in [p7-12-go-live-result.md](p7-12-go-live-result.md) (`auth_required`).
 
 ## Verification
 
