@@ -4,7 +4,7 @@ Last updated: 2026-11-26. Status is maintained here; phase contracts are in [doc
 
 ## Current state
 
-- **P7.12 live continuation result (auth_required):** After [setup PR #140](https://github.com/awesomejt/agent-harness/pull/140) and a fresh U3/U4 attestation (Personal workspace, Extra Usage off, `beam-free`), one `go_live.py` cloud-only reviewer run on OpenCode 2.4.1 submitted then stopped uncertain (exit 4) with D107 labels `acp_error=auth_required`, `acp_data=unclassified`, cleanup confirmed, zero grants/tools ([result](docs/evidence/p7-12-go-live-result.md)). Digests matched the continuation record. No retry. The 2026-11-25 stop remains unclassified ([prior](docs/evidence/p7-12-go-live-setup.md#bounded-live-observation--stopped)). P7.12 remains open; operator must confirm the Personal-workspace API key before another attested attempt.
+- **P7.12 Model Access live setup:** Console evidence showed the prior stop used the Personal **MacBookPro (Read only)** key ([`auth_required` result](docs/evidence/p7-12-go-live-result.md)). A **new** reviewed attempt setup selects the Personal **OpenCode Model Access** (7 scopes) key as `P712_KEY` / `OPENCODE_API_KEY` ([setup](docs/evidence/p7-12-go-live-model-access-setup.md)); MacBookPro is excluded. Personal workspace confirmed; Extra Usage-off carries from same-day Go-page attestation (new screenshots do not re-show that toggle). No live prompt in the setup increment. P7.12 remains open.
 
 - **OpenCode 2.4 qualification (D106; effective on this increment’s merge):** Homebrew supplied 2.4.1; the compatibility increment tests isolated local execution and intercepted Go setup. P7.12 live coding and constrained review remain separately gated. [Evidence](docs/evidence/opencode-2-4-compatibility.md).
 
